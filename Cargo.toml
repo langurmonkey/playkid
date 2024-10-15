@@ -1,0 +1,10 @@
+[package]
+name = "playkid"
+version = "0.1.0"
+description = "Game Boy emulator"
+authors = ["Toni Sagristà Sellés <me@tonisagrista.com>"]
+edition = "2021"
+
+[dependencies]
+sdl2 = "0.37.*"
+clap = "4.5.*"
