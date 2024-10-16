@@ -1,3 +1,5 @@
+mod constants;
+mod instruction;
 mod machine;
 
 fn main() {
