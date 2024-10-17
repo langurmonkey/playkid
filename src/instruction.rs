@@ -75,6 +75,21 @@ pub enum Instruction {
     XOR(R8),
     OR(R8),
     CP(R8),
+
+    // Bit shifts.
+    RLCA(),
+    RRCA(),
+    RLA(),
+    RRA(),
+
+    // Decimal adjust accumulator.
+    DAA(),
+    // Set carry flag.
+    SCF(),
+    // Complement accumulator.
+    CPL(),
+    // Complement carry flag.
+    CCF(),
 }
 
 impl Instruction {
@@ -305,6 +320,24 @@ impl Instruction {
             0x2D => Some(Instruction::DEC(R8::L)),
             0x35 => Some(Instruction::DEC(R8::HL)),
             0x3D => Some(Instruction::DEC(R8::A)),
+
+            // RRCA
+            0x0F => Some(Instruction::RRCA()),
+            // RRA
+            0x1F => Some(Instruction::RRA()),
+            // RLCA
+            0x07 => Some(Instruction::RLCA()),
+            // RLA
+            0x17 => Some(Instruction::RLA()),
+
+            // DAA
+            0x27 => Some(Instruction::DAA()),
+            // SCF
+            0x37 => Some(Instruction::SCF()),
+            // CPL
+            0x2F => Some(Instruction::CPL()),
+            // CCF
+            0x3F => Some(Instruction::CCF()),
 
             // Not found!
             _ => panic!("Instruction is not implemented: {:#04X}", byte),
