@@ -143,6 +143,8 @@ pub enum Instruction {
 
     // Return.
     RET(CC),
+    // Return interrupt-service routine.
+    RETI(),
 
     // 16-bit opcodes.
     OPCODE16(),
@@ -430,6 +432,7 @@ impl Instruction {
             0xC8 => Some(Instruction::RET(CC::Z)),
             0xD8 => Some(Instruction::RET(CC::C)),
             0xC9 => Some(Instruction::RET(CC::NONE)),
+            0xD9 => Some(Instruction::RETI()),
 
             // POP
             0xC1 => Some(Instruction::POP(R16EXT::BC)),

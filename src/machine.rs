@@ -1237,6 +1237,14 @@ impl GameBoy {
             }
 
             // RET
+            Instruction::RET(cc) => match cc {
+                CC::NZ => {}
+                CC::NC => {}
+                CC::Z => {}
+                CC::C => {}
+                CC::NONE => {}
+            },
+            // RETI
 
             // POP
 
