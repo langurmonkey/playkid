@@ -1,7 +1,7 @@
 use crate::constants;
 use crate::instruction;
 
-use instruction::{Instruction, CC, CC, R16, R16EXT, R16LD, R8, TGT3};
+use instruction::{Instruction, CC, R16, R16EXT, R16LD, R8, TGT3};
 
 /// # Registers
 /// We have 7 1-bit registers (`a`, `b`, `c`, `d`, `e`, `h`, `l`) which can be accessed individually,
@@ -1151,6 +1151,103 @@ impl GameBoy {
                 }
             },
 
+            // RLCA
+            Instruction::RLCA() => {
+                self.registers.a = self.rlc(self.registers.a);
+                self.registers.z(false);
+                1
+            }
+            // RRCA
+            Instruction::RRCA() => {
+                self.registers.a = self.rrc(self.registers.a);
+                self.registers.z(false);
+                1
+            }
+
+            // RLA
+            Instruction::RLA() => {
+                self.registers.a = self.rl(self.registers.a);
+                self.registers.z(false);
+                1
+            }
+            // RRA
+            Instruction::RRA() => {
+                self.registers.a = self.rr(self.registers.a);
+                self.registers.z(false);
+                1
+            }
+
+            // DAA
+            Instruction::DAA() => {
+                // Apply corrections after addition or subtraction of two BCD numbers, whose result
+                // is in `a`, and goes to `a`.
+                // What we do:
+                // - If addition, add 6 to each digit > 9, or if (half-)carry.
+                // - If subtraction, subtract 6 from each digit > 9, or if (half-)carry.
+                let mut a = self.registers.a;
+                let c = self.registers.get_flag_c();
+                let h = self.registers.get_flag_h();
+                let n = self.registers.get_flag_n();
+
+                if !n {
+                    // After addition.
+                    if c || a > 0x99 {
+                        a += 0x60;
+                        self.registers.c(true);
+                    }
+                    if h || (a & 0x0F) > 0x09 {
+                        a += 0x6;
+                    }
+                } else {
+                    // After subtraction.
+                    if c {
+                        a -= 0x60;
+                    }
+                    if h {
+                        a -= 0x6;
+                    }
+                }
+                self.registers.z(a == 0);
+                self.registers.h(false);
+                self.registers.a = a;
+                1
+            }
+            // SCF
+            Instruction::SCF() => {
+                self.registers.c(true);
+                self.registers.h(true);
+                self.registers.n(true);
+                1
+            }
+            // CPL
+            Instruction::CPL() => {
+                // Bitwise not of `a`.
+                self.registers.a = !self.registers.a;
+                self.registers.h(true);
+                self.registers.n(true);
+                1
+            }
+            // CCF
+            Instruction::CCF() => {
+                // Flip carry flag.
+                self.registers.c(!self.registers.get_flag_c());
+                self.registers.h(false);
+                self.registers.n(false);
+                1
+            }
+
+            // RET
+
+            // POP
+
+            // PUSH
+
+            // CALL
+
+            // RST
+
+            // DI
+            // EI
             _ => {
                 // TODO: More instructions.
                 0
@@ -1203,6 +1300,41 @@ impl GameBoy {
         self.registers.z(result == 0);
         self.registers.h((value & 0x0F) == 0);
         self.registers.n(true);
+        result
+    }
+
+    fn rotate_flags(&mut self, result: u8, carry: bool) {
+        self.registers.z(result == 0);
+        self.registers.c(carry);
+        self.registers.h(false);
+        self.registers.n(false);
+    }
+
+    fn rlc(&mut self, val: u8) -> u8 {
+        let carry = val & 0x80 > 0;
+        let result = (val << 1) | (if carry { 1 } else { 0 });
+        self.rotate_flags(result, carry);
+        result
+    }
+
+    fn rl(&mut self, val: u8) -> u8 {
+        let carry = val & 0x80 > 0;
+        let result = (val << 1) | (if self.registers.get_flag_c() { 1 } else { 0 });
+        self.rotate_flags(result, carry);
+        result
+    }
+
+    fn rrc(&mut self, val: u8) -> u8 {
+        let carry = val & 0x01 > 0;
+        let result = (val >> 1) | (if carry { 0x80 } else { 0 });
+        self.rotate_flags(result, carry);
+        result
+    }
+
+    fn rr(&mut self, val: u8) -> u8 {
+        let carry = val & 0x01 > 0;
+        let result = (val >> 1) | (if self.registers.get_flag_c() { 0x80 } else { 0 });
+        self.rotate_flags(result, carry);
         result
     }
 
