@@ -1,7 +1,7 @@
 use crate::constants;
 use crate::instruction;
 
-use instruction::{Instruction, CC, R16, R8};
+use instruction::{Instruction, CC, CC, R16, R16EXT, R16LD, R8, TGT3};
 
 /// # Registers
 /// We have 7 1-bit registers (`a`, `b`, `c`, `d`, `e`, `h`, `l`) which can be accessed individually,
@@ -54,6 +54,16 @@ impl Registers {
     }
     fn get_hl(&self) -> u16 {
         (self.h as u16) << 8 | self.l as u16
+    }
+    fn get_hl_plus(&mut self) -> u16 {
+        let result = self.get_hl();
+        self.set_hl(result + 1);
+        result
+    }
+    fn get_hl_minus(&mut self) -> u16 {
+        let result = self.get_hl();
+        self.set_hl(result - 1);
+        result
     }
     fn set_hl(&mut self, value: u16) {
         self.h = ((value & 0xFF00) >> 8) as u8;
@@ -476,8 +486,8 @@ impl GameBoy {
                     2
                 }
                 R8::HL => {
-                    let v = self.read8();
-                    self.memory.write(self.registers.get_hl(), v);
+                    let val = self.read8();
+                    self.memory.write(self.registers.get_hl(), val);
                     3
                 }
                 R8::A => {
@@ -486,7 +496,94 @@ impl GameBoy {
                 }
             },
 
-            // ADD r16
+            // LD x, A
+            Instruction::LDfromA(r16ld) => match r16ld {
+                R16LD::BC => {
+                    self.memory.write(self.registers.get_bc(), self.registers.a);
+                    2
+                }
+                R16LD::DE => {
+                    self.memory.write(self.registers.get_de(), self.registers.a);
+                    2
+                }
+                R16LD::HLp => {
+                    self.memory
+                        .write(self.registers.get_hl_plus(), self.registers.a);
+                    2
+                }
+                R16LD::HLm => {
+                    self.memory
+                        .write(self.registers.get_hl_minus(), self.registers.a);
+                    2
+                }
+                R16LD::A8 => {
+                    let val = 0xFF00 | (self.read8() as u16);
+                    self.memory.write(val, self.registers.a);
+                    3
+                }
+                R16LD::C => {
+                    self.memory
+                        .write(0xFF00 | (self.registers.c as u16), self.registers.a);
+                    2
+                }
+                R16LD::A16 => {
+                    let val = self.read16();
+                    self.memory.write(val, self.registers.a);
+                    4
+                }
+            },
+            // LD A, x
+            Instruction::LDtoA(r16ld) => match r16ld {
+                R16LD::BC => {
+                    self.registers.a = self.memory.read(self.registers.get_bc());
+                    2
+                }
+                R16LD::DE => {
+                    self.registers.a = self.memory.read(self.registers.get_de());
+                    2
+                }
+                R16LD::HLp => {
+                    self.registers.a = self.memory.read(self.registers.get_hl_plus());
+                    2
+                }
+                R16LD::HLm => {
+                    self.registers.a = self.memory.read(self.registers.get_hl_minus());
+                    2
+                }
+                R16LD::A8 => {
+                    let val = 0xFF00 | (self.read8() as u16);
+                    self.registers.a = self.memory.read(val);
+                    3
+                }
+                R16LD::C => {
+                    self.registers.a = self.memory.read(0xFF00 | (self.registers.c as u16));
+                    2
+                }
+                R16LD::A16 => {
+                    let val = self.read16();
+                    self.registers.a = self.memory.read(val);
+                    4
+                }
+            },
+
+            // LD x, SP
+            Instruction::LDfromSP() => {
+                let val = self.add16imm(self.registers.sp);
+                self.registers.set_hl(val);
+                3
+            }
+            // LD SP, x
+            Instruction::LDtoSP() => {
+                self.registers.sp = self.registers.get_hl();
+                2
+            }
+            // ADD SP, s8
+            Instruction::ADDSP() => {
+                self.registers.pc = self.add16imm(self.registers.sp);
+                4
+            }
+
+            // ADD HL, r16
             Instruction::ADD16(r16) => match r16 {
                 R16::BC => {
                     self.add16(self.registers.get_bc());
@@ -506,7 +603,7 @@ impl GameBoy {
                 }
             },
 
-            // ADD r8
+            // ADD a, r8
             Instruction::ADD(r8) => match r8 {
                 R8::A => {
                     self.add(self.registers.a, false);
@@ -542,7 +639,7 @@ impl GameBoy {
                     2
                 }
             },
-            // ADC r8
+            // ADC a, r8
             Instruction::ADC(r8) => match r8 {
                 R8::A => {
                     self.add(self.registers.a, true);
@@ -578,7 +675,7 @@ impl GameBoy {
                     2
                 }
             },
-            // SUB r8
+            // SUB a, r8
             Instruction::SUB(r8) => match r8 {
                 R8::A => {
                     self.sub(self.registers.a, false);
@@ -614,7 +711,7 @@ impl GameBoy {
                     2
                 }
             },
-            // SBC r8
+            // SBC a, r8
             Instruction::SBC(r8) => match r8 {
                 R8::A => {
                     self.sub(self.registers.a, true);
@@ -650,7 +747,7 @@ impl GameBoy {
                     2
                 }
             },
-            // AND r8
+            // AND a, r8
             Instruction::AND(r8) => match r8 {
                 R8::A => {
                     self.and(self.registers.a);
@@ -686,7 +783,7 @@ impl GameBoy {
                     2
                 }
             },
-            // XOR r8
+            // XOR a, r8
             Instruction::XOR(r8) => match r8 {
                 R8::A => {
                     self.xor(self.registers.a);
@@ -722,7 +819,7 @@ impl GameBoy {
                     2
                 }
             },
-            // OR r8
+            // OR a, r8
             Instruction::OR(r8) => match r8 {
                 R8::A => {
                     self.or(self.registers.a);
@@ -758,7 +855,7 @@ impl GameBoy {
                     2
                 }
             },
-            // CP r8
+            // CP a, r8
             Instruction::CP(r8) => match r8 {
                 R8::A => {
                     self.cp(self.registers.a);
@@ -794,13 +891,105 @@ impl GameBoy {
                     2
                 }
             },
-            // JP
-            Instruction::JP() => {
+            // ADD a, d8
+            Instruction::ADDimm() => {
+                let val = self.read8();
+                self.add(val, false);
+                2
+            }
+            // ADC a, d8
+            Instruction::ADCimm() => {
+                let val = self.read8();
+                self.add(val, true);
+                2
+            }
+            // SUB a, d8
+            Instruction::SUBimm() => {
+                let val = self.read8();
+                self.sub(val, false);
+                2
+            }
+            // SBC a, d8
+            Instruction::SBCimm() => {
+                let val = self.read8();
+                self.sub(val, true);
+                2
+            }
+            // AND a, d8
+            Instruction::ANDimm() => {
+                let val = self.read8();
+                self.and(val);
+                2
+            }
+            // XOR a, d8
+            Instruction::XORimm() => {
+                let val = self.read8();
+                self.xor(val);
+                2
+            }
+            // OR a, d8
+            Instruction::ORimm() => {
+                let val = self.read8();
+                self.or(val);
+                2
+            }
+            // CP a, d8
+            Instruction::CPimm() => {
+                let val = self.read8();
+                self.cp(val);
+                2
+            }
+
+            // JP HL
+            Instruction::JPHL() => {
                 self.registers.pc = self.registers.get_hl();
                 1
             }
-            // JR
-            Instruction::JR(cc) => match (cc) {
+            // JP cond, a16
+            Instruction::JP(cc) => match cc {
+                CC::NONE => {
+                    self.jp();
+                    4
+                }
+                CC::NZ => {
+                    if !self.registers.get_flag_z() {
+                        self.jp();
+                        4
+                    } else {
+                        self.registers.pc += 2;
+                        3
+                    }
+                }
+                CC::Z => {
+                    if self.registers.get_flag_z() {
+                        self.jp();
+                        4
+                    } else {
+                        self.registers.pc += 2;
+                        3
+                    }
+                }
+                CC::NC => {
+                    if !self.registers.get_flag_c() {
+                        self.jp();
+                        4
+                    } else {
+                        self.registers.pc += 2;
+                        3
+                    }
+                }
+                CC::C => {
+                    if self.registers.get_flag_c() {
+                        self.jp();
+                        4
+                    } else {
+                        self.registers.pc += 2;
+                        3
+                    }
+                }
+            },
+            // JR cond, a16
+            Instruction::JR(cc) => match cc {
                 CC::NONE => {
                     self.jr();
                     3
@@ -842,6 +1031,126 @@ impl GameBoy {
                     }
                 }
             },
+
+            // INC r16
+            Instruction::INC16(r16) => match r16 {
+                R16::BC => {
+                    self.registers
+                        .set_bc(self.registers.get_bc().wrapping_add(1));
+                    2
+                }
+                R16::DE => {
+                    self.registers
+                        .set_de(self.registers.get_de().wrapping_add(1));
+                    2
+                }
+                R16::HL => {
+                    self.registers
+                        .set_hl(self.registers.get_hl().wrapping_add(1));
+                    2
+                }
+                R16::SP => {
+                    self.registers.sp = self.registers.sp.wrapping_add(1);
+                    2
+                }
+            },
+            // DEC r16
+            Instruction::DEC16(r16) => match r16 {
+                R16::BC => {
+                    self.registers
+                        .set_bc(self.registers.get_bc().wrapping_sub(1));
+                    2
+                }
+                R16::DE => {
+                    self.registers
+                        .set_de(self.registers.get_de().wrapping_sub(1));
+                    2
+                }
+                R16::HL => {
+                    self.registers
+                        .set_hl(self.registers.get_hl().wrapping_sub(1));
+                    2
+                }
+                R16::SP => {
+                    self.registers.sp = self.registers.sp.wrapping_sub(1);
+                    2
+                }
+            },
+            // INC r8
+            Instruction::INC(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.inc(self.registers.b);
+                    1
+                }
+                R8::C => {
+                    self.registers.c = self.inc(self.registers.c);
+                    1
+                }
+                R8::D => {
+                    self.registers.d = self.inc(self.registers.d);
+                    1
+                }
+                R8::E => {
+                    self.registers.e = self.inc(self.registers.e);
+                    1
+                }
+                R8::H => {
+                    self.registers.h = self.inc(self.registers.h);
+                    1
+                }
+                R8::L => {
+                    self.registers.l = self.inc(self.registers.l);
+                    1
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val_inc = self.inc(self.memory.read(hl));
+                    self.memory.write(hl, val_inc);
+                    3
+                }
+                R8::A => {
+                    self.registers.a = self.inc(self.registers.a);
+                    1
+                }
+            },
+            // DEC r8
+            Instruction::DEC(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.dec(self.registers.b);
+                    1
+                }
+                R8::C => {
+                    self.registers.c = self.dec(self.registers.c);
+                    1
+                }
+                R8::D => {
+                    self.registers.d = self.dec(self.registers.d);
+                    1
+                }
+                R8::E => {
+                    self.registers.e = self.dec(self.registers.e);
+                    1
+                }
+                R8::H => {
+                    self.registers.h = self.dec(self.registers.h);
+                    1
+                }
+                R8::L => {
+                    self.registers.l = self.dec(self.registers.l);
+                    1
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val_dec = self.dec(self.memory.read(hl));
+                    self.memory.write(hl, val_dec);
+                    3
+                }
+                R8::A => {
+                    self.registers.a = self.inc(self.registers.a);
+                    1
+                }
+            },
+
             _ => {
                 // TODO: More instructions.
                 0
@@ -872,9 +1181,29 @@ impl GameBoy {
         result
     }
 
+    fn jp(&mut self) {
+        self.registers.pc = self.read16();
+    }
+
     fn jr(&mut self) {
         let j = self.read8() as i8;
         self.registers.pc = ((self.registers.pc as i32) + (j as i32)) as u16;
+    }
+
+    fn inc(&mut self, value: u8) -> u8 {
+        let result = value.wrapping_add(1);
+        self.registers.z(result == 0);
+        self.registers.h((value & 0x0F) + 1 > 0x0F);
+        self.registers.n(false);
+        result
+    }
+
+    fn dec(&mut self, value: u8) -> u8 {
+        let result = value.wrapping_sub(1);
+        self.registers.z(result == 0);
+        self.registers.h((value & 0x0F) == 0);
+        self.registers.n(true);
+        result
     }
 
     /// Adds the given 16-bit value to `hl`.
@@ -893,6 +1222,16 @@ impl GameBoy {
 
         // Result -> hl.
         self.registers.set_hl(result);
+    }
+
+    /// Adds the given value to the next immediate 16-bit signed number, and update flags.
+    fn add16imm(&mut self, value: u16) -> u16 {
+        let v: u16 = self.read8() as i8 as i16 as u16;
+        self.registers.n(false);
+        self.registers.z(false);
+        self.registers.h((value & 0x000F) + (v & 0x000F) > 0x000F);
+        self.registers.c((value & 0x00FF) + (v & 0x00FF) > 0x00FF);
+        value.wrapping_add(v)
     }
 
     /// Adds the given byte to the register `a` and updates the flags.
