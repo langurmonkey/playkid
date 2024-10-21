@@ -58,6 +58,7 @@ pub enum TGT3 {
     T7,
 }
 
+/// # Instruction
 /// This enum contains all supported instructions.
 /// Instructions that can act with both r8 and r16 registers are first named
 /// by default in their r8 version. The r16 versions add a `16` at the end of the name.
