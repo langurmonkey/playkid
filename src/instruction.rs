@@ -23,7 +23,6 @@ pub enum R16EXT {
     BC,
     DE,
     HL,
-    SP,
     AF,
 }
 
@@ -146,8 +145,78 @@ pub enum Instruction {
     // Return interrupt-service routine.
     RETI(),
 
-    // 16-bit opcodes.
+    // 16-bit opcodes (below).
+    // This virtual instruction leads to interpreting the next byte as some
+    // of the opcodes immediately following.
     OPCODE16(),
+
+    // RLC r8
+    RLC(R8),
+    // RRC r8
+    RRC(R8),
+    // RL r8
+    RL(R8),
+    // RR r8
+    RR(R8),
+    // SLA r8
+    SLA(R8),
+    // SRA r8
+    SRA(R8),
+    // SWAP r8
+    SWAP(R8),
+    // SRL r8
+    SRL(R8),
+
+    // BIT0 r8
+    BIT0(R8),
+    // BIT1 r8
+    BIT1(R8),
+    // BIT2 r8
+    BIT2(R8),
+    // BIT3 r8
+    BIT3(R8),
+    // BIT4 r8
+    BIT4(R8),
+    // BIT5 r8
+    BIT5(R8),
+    // BIT6 r8
+    BIT6(R8),
+    // BIT7 r8
+    BIT7(R8),
+
+    // RES0 r8
+    RES0(R8),
+    // RES1 r8
+    RES1(R8),
+    // RES2 r8
+    RES2(R8),
+    // RES3 r8
+    RES3(R8),
+    // RES4 r8
+    RES4(R8),
+    // RES5 r8
+    RES5(R8),
+    // RES6 r8
+    RES6(R8),
+    // RES7 r8
+    RES7(R8),
+
+    // SET0 r8
+    SET0(R8),
+    // SET1 r8
+    SET1(R8),
+    // SET2 r8
+    SET2(R8),
+    // SET3 r8
+    SET3(R8),
+    // SET4 r8
+    SET4(R8),
+    // SET5 r8
+    SET5(R8),
+    // SET6 r8
+    SET6(R8),
+    // SET7 r8
+    SET7(R8),
 }
 
 impl Instruction {
@@ -473,6 +542,301 @@ impl Instruction {
 
             // Not found!
             _ => panic!("Instruction is not implemented: {:#04X}", byte),
+        }
+    }
+
+    pub fn from_byte_0xcb(byte: u8) -> Option<Instruction> {
+        match byte {
+            // 0x0x
+            0x00 => Some(Instruction::RLC(R8::B)),
+            0x01 => Some(Instruction::RLC(R8::C)),
+            0x02 => Some(Instruction::RLC(R8::D)),
+            0x03 => Some(Instruction::RLC(R8::E)),
+            0x04 => Some(Instruction::RLC(R8::H)),
+            0x05 => Some(Instruction::RLC(R8::L)),
+            0x06 => Some(Instruction::RLC(R8::HL)),
+            0x07 => Some(Instruction::RLC(R8::A)),
+            0x08 => Some(Instruction::RRC(R8::B)),
+            0x09 => Some(Instruction::RRC(R8::C)),
+            0x0A => Some(Instruction::RRC(R8::D)),
+            0x0B => Some(Instruction::RRC(R8::E)),
+            0x0C => Some(Instruction::RRC(R8::H)),
+            0x0D => Some(Instruction::RRC(R8::L)),
+            0x0E => Some(Instruction::RRC(R8::HL)),
+            0x0F => Some(Instruction::RRC(R8::A)),
+
+            // 0x1x
+            0x10 => Some(Instruction::RL(R8::B)),
+            0x11 => Some(Instruction::RL(R8::C)),
+            0x12 => Some(Instruction::RL(R8::D)),
+            0x13 => Some(Instruction::RL(R8::E)),
+            0x14 => Some(Instruction::RL(R8::H)),
+            0x15 => Some(Instruction::RL(R8::L)),
+            0x16 => Some(Instruction::RL(R8::HL)),
+            0x17 => Some(Instruction::RL(R8::A)),
+            0x18 => Some(Instruction::RR(R8::B)),
+            0x19 => Some(Instruction::RR(R8::C)),
+            0x1A => Some(Instruction::RR(R8::D)),
+            0x1B => Some(Instruction::RR(R8::E)),
+            0x1C => Some(Instruction::RR(R8::H)),
+            0x1D => Some(Instruction::RR(R8::L)),
+            0x1E => Some(Instruction::RR(R8::HL)),
+            0x1F => Some(Instruction::RR(R8::A)),
+
+            // 0x2x
+            0x20 => Some(Instruction::SLA(R8::B)),
+            0x21 => Some(Instruction::SLA(R8::C)),
+            0x22 => Some(Instruction::SLA(R8::D)),
+            0x23 => Some(Instruction::SLA(R8::E)),
+            0x24 => Some(Instruction::SLA(R8::H)),
+            0x25 => Some(Instruction::SLA(R8::L)),
+            0x26 => Some(Instruction::SLA(R8::HL)),
+            0x27 => Some(Instruction::SLA(R8::A)),
+            0x28 => Some(Instruction::SRA(R8::B)),
+            0x29 => Some(Instruction::SRA(R8::C)),
+            0x2A => Some(Instruction::SRA(R8::D)),
+            0x2B => Some(Instruction::SRA(R8::E)),
+            0x2C => Some(Instruction::SRA(R8::H)),
+            0x2D => Some(Instruction::SRA(R8::L)),
+            0x2E => Some(Instruction::SRA(R8::HL)),
+            0x2F => Some(Instruction::SRA(R8::A)),
+
+            // 0x3x
+            0x30 => Some(Instruction::SWAP(R8::B)),
+            0x31 => Some(Instruction::SWAP(R8::C)),
+            0x32 => Some(Instruction::SWAP(R8::D)),
+            0x33 => Some(Instruction::SWAP(R8::E)),
+            0x34 => Some(Instruction::SWAP(R8::H)),
+            0x35 => Some(Instruction::SWAP(R8::L)),
+            0x36 => Some(Instruction::SWAP(R8::HL)),
+            0x37 => Some(Instruction::SWAP(R8::A)),
+            0x38 => Some(Instruction::SRL(R8::B)),
+            0x39 => Some(Instruction::SRL(R8::C)),
+            0x3A => Some(Instruction::SRL(R8::D)),
+            0x3B => Some(Instruction::SRL(R8::E)),
+            0x3C => Some(Instruction::SRL(R8::H)),
+            0x3D => Some(Instruction::SRL(R8::L)),
+            0x3E => Some(Instruction::SRL(R8::HL)),
+            0x3F => Some(Instruction::SRL(R8::A)),
+
+            // 0x4x
+            0x40 => Some(Instruction::BIT0(R8::B)),
+            0x41 => Some(Instruction::BIT0(R8::C)),
+            0x42 => Some(Instruction::BIT0(R8::D)),
+            0x43 => Some(Instruction::BIT0(R8::E)),
+            0x44 => Some(Instruction::BIT0(R8::H)),
+            0x45 => Some(Instruction::BIT0(R8::L)),
+            0x46 => Some(Instruction::BIT0(R8::HL)),
+            0x47 => Some(Instruction::BIT0(R8::A)),
+            0x48 => Some(Instruction::BIT1(R8::B)),
+            0x49 => Some(Instruction::BIT1(R8::C)),
+            0x4A => Some(Instruction::BIT1(R8::D)),
+            0x4B => Some(Instruction::BIT1(R8::E)),
+            0x4C => Some(Instruction::BIT1(R8::H)),
+            0x4D => Some(Instruction::BIT1(R8::L)),
+            0x4E => Some(Instruction::BIT1(R8::HL)),
+            0x4F => Some(Instruction::BIT1(R8::A)),
+
+            // 0x5x
+            0x50 => Some(Instruction::BIT2(R8::B)),
+            0x51 => Some(Instruction::BIT2(R8::C)),
+            0x52 => Some(Instruction::BIT2(R8::D)),
+            0x53 => Some(Instruction::BIT2(R8::E)),
+            0x54 => Some(Instruction::BIT2(R8::H)),
+            0x55 => Some(Instruction::BIT2(R8::L)),
+            0x56 => Some(Instruction::BIT2(R8::HL)),
+            0x57 => Some(Instruction::BIT2(R8::A)),
+            0x58 => Some(Instruction::BIT3(R8::B)),
+            0x59 => Some(Instruction::BIT3(R8::C)),
+            0x5A => Some(Instruction::BIT3(R8::D)),
+            0x5B => Some(Instruction::BIT3(R8::E)),
+            0x5C => Some(Instruction::BIT3(R8::H)),
+            0x5D => Some(Instruction::BIT3(R8::L)),
+            0x5E => Some(Instruction::BIT3(R8::HL)),
+            0x5F => Some(Instruction::BIT3(R8::A)),
+
+            // 0x6x
+            0x60 => Some(Instruction::BIT4(R8::B)),
+            0x61 => Some(Instruction::BIT4(R8::C)),
+            0x62 => Some(Instruction::BIT4(R8::D)),
+            0x63 => Some(Instruction::BIT4(R8::E)),
+            0x64 => Some(Instruction::BIT4(R8::H)),
+            0x65 => Some(Instruction::BIT4(R8::L)),
+            0x66 => Some(Instruction::BIT4(R8::HL)),
+            0x67 => Some(Instruction::BIT4(R8::A)),
+            0x68 => Some(Instruction::BIT5(R8::B)),
+            0x69 => Some(Instruction::BIT5(R8::C)),
+            0x6A => Some(Instruction::BIT5(R8::D)),
+            0x6B => Some(Instruction::BIT5(R8::E)),
+            0x6C => Some(Instruction::BIT5(R8::H)),
+            0x6D => Some(Instruction::BIT5(R8::L)),
+            0x6E => Some(Instruction::BIT5(R8::HL)),
+            0x6F => Some(Instruction::BIT5(R8::A)),
+
+            // 0x7x
+            0x70 => Some(Instruction::BIT6(R8::B)),
+            0x71 => Some(Instruction::BIT6(R8::C)),
+            0x72 => Some(Instruction::BIT6(R8::D)),
+            0x73 => Some(Instruction::BIT6(R8::E)),
+            0x74 => Some(Instruction::BIT6(R8::H)),
+            0x75 => Some(Instruction::BIT6(R8::L)),
+            0x76 => Some(Instruction::BIT6(R8::HL)),
+            0x77 => Some(Instruction::BIT6(R8::A)),
+            0x78 => Some(Instruction::BIT7(R8::B)),
+            0x79 => Some(Instruction::BIT7(R8::C)),
+            0x7A => Some(Instruction::BIT7(R8::D)),
+            0x7B => Some(Instruction::BIT7(R8::E)),
+            0x7C => Some(Instruction::BIT7(R8::H)),
+            0x7D => Some(Instruction::BIT7(R8::L)),
+            0x7E => Some(Instruction::BIT7(R8::HL)),
+            0x7F => Some(Instruction::BIT7(R8::A)),
+
+            // 0x8x
+            0x80 => Some(Instruction::RES0(R8::B)),
+            0x81 => Some(Instruction::RES0(R8::C)),
+            0x82 => Some(Instruction::RES0(R8::D)),
+            0x83 => Some(Instruction::RES0(R8::E)),
+            0x84 => Some(Instruction::RES0(R8::H)),
+            0x85 => Some(Instruction::RES0(R8::L)),
+            0x86 => Some(Instruction::RES0(R8::HL)),
+            0x87 => Some(Instruction::RES0(R8::A)),
+            0x88 => Some(Instruction::RES1(R8::B)),
+            0x89 => Some(Instruction::RES1(R8::C)),
+            0x8A => Some(Instruction::RES1(R8::D)),
+            0x8B => Some(Instruction::RES1(R8::E)),
+            0x8C => Some(Instruction::RES1(R8::H)),
+            0x8D => Some(Instruction::RES1(R8::L)),
+            0x8E => Some(Instruction::RES1(R8::HL)),
+            0x8F => Some(Instruction::RES1(R8::A)),
+
+            // 0x9x
+            0x90 => Some(Instruction::RES2(R8::B)),
+            0x91 => Some(Instruction::RES2(R8::C)),
+            0x92 => Some(Instruction::RES2(R8::D)),
+            0x93 => Some(Instruction::RES2(R8::E)),
+            0x94 => Some(Instruction::RES2(R8::H)),
+            0x95 => Some(Instruction::RES2(R8::L)),
+            0x96 => Some(Instruction::RES2(R8::HL)),
+            0x97 => Some(Instruction::RES2(R8::A)),
+            0x98 => Some(Instruction::RES3(R8::B)),
+            0x99 => Some(Instruction::RES3(R8::C)),
+            0x9A => Some(Instruction::RES3(R8::D)),
+            0x9B => Some(Instruction::RES3(R8::E)),
+            0x9C => Some(Instruction::RES3(R8::H)),
+            0x9D => Some(Instruction::RES3(R8::L)),
+            0x9E => Some(Instruction::RES3(R8::HL)),
+            0x9F => Some(Instruction::RES3(R8::A)),
+
+            // 0xAx
+            0xA0 => Some(Instruction::RES4(R8::B)),
+            0xA1 => Some(Instruction::RES4(R8::C)),
+            0xA2 => Some(Instruction::RES4(R8::D)),
+            0xA3 => Some(Instruction::RES4(R8::E)),
+            0xA4 => Some(Instruction::RES4(R8::H)),
+            0xA5 => Some(Instruction::RES4(R8::L)),
+            0xA6 => Some(Instruction::RES4(R8::HL)),
+            0xA7 => Some(Instruction::RES4(R8::A)),
+            0xA8 => Some(Instruction::RES5(R8::B)),
+            0xA9 => Some(Instruction::RES5(R8::C)),
+            0xAA => Some(Instruction::RES5(R8::D)),
+            0xAB => Some(Instruction::RES5(R8::E)),
+            0xAC => Some(Instruction::RES5(R8::H)),
+            0xAD => Some(Instruction::RES5(R8::L)),
+            0xAE => Some(Instruction::RES5(R8::HL)),
+            0xAF => Some(Instruction::RES5(R8::A)),
+
+            // 0xBx
+            0xB0 => Some(Instruction::RES6(R8::B)),
+            0xB1 => Some(Instruction::RES6(R8::C)),
+            0xB2 => Some(Instruction::RES6(R8::D)),
+            0xB3 => Some(Instruction::RES6(R8::E)),
+            0xB4 => Some(Instruction::RES6(R8::H)),
+            0xB5 => Some(Instruction::RES6(R8::L)),
+            0xB6 => Some(Instruction::RES6(R8::HL)),
+            0xB7 => Some(Instruction::RES6(R8::A)),
+            0xB8 => Some(Instruction::RES7(R8::B)),
+            0xB9 => Some(Instruction::RES7(R8::C)),
+            0xBA => Some(Instruction::RES7(R8::D)),
+            0xBB => Some(Instruction::RES7(R8::E)),
+            0xBC => Some(Instruction::RES7(R8::H)),
+            0xBD => Some(Instruction::RES7(R8::L)),
+            0xBE => Some(Instruction::RES7(R8::HL)),
+            0xBF => Some(Instruction::RES7(R8::A)),
+
+            // 0xCx
+            0xC0 => Some(Instruction::SET0(R8::B)),
+            0xC1 => Some(Instruction::SET0(R8::C)),
+            0xC2 => Some(Instruction::SET0(R8::D)),
+            0xC3 => Some(Instruction::SET0(R8::E)),
+            0xC4 => Some(Instruction::SET0(R8::H)),
+            0xC5 => Some(Instruction::SET0(R8::L)),
+            0xC6 => Some(Instruction::SET0(R8::HL)),
+            0xC7 => Some(Instruction::SET0(R8::A)),
+            0xC8 => Some(Instruction::SET1(R8::B)),
+            0xC9 => Some(Instruction::SET1(R8::C)),
+            0xCA => Some(Instruction::SET1(R8::D)),
+            0xCB => Some(Instruction::SET1(R8::E)),
+            0xCC => Some(Instruction::SET1(R8::H)),
+            0xCD => Some(Instruction::SET1(R8::L)),
+            0xCE => Some(Instruction::SET1(R8::HL)),
+            0xCF => Some(Instruction::SET1(R8::A)),
+
+            // 0xDx
+            0xD0 => Some(Instruction::SET2(R8::B)),
+            0xD1 => Some(Instruction::SET2(R8::C)),
+            0xD2 => Some(Instruction::SET2(R8::D)),
+            0xD3 => Some(Instruction::SET2(R8::E)),
+            0xD4 => Some(Instruction::SET2(R8::H)),
+            0xD5 => Some(Instruction::SET2(R8::L)),
+            0xD6 => Some(Instruction::SET2(R8::HL)),
+            0xD7 => Some(Instruction::SET2(R8::A)),
+            0xD8 => Some(Instruction::SET3(R8::B)),
+            0xD9 => Some(Instruction::SET3(R8::C)),
+            0xDA => Some(Instruction::SET3(R8::D)),
+            0xDB => Some(Instruction::SET3(R8::E)),
+            0xDC => Some(Instruction::SET3(R8::H)),
+            0xDD => Some(Instruction::SET3(R8::L)),
+            0xDE => Some(Instruction::SET3(R8::HL)),
+            0xDF => Some(Instruction::SET3(R8::A)),
+
+            // 0xEx
+            0xE0 => Some(Instruction::SET4(R8::B)),
+            0xE1 => Some(Instruction::SET4(R8::C)),
+            0xE2 => Some(Instruction::SET4(R8::D)),
+            0xE3 => Some(Instruction::SET4(R8::E)),
+            0xE4 => Some(Instruction::SET4(R8::H)),
+            0xE5 => Some(Instruction::SET4(R8::L)),
+            0xE6 => Some(Instruction::SET4(R8::HL)),
+            0xE7 => Some(Instruction::SET4(R8::A)),
+            0xE8 => Some(Instruction::SET5(R8::B)),
+            0xE9 => Some(Instruction::SET5(R8::C)),
+            0xEA => Some(Instruction::SET5(R8::D)),
+            0xEB => Some(Instruction::SET5(R8::E)),
+            0xEC => Some(Instruction::SET5(R8::H)),
+            0xED => Some(Instruction::SET5(R8::L)),
+            0xEE => Some(Instruction::SET5(R8::HL)),
+            0xEF => Some(Instruction::SET5(R8::A)),
+
+            // 0xFx
+            0xF0 => Some(Instruction::SET6(R8::B)),
+            0xF1 => Some(Instruction::SET6(R8::C)),
+            0xF2 => Some(Instruction::SET6(R8::D)),
+            0xF3 => Some(Instruction::SET6(R8::E)),
+            0xF4 => Some(Instruction::SET6(R8::H)),
+            0xF5 => Some(Instruction::SET6(R8::L)),
+            0xF6 => Some(Instruction::SET6(R8::HL)),
+            0xF7 => Some(Instruction::SET6(R8::A)),
+            0xF8 => Some(Instruction::SET7(R8::B)),
+            0xF9 => Some(Instruction::SET7(R8::C)),
+            0xFA => Some(Instruction::SET7(R8::D)),
+            0xFB => Some(Instruction::SET7(R8::E)),
+            0xFC => Some(Instruction::SET7(R8::H)),
+            0xFD => Some(Instruction::SET7(R8::L)),
+            0xFE => Some(Instruction::SET7(R8::HL)),
+            0xFF => Some(Instruction::SET7(R8::A)),
+
+            // Not found!
+            _ => panic!("0xCB instruction is not implemented: {:#04X}", byte),
         }
     }
 }

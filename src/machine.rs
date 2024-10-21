@@ -153,6 +153,10 @@ impl Memory {
     fn write(&mut self, address: u16, value: u8) {
         self.data[address as usize] = value;
     }
+    fn write16(&mut self, address: u16, value: u16) {
+        self.write(address, (value & 0xFF) as u8);
+        self.write(address + 1, (value >> 8) as u8);
+    }
 }
 
 /// This is our machine, which contains the registers and the memory.
@@ -161,6 +165,12 @@ struct GameBoy {
     registers: Registers,
     /// The main memory.
     memory: Memory,
+    /// Interrupt master enable flag.
+    ime: bool,
+    /// Interrupt master enable flag: EI.
+    ei: u32,
+    /// Interrupt master enable falg: DI.
+    di: u32,
 }
 
 impl GameBoy {
@@ -171,7 +181,7 @@ impl GameBoy {
     fn stop(&self) {}
 
     /// Execute a single instruction, and returns the number of cycles it takes.
-    fn execute(&mut self, instr: Instruction) -> u8 {
+    fn execute(&mut self, instr: Instruction, opcode: u8) -> u8 {
         match instr {
             // NOP: do nothing
             Instruction::NOP() => 1,
@@ -1238,28 +1248,1369 @@ impl GameBoy {
 
             // RET
             Instruction::RET(cc) => match cc {
-                CC::NZ => {}
-                CC::NC => {}
-                CC::Z => {}
-                CC::C => {}
-                CC::NONE => {}
+                CC::NZ => {
+                    if !self.registers.get_flag_z() {
+                        self.registers.pc = self.pop_stack();
+                        5
+                    } else {
+                        2
+                    }
+                }
+                CC::NC => {
+                    if !self.registers.get_flag_c() {
+                        self.registers.pc = self.pop_stack();
+                        5
+                    } else {
+                        2
+                    }
+                }
+                CC::Z => {
+                    if self.registers.get_flag_z() {
+                        self.registers.pc = self.pop_stack();
+                        5
+                    } else {
+                        2
+                    }
+                }
+                CC::C => {
+                    if self.registers.get_flag_c() {
+                        self.registers.pc = self.pop_stack();
+                        5
+                    } else {
+                        2
+                    }
+                }
+                CC::NONE => {
+                    self.registers.pc = self.pop_stack();
+                    4
+                }
             },
             // RETI
+            Instruction::RETI() => {
+                let val = self.memory.read16(self.registers.sp);
+                self.registers.sp += 2;
+                self.registers.pc = val;
+                self.ei = 1;
+                4
+            }
 
             // POP
+            Instruction::POP(r16ext) => match r16ext {
+                R16EXT::BC => {
+                    let value = self.pop_stack();
+                    self.registers.set_bc(value);
+                    3
+                }
+                R16EXT::DE => {
+                    let value = self.pop_stack();
+                    self.registers.set_de(value);
+                    3
+                }
+                R16EXT::HL => {
+                    let value = self.pop_stack();
+                    self.registers.set_hl(value);
+                    3
+                }
+                R16EXT::AF => {
+                    let value = self.pop_stack();
+                    self.registers.set_af(value);
+                    3
+                }
+            },
 
             // PUSH
+            Instruction::PUSH(r16ext) => match r16ext {
+                R16EXT::BC => {
+                    self.push_stack(self.registers.get_bc());
+                    4
+                }
+                R16EXT::DE => {
+                    self.push_stack(self.registers.get_de());
+                    4
+                }
+                R16EXT::HL => {
+                    self.push_stack(self.registers.get_hl());
+                    4
+                }
+                R16EXT::AF => {
+                    self.push_stack(self.registers.get_af());
+                    4
+                }
+            },
 
             // CALL
+            Instruction::CALL(cc) => match cc {
+                CC::NZ => {
+                    if !self.registers.get_flag_z() {
+                        self.push_stack(self.registers.pc + 2);
+                        self.registers.pc = self.read16();
+                        6
+                    } else {
+                        self.registers.pc += 2;
+                        3
+                    }
+                }
+                CC::NC => {
+                    if !self.registers.get_flag_c() {
+                        self.push_stack(self.registers.pc + 2);
+                        self.registers.pc = self.read16();
+                        6
+                    } else {
+                        self.registers.pc += 2;
+                        3
+                    }
+                }
+                CC::Z => {
+                    if self.registers.get_flag_z() {
+                        self.push_stack(self.registers.pc + 2);
+                        self.registers.pc = self.read16();
+                        6
+                    } else {
+                        self.registers.pc += 2;
+                        3
+                    }
+                }
+                CC::C => {
+                    if self.registers.get_flag_c() {
+                        self.push_stack(self.registers.pc + 2);
+                        self.registers.pc = self.read16();
+                        6
+                    } else {
+                        self.registers.pc += 2;
+                        3
+                    }
+                }
+                CC::NONE => {
+                    self.push_stack(self.registers.pc + 2);
+                    self.registers.pc = self.read16();
+                    6
+                }
+            },
 
             // RST
+            Instruction::RST(tgt3) => match tgt3 {
+                TGT3::T0 => {
+                    self.push_stack(self.registers.pc);
+                    self.registers.pc = 0x00;
+                    4
+                }
+                TGT3::T1 => {
+                    self.push_stack(self.registers.pc);
+                    self.registers.pc = 0x08;
+                    4
+                }
+                TGT3::T2 => {
+                    self.push_stack(self.registers.pc);
+                    self.registers.pc = 0x10;
+                    4
+                }
+                TGT3::T3 => {
+                    self.push_stack(self.registers.pc);
+                    self.registers.pc = 0x18;
+                    4
+                }
+                TGT3::T4 => {
+                    self.push_stack(self.registers.pc);
+                    self.registers.pc = 0x20;
+                    4
+                }
+                TGT3::T5 => {
+                    self.push_stack(self.registers.pc);
+                    self.registers.pc = 0x28;
+                    4
+                }
+                TGT3::T6 => {
+                    self.push_stack(self.registers.pc);
+                    self.registers.pc = 0x30;
+                    4
+                }
+                TGT3::T7 => {
+                    self.push_stack(self.registers.pc);
+                    self.registers.pc = 0x38;
+                    4
+                }
+            },
 
             // DI
-            // EI
-            _ => {
-                // TODO: More instructions.
-                0
+            Instruction::DI() => {
+                self.di = 2;
+                1
             }
+            // EI
+            Instruction::EI() => {
+                self.ei = 2;
+                1
+            }
+            // OPCODE 16-bit (0xCB).
+            Instruction::OPCODE16() => {
+                // Read next byte, construct instruction, execute 0xCB instruction.
+                let opcode0xcb = self.read8();
+                let instr0xcb = Instruction::from_byte_0xcb(opcode0xcb);
+                let msg = format!("Incorrect 0xCB opcode: {:#04X}", opcode0xcb);
+                self.execute_0xcb(instr0xcb.expect(&msg), opcode0xcb)
+            }
+
+            // Never should happen.
+            _ => panic!("Instruction is not implemented: {:#04X}", opcode),
+        }
+    }
+
+    fn execute_0xcb(&mut self, instr: Instruction, opcode: u8) -> u8 {
+        match instr {
+            Instruction::RLC(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.rlc(self.registers.b);
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.rlc(self.registers.c);
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.rlc(self.registers.d);
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.rlc(self.registers.e);
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.rlc(self.registers.h);
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.rlc(self.registers.l);
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let value = self.memory.read(hl);
+                    let value2 = self.rlc(value);
+                    self.memory.write(hl, value2);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.rlc(self.registers.a);
+                    2
+                }
+            },
+            Instruction::RRC(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.rrc(self.registers.b);
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.rrc(self.registers.c);
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.rrc(self.registers.d);
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.rrc(self.registers.e);
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.rrc(self.registers.h);
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.rrc(self.registers.l);
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let value = self.memory.read(hl);
+                    let value2 = self.rrc(value);
+                    self.memory.write(hl, value2);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.rrc(self.registers.a);
+                    2
+                }
+            },
+            Instruction::RL(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.rl(self.registers.b);
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.rl(self.registers.c);
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.rl(self.registers.d);
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.rl(self.registers.e);
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.rl(self.registers.h);
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.rl(self.registers.l);
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let value = self.memory.read(hl);
+                    let value2 = self.rl(value);
+                    self.memory.write(hl, value2);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.rl(self.registers.a);
+                    2
+                }
+            },
+            Instruction::RR(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.rr(self.registers.b);
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.rr(self.registers.c);
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.rr(self.registers.d);
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.rr(self.registers.e);
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.rr(self.registers.h);
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.rr(self.registers.l);
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let value = self.memory.read(hl);
+                    let value2 = self.rr(value);
+                    self.memory.write(hl, value2);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.rr(self.registers.a);
+                    2
+                }
+            },
+            Instruction::SLA(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.sla(self.registers.b);
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.sla(self.registers.c);
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.sla(self.registers.d);
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.sla(self.registers.e);
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.sla(self.registers.h);
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.sla(self.registers.l);
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let value = self.memory.read(hl);
+                    let value2 = self.sla(value);
+                    self.memory.write(hl, value2);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.sla(self.registers.a);
+                    2
+                }
+            },
+            Instruction::SRA(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.sra(self.registers.b);
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.sra(self.registers.c);
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.sra(self.registers.d);
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.sra(self.registers.e);
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.sra(self.registers.h);
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.sra(self.registers.l);
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let value = self.memory.read(hl);
+                    let value2 = self.sra(value);
+                    self.memory.write(hl, value2);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.sra(self.registers.a);
+                    2
+                }
+            },
+            Instruction::SWAP(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.swap(self.registers.b);
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.swap(self.registers.c);
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.swap(self.registers.d);
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.swap(self.registers.e);
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.swap(self.registers.h);
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.swap(self.registers.l);
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let value = self.memory.read(hl);
+                    let value2 = self.swap(value);
+                    self.memory.write(hl, value2);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.swap(self.registers.a);
+                    2
+                }
+            },
+            Instruction::SRL(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.srl(self.registers.b);
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.srl(self.registers.c);
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.srl(self.registers.d);
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.srl(self.registers.e);
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.srl(self.registers.h);
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.srl(self.registers.l);
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let value = self.memory.read(hl);
+                    let value2 = self.srl(value);
+                    self.memory.write(hl, value2);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.srl(self.registers.a);
+                    2
+                }
+            },
+            Instruction::BIT0(r8) => match r8 {
+                R8::B => {
+                    self.bit(self.registers.b, 0);
+                    2
+                }
+                R8::C => {
+                    self.bit(self.registers.c, 0);
+                    2
+                }
+                R8::D => {
+                    self.bit(self.registers.d, 0);
+                    2
+                }
+                R8::E => {
+                    self.bit(self.registers.e, 0);
+                    2
+                }
+                R8::H => {
+                    self.bit(self.registers.h, 0);
+                    2
+                }
+                R8::L => {
+                    self.bit(self.registers.l, 0);
+                    2
+                }
+                R8::HL => {
+                    let value = self.memory.read(self.registers.get_hl());
+                    self.bit(value, 0);
+                    3
+                }
+                R8::A => {
+                    self.bit(self.registers.a, 0);
+                    2
+                }
+            },
+            Instruction::BIT1(r8) => match r8 {
+                R8::B => {
+                    self.bit(self.registers.b, 1);
+                    2
+                }
+                R8::C => {
+                    self.bit(self.registers.c, 1);
+                    2
+                }
+                R8::D => {
+                    self.bit(self.registers.d, 1);
+                    2
+                }
+                R8::E => {
+                    self.bit(self.registers.e, 1);
+                    2
+                }
+                R8::H => {
+                    self.bit(self.registers.h, 1);
+                    2
+                }
+                R8::L => {
+                    self.bit(self.registers.l, 1);
+                    2
+                }
+                R8::HL => {
+                    let value = self.memory.read(self.registers.get_hl());
+                    self.bit(value, 1);
+                    3
+                }
+                R8::A => {
+                    self.bit(self.registers.a, 1);
+                    2
+                }
+            },
+            Instruction::BIT2(r8) => match r8 {
+                R8::B => {
+                    self.bit(self.registers.b, 2);
+                    2
+                }
+                R8::C => {
+                    self.bit(self.registers.c, 2);
+                    2
+                }
+                R8::D => {
+                    self.bit(self.registers.d, 2);
+                    2
+                }
+                R8::E => {
+                    self.bit(self.registers.e, 2);
+                    2
+                }
+                R8::H => {
+                    self.bit(self.registers.h, 2);
+                    2
+                }
+                R8::L => {
+                    self.bit(self.registers.l, 2);
+                    2
+                }
+                R8::HL => {
+                    let value = self.memory.read(self.registers.get_hl());
+                    self.bit(value, 2);
+                    3
+                }
+                R8::A => {
+                    self.bit(self.registers.a, 2);
+                    2
+                }
+            },
+            Instruction::BIT3(r8) => match r8 {
+                R8::B => {
+                    self.bit(self.registers.b, 3);
+                    2
+                }
+                R8::C => {
+                    self.bit(self.registers.c, 3);
+                    2
+                }
+                R8::D => {
+                    self.bit(self.registers.d, 3);
+                    2
+                }
+                R8::E => {
+                    self.bit(self.registers.e, 3);
+                    2
+                }
+                R8::H => {
+                    self.bit(self.registers.h, 3);
+                    2
+                }
+                R8::L => {
+                    self.bit(self.registers.l, 3);
+                    2
+                }
+                R8::HL => {
+                    let value = self.memory.read(self.registers.get_hl());
+                    self.bit(value, 3);
+                    3
+                }
+                R8::A => {
+                    self.bit(self.registers.a, 3);
+                    2
+                }
+            },
+            Instruction::BIT4(r8) => match r8 {
+                R8::B => {
+                    self.bit(self.registers.b, 4);
+                    2
+                }
+                R8::C => {
+                    self.bit(self.registers.c, 4);
+                    2
+                }
+                R8::D => {
+                    self.bit(self.registers.d, 4);
+                    2
+                }
+                R8::E => {
+                    self.bit(self.registers.e, 4);
+                    2
+                }
+                R8::H => {
+                    self.bit(self.registers.h, 4);
+                    2
+                }
+                R8::L => {
+                    self.bit(self.registers.l, 4);
+                    2
+                }
+                R8::HL => {
+                    let value = self.memory.read(self.registers.get_hl());
+                    self.bit(value, 4);
+                    3
+                }
+                R8::A => {
+                    self.bit(self.registers.a, 4);
+                    2
+                }
+            },
+            Instruction::BIT5(r8) => match r8 {
+                R8::B => {
+                    self.bit(self.registers.b, 5);
+                    2
+                }
+                R8::C => {
+                    self.bit(self.registers.c, 5);
+                    2
+                }
+                R8::D => {
+                    self.bit(self.registers.d, 5);
+                    2
+                }
+                R8::E => {
+                    self.bit(self.registers.e, 5);
+                    2
+                }
+                R8::H => {
+                    self.bit(self.registers.h, 5);
+                    2
+                }
+                R8::L => {
+                    self.bit(self.registers.l, 5);
+                    2
+                }
+                R8::HL => {
+                    let value = self.memory.read(self.registers.get_hl());
+                    self.bit(value, 5);
+                    3
+                }
+                R8::A => {
+                    self.bit(self.registers.a, 5);
+                    2
+                }
+            },
+            Instruction::BIT6(r8) => match r8 {
+                R8::B => {
+                    self.bit(self.registers.b, 6);
+                    2
+                }
+                R8::C => {
+                    self.bit(self.registers.c, 6);
+                    2
+                }
+                R8::D => {
+                    self.bit(self.registers.d, 6);
+                    2
+                }
+                R8::E => {
+                    self.bit(self.registers.e, 6);
+                    2
+                }
+                R8::H => {
+                    self.bit(self.registers.h, 6);
+                    2
+                }
+                R8::L => {
+                    self.bit(self.registers.l, 6);
+                    2
+                }
+                R8::HL => {
+                    let value = self.memory.read(self.registers.get_hl());
+                    self.bit(value, 6);
+                    3
+                }
+                R8::A => {
+                    self.bit(self.registers.a, 6);
+                    2
+                }
+            },
+            Instruction::BIT7(r8) => match r8 {
+                R8::B => {
+                    self.bit(self.registers.b, 7);
+                    2
+                }
+                R8::C => {
+                    self.bit(self.registers.c, 7);
+                    2
+                }
+                R8::D => {
+                    self.bit(self.registers.d, 7);
+                    2
+                }
+                R8::E => {
+                    self.bit(self.registers.e, 7);
+                    2
+                }
+                R8::H => {
+                    self.bit(self.registers.h, 7);
+                    2
+                }
+                R8::L => {
+                    self.bit(self.registers.l, 7);
+                    2
+                }
+                R8::HL => {
+                    let value = self.memory.read(self.registers.get_hl());
+                    self.bit(value, 7);
+                    3
+                }
+                R8::A => {
+                    self.bit(self.registers.a, 7);
+                    2
+                }
+            },
+            Instruction::RES0(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b & 0xFE;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c & 0xFE;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d & 0xFE;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e & 0xFE;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h & 0xFE;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l & 0xFE;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) & 0xFE;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a & 0xFE;
+                    2
+                }
+            },
+            Instruction::RES1(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b & 0xFD;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c & 0xFD;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d & 0xFD;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e & 0xFD;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h & 0xFD;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l & 0xFD;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) & 0xFD;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a & 0xFD;
+                    2
+                }
+            },
+            Instruction::RES2(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b & 0xFB;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c & 0xFB;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d & 0xFB;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e & 0xFB;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h & 0xFB;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l & 0xFB;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) & 0xFB;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a & 0xFB;
+                    2
+                }
+            },
+            Instruction::RES3(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b & 0xF7;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c & 0xF7;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d & 0xF7;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e & 0xF7;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h & 0xF7;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l & 0xF7;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) & 0xF7;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a & 0xF7;
+                    2
+                }
+            },
+            Instruction::RES4(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b & 0xEF;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c & 0xEF;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d & 0xEF;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e & 0xEF;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h & 0xEF;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l & 0xEF;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) & 0xEF;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a & 0xEF;
+                    2
+                }
+            },
+            Instruction::RES5(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b & 0xDF;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c & 0xDF;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d & 0xDF;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e & 0xDF;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h & 0xDF;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l & 0xDF;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) & 0xDF;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a & 0xDF;
+                    2
+                }
+            },
+            Instruction::RES6(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b & 0xDF;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c & 0xDF;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d & 0xDF;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e & 0xDF;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h & 0xDF;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l & 0xDF;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) & 0xDF;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a & 0xDF;
+                    2
+                }
+            },
+            Instruction::RES7(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b & 0x7F;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c & 0x7F;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d & 0x7F;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e & 0x7F;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h & 0x7F;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l & 0x7F;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) & 0x7F;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a & 0x7F;
+                    2
+                }
+            },
+            Instruction::SET0(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b | 0x01;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c | 0x01;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d | 0x01;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e | 0x01;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h | 0x01;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l | 0x01;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) | 0x01;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a | 0x01;
+                    2
+                }
+            },
+            Instruction::SET1(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b | 0x02;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c | 0x02;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d | 0x02;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e | 0x02;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h | 0x02;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l | 0x02;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) | 0x02;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a | 0x02;
+                    2
+                }
+            },
+            Instruction::SET2(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b | 0x04;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c | 0x04;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d | 0x04;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e | 0x04;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h | 0x04;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l | 0x04;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) | 0x04;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a | 0x04;
+                    2
+                }
+            },
+            Instruction::SET3(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b | 0x08;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c | 0x08;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d | 0x08;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e | 0x08;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h | 0x08;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l | 0x08;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) | 0x08;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a | 0x08;
+                    2
+                }
+            },
+            Instruction::SET4(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b | 0x10;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c | 0x10;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d | 0x10;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e | 0x10;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h | 0x10;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l | 0x10;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) | 0x10;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a | 0x10;
+                    2
+                }
+            },
+            Instruction::SET5(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b | 0x20;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c | 0x20;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d | 0x20;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e | 0x20;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h | 0x20;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l | 0x20;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) | 0x20;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a | 0x20;
+                    2
+                }
+            },
+            Instruction::SET6(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b | 0x40;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c | 0x40;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d | 0x40;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e | 0x40;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h | 0x40;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l | 0x40;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) | 0x40;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a | 0x40;
+                    2
+                }
+            },
+            Instruction::SET7(r8) => match r8 {
+                R8::B => {
+                    self.registers.b = self.registers.b | 0x80;
+                    2
+                }
+                R8::C => {
+                    self.registers.c = self.registers.c | 0x80;
+                    2
+                }
+                R8::D => {
+                    self.registers.d = self.registers.d | 0x80;
+                    2
+                }
+                R8::E => {
+                    self.registers.e = self.registers.e | 0x80;
+                    2
+                }
+                R8::H => {
+                    self.registers.h = self.registers.h | 0x80;
+                    2
+                }
+                R8::L => {
+                    self.registers.l = self.registers.l | 0x80;
+                    2
+                }
+                R8::HL => {
+                    let hl = self.registers.get_hl();
+                    let val = self.memory.read(hl) | 0x80;
+                    self.memory.write(hl, val);
+                    4
+                }
+                R8::A => {
+                    self.registers.a = self.registers.a | 0x80;
+                    2
+                }
+            },
+            // Never should happen.
+            _ => panic!("0xCB instruction is not implemented: {:#04X}", opcode),
         }
     }
 
@@ -1283,6 +2634,17 @@ impl GameBoy {
     fn read16(&mut self) -> u16 {
         let result = self.memory.read16(self.registers.pc);
         self.registers.pc = self.registers.pc.wrapping_add(2);
+        result
+    }
+
+    fn push_stack(&mut self, value: u16) {
+        self.registers.sp = self.registers.sp.wrapping_sub(2);
+        self.memory.write16(self.registers.sp, value);
+    }
+
+    fn pop_stack(&mut self) -> u16 {
+        let result = self.memory.read16(self.registers.sp);
+        self.registers.sp += 2;
         result
     }
 
@@ -1311,6 +2673,7 @@ impl GameBoy {
         result
     }
 
+    /// Set flags after a bit shift operation (RR, RL, RLC, RRC, SLA, SRA, SLR)
     fn rotate_flags(&mut self, result: u8, carry: bool) {
         self.registers.z(result == 0);
         self.registers.c(carry);
@@ -1318,6 +2681,8 @@ impl GameBoy {
         self.registers.n(false);
     }
 
+    /// RLC operation: rotate contents of `val` to the right. Update flags.
+    /// The contents of bit 7 are placed in `c` and in bit 0 of `val`.
     fn rlc(&mut self, val: u8) -> u8 {
         let carry = val & 0x80 > 0;
         let result = (val << 1) | (if carry { 1 } else { 0 });
@@ -1325,6 +2690,8 @@ impl GameBoy {
         result
     }
 
+    /// RL operation: rotate contents of `val` to the left. Update flags.
+    /// The previous contents of the carry `c` flag are copied to bit 0 of `val`.
     fn rl(&mut self, val: u8) -> u8 {
         let carry = val & 0x80 > 0;
         let result = (val << 1) | (if self.registers.get_flag_c() { 1 } else { 0 });
@@ -1332,6 +2699,8 @@ impl GameBoy {
         result
     }
 
+    /// RRC operation: rotate contents of `val` to the right. Update flags.
+    /// The contents of bit 0 are placed in `c` and in bit 7 of `val`.
     fn rrc(&mut self, val: u8) -> u8 {
         let carry = val & 0x01 > 0;
         let result = (val >> 1) | (if carry { 0x80 } else { 0 });
@@ -1339,11 +2708,60 @@ impl GameBoy {
         result
     }
 
+    /// RR operation: rotate contents of `val` to the right. Update flags.
+    /// The previous contents of the carry `c` flag are copied to bit 7 of `val`.
     fn rr(&mut self, val: u8) -> u8 {
         let carry = val & 0x01 > 0;
         let result = (val >> 1) | (if self.registers.get_flag_c() { 0x80 } else { 0 });
         self.rotate_flags(result, carry);
         result
+    }
+
+    /// SLA operation: shift contents of `val` to the left,
+    /// update flags, reset bit 0 of `val` to 0.
+    fn sla(&mut self, val: u8) -> u8 {
+        let carry = val & 0x80 == 0x80;
+        let result = val << 1;
+        self.rotate_flags(result, carry);
+        result
+    }
+
+    /// SRA operation: shift contents of `val` to the
+    /// right, update flags, but do not change bit 7 of `val`.
+    fn sra(&mut self, val: u8) -> u8 {
+        let carry = val & 0x01 == 0x01;
+        let result = (val >> 1) | (val & 0x80);
+        self.rotate_flags(result, carry);
+        result
+    }
+
+    /// SWAP operation: shift the contents of the lower-order 4 bits of `val` to the
+    /// higher-order 4 bits, and shift the higher-order 4 bits to the lower-order
+    /// 4 bits.
+    fn swap(&mut self, val: u8) -> u8 {
+        self.registers.z(val == 0);
+        self.registers.c(false);
+        self.registers.h(false);
+        self.registers.n(false);
+        (val >> 4) | (val << 4)
+    }
+
+    /// SRL operation: shift the contents of `val` to the
+    /// right, update flags, reset bit 7 of `val` to 0.
+    fn srl(&mut self, val: u8) -> u8 {
+        let carry = val & 0x01 == 0x01;
+        let result = val >> 1;
+        self.rotate_flags(result, carry);
+        result
+    }
+
+    /// BIT operation: copy the complement of the contents of the bit `bit` of `val`
+    /// to the `z` flagof the program status word (PSW).
+    fn bit(&mut self, val: u8, bit: u8) {
+        let result = val & (1 << (bit as u32)) == 0;
+        self.registers.n(false);
+        self.registers.h(true);
+        self.registers.z(result);
     }
 
     /// Adds the given 16-bit value to `hl`.
