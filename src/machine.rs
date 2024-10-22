@@ -1,29 +1,51 @@
+use crate::cartridge;
+use crate::debug;
 use crate::instruction;
 use crate::memory;
 use crate::registers;
 
+use cartridge::Cartridge;
 use instruction::{Instruction, CC, R16, R16EXT, R16LD, R8, TGT3};
 use memory::Memory;
 use registers::Registers;
+use std::io;
 
 /// This is our machine, which contains the registers and the memory, and
 /// executes the operations.
-struct GameBoy {
+pub struct GameBoy<'a> {
     /// Our registers.
     registers: Registers,
     /// The main memory.
-    memory: Memory,
+    memory: Memory<'a>,
     /// Interrupt master enable flag.
-    ime: bool,
+    pub ime: bool,
     /// Interrupt master enable flag: EI.
     ei: u32,
     /// Interrupt master enable falg: DI.
     di: u32,
     /// Flag that holds the running status.
     running: bool,
+    /// Debug mode flag.
+    debug: bool,
 }
 
-impl GameBoy {
+impl<'a> GameBoy<'a> {
+    pub fn new(cart: &'a Cartridge, debug: bool) -> Self {
+        GameBoy {
+            registers: Registers::new(),
+            memory: Memory::new(cart),
+            ime: false,
+            ei: 0,
+            di: 0,
+            running: false,
+            debug,
+        }
+    }
+    /// Starts the execution of the machine.
+    pub fn start(&mut self) {
+        self.running = true;
+        self.cycle();
+    }
     /// Main loop of the machine.
     fn cycle(&mut self) {
         while self.running {
@@ -31,12 +53,21 @@ impl GameBoy {
             let opcode = self.memory.read(self.registers.pc);
             let instruction = Instruction::from_byte(opcode);
             let msg = format!("Incorrect opcode: {:#04X}", opcode);
+            // Execute the instruction.
             self.execute(instruction.expect(&msg), opcode);
+            // Move the program counter to the next location.
+            self.registers.pc += 1;
         }
     }
 
     /// Execute a single instruction, and returns the number of cycles it takes.
     fn execute(&mut self, instr: Instruction, opcode: u8) -> u8 {
+        // Debug if needed.
+        if self.debug {
+            debug::debug(self.registers.pc, &self.memory, &instr, opcode);
+        }
+
+        // Actually execute the instruction.
         match instr {
             // NOP: do nothing
             Instruction::NOP() => 1,

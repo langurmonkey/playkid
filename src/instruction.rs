@@ -1,4 +1,5 @@
 /// Enumerates the r8 registers.
+#[derive(Debug)]
 pub enum R8 {
     A,
     B,
@@ -11,6 +12,7 @@ pub enum R8 {
 }
 
 /// Enumerates the r16 registers.
+#[derive(Debug)]
 pub enum R16 {
     BC,
     DE,
@@ -19,6 +21,7 @@ pub enum R16 {
 }
 
 /// Enumerates r16 registers for POP and PUSH, which contain AF.
+#[derive(Debug)]
 pub enum R16EXT {
     BC,
     DE,
@@ -27,6 +30,7 @@ pub enum R16EXT {
 }
 
 /// Enumerates the R16 registers to be used in (some) load operations.
+#[derive(Debug)]
 pub enum R16LD {
     BC,
     DE,
@@ -38,6 +42,7 @@ pub enum R16LD {
 }
 
 /// Enumerates jump conditions, mostly flags.
+#[derive(Debug)]
 pub enum CC {
     NONE,
     NZ,
@@ -47,6 +52,7 @@ pub enum CC {
 }
 
 /// RST's target address, divided by 8.
+#[derive(Debug)]
 pub enum TGT3 {
     T0,
     T1,
@@ -62,6 +68,7 @@ pub enum TGT3 {
 /// This enum contains all supported instructions.
 /// Instructions that can act with both r8 and r16 registers are first named
 /// by default in their r8 version. The r16 versions add a `16` at the end of the name.
+#[derive(Debug)]
 pub enum Instruction {
     // NoOp.
     NOP(),

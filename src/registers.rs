@@ -36,6 +36,22 @@ enum Flag {
 
 // Methods to access and set values of registers.
 impl Registers {
+    pub fn new() -> Self {
+        Registers {
+            a: 0,
+            b: 0,
+            c: 0,
+            d: 0,
+            e: 0,
+            f: 0,
+            h: 0,
+            l: 0,
+            sp: 0,
+            // We start at the 0x0100 location, which is te
+            // begin code execution point.
+            pc: 0x0100,
+        }
+    }
     pub fn get_af(&self) -> u16 {
         (self.a as u16) << 8 | self.f as u16
     }
