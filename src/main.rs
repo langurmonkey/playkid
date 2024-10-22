@@ -25,8 +25,7 @@ fn main() -> io::Result<()> {
     let rom = args.input.as_path().to_str().unwrap();
     println!("Using rom file: {}", rom);
 
-    // Load rom file.
-    let cart = Cartridge::new(rom, true)?;
-
+    // Load rom file into cartridge.
+    let cart = Cartridge::new(rom, true).expect("Error reading rom file");
     Ok(())
 }

@@ -817,7 +817,7 @@ impl GameBoy {
                     4
                 }
                 CC::NZ => {
-                    if !self.registers.get_flag_z() {
+                    if !self.registers.get_z() {
                         self.jp();
                         4
                     } else {
@@ -826,7 +826,7 @@ impl GameBoy {
                     }
                 }
                 CC::Z => {
-                    if self.registers.get_flag_z() {
+                    if self.registers.get_z() {
                         self.jp();
                         4
                     } else {
@@ -835,7 +835,7 @@ impl GameBoy {
                     }
                 }
                 CC::NC => {
-                    if !self.registers.get_flag_c() {
+                    if !self.registers.get_c() {
                         self.jp();
                         4
                     } else {
@@ -844,7 +844,7 @@ impl GameBoy {
                     }
                 }
                 CC::C => {
-                    if self.registers.get_flag_c() {
+                    if self.registers.get_c() {
                         self.jp();
                         4
                     } else {
@@ -860,7 +860,7 @@ impl GameBoy {
                     3
                 }
                 CC::NZ => {
-                    if !self.registers.get_flag_z() {
+                    if !self.registers.get_z() {
                         self.jr();
                         3
                     } else {
@@ -869,7 +869,7 @@ impl GameBoy {
                     }
                 }
                 CC::Z => {
-                    if self.registers.get_flag_z() {
+                    if self.registers.get_z() {
                         self.jr();
                         3
                     } else {
@@ -878,7 +878,7 @@ impl GameBoy {
                     }
                 }
                 CC::NC => {
-                    if !self.registers.get_flag_c() {
+                    if !self.registers.get_c() {
                         self.jr();
                         3
                     } else {
@@ -887,7 +887,7 @@ impl GameBoy {
                     }
                 }
                 CC::C => {
-                    if self.registers.get_flag_c() {
+                    if self.registers.get_c() {
                         self.jr();
                         3
                     } else {
@@ -1050,9 +1050,9 @@ impl GameBoy {
                 // - If addition, add 6 to each digit > 9, or if (half-)carry.
                 // - If subtraction, subtract 6 from each digit > 9, or if (half-)carry.
                 let mut a = self.registers.a;
-                let c = self.registers.get_flag_c();
-                let h = self.registers.get_flag_h();
-                let n = self.registers.get_flag_n();
+                let c = self.registers.get_c();
+                let h = self.registers.get_h();
+                let n = self.registers.get_n();
 
                 if !n {
                     // After addition.
@@ -1095,7 +1095,7 @@ impl GameBoy {
             // CCF
             Instruction::CCF() => {
                 // Flip carry flag.
-                self.registers.c(!self.registers.get_flag_c());
+                self.registers.c(!self.registers.get_c());
                 self.registers.h(false);
                 self.registers.n(false);
                 1
@@ -1104,7 +1104,7 @@ impl GameBoy {
             // RET
             Instruction::RET(cc) => match cc {
                 CC::NZ => {
-                    if !self.registers.get_flag_z() {
+                    if !self.registers.get_z() {
                         self.registers.pc = self.pop_stack();
                         5
                     } else {
@@ -1112,7 +1112,7 @@ impl GameBoy {
                     }
                 }
                 CC::NC => {
-                    if !self.registers.get_flag_c() {
+                    if !self.registers.get_c() {
                         self.registers.pc = self.pop_stack();
                         5
                     } else {
@@ -1120,7 +1120,7 @@ impl GameBoy {
                     }
                 }
                 CC::Z => {
-                    if self.registers.get_flag_z() {
+                    if self.registers.get_z() {
                         self.registers.pc = self.pop_stack();
                         5
                     } else {
@@ -1128,7 +1128,7 @@ impl GameBoy {
                     }
                 }
                 CC::C => {
-                    if self.registers.get_flag_c() {
+                    if self.registers.get_c() {
                         self.registers.pc = self.pop_stack();
                         5
                     } else {
@@ -1196,7 +1196,7 @@ impl GameBoy {
             // CALL
             Instruction::CALL(cc) => match cc {
                 CC::NZ => {
-                    if !self.registers.get_flag_z() {
+                    if !self.registers.get_z() {
                         self.push_stack(self.registers.pc + 2);
                         self.registers.pc = self.read16();
                         6
@@ -1206,7 +1206,7 @@ impl GameBoy {
                     }
                 }
                 CC::NC => {
-                    if !self.registers.get_flag_c() {
+                    if !self.registers.get_c() {
                         self.push_stack(self.registers.pc + 2);
                         self.registers.pc = self.read16();
                         6
@@ -1216,7 +1216,7 @@ impl GameBoy {
                     }
                 }
                 CC::Z => {
-                    if self.registers.get_flag_z() {
+                    if self.registers.get_z() {
                         self.push_stack(self.registers.pc + 2);
                         self.registers.pc = self.read16();
                         6
@@ -1226,7 +1226,7 @@ impl GameBoy {
                     }
                 }
                 CC::C => {
-                    if self.registers.get_flag_c() {
+                    if self.registers.get_c() {
                         self.push_stack(self.registers.pc + 2);
                         self.registers.pc = self.read16();
                         6
@@ -2548,7 +2548,7 @@ impl GameBoy {
     /// The previous contents of the carry `c` flag are copied to bit 0 of `val`.
     fn rl(&mut self, val: u8) -> u8 {
         let carry = val & 0x80 > 0;
-        let result = (val << 1) | (if self.registers.get_flag_c() { 1 } else { 0 });
+        let result = (val << 1) | (if self.registers.get_c() { 1 } else { 0 });
         self.rotate_flags(result, carry);
         result
     }
@@ -2566,7 +2566,7 @@ impl GameBoy {
     /// The previous contents of the carry `c` flag are copied to bit 7 of `val`.
     fn rr(&mut self, val: u8) -> u8 {
         let carry = val & 0x01 > 0;
-        let result = (val >> 1) | (if self.registers.get_flag_c() { 0x80 } else { 0 });
+        let result = (val >> 1) | (if self.registers.get_c() { 0x80 } else { 0 });
         self.rotate_flags(result, carry);
         result
     }
@@ -2649,7 +2649,7 @@ impl GameBoy {
     /// Adds the given byte to the register `a` and updates the flags.
     fn add(&mut self, value: u8, use_carry: bool) {
         // Get carry if needed.
-        let carry = if use_carry && self.registers.get_flag_c() {
+        let carry = if use_carry && self.registers.get_c() {
             1
         } else {
             0
@@ -2676,7 +2676,7 @@ impl GameBoy {
 
     fn sub(&mut self, value: u8, use_carry: bool) {
         // Get carry if needed.
-        let carry = if use_carry && self.registers.get_flag_c() {
+        let carry = if use_carry && self.registers.get_c() {
             1
         } else {
             0

@@ -11,7 +11,7 @@ pub struct Registers {
     pub c: u8,
     pub d: u8,
     pub e: u8,
-    /// Flags register.
+    /// Flags register. See `Flag` below.
     /// - Bit 7: `z`, zero flag
     /// - Bit 6: `n`, subtraction flag (BCD)
     /// - Bit 5: `h`, half-carry flag (BCD)
@@ -25,6 +25,16 @@ pub struct Registers {
     pub pc: u16,
 }
 
+/// Represents the masks to access the flags in register `f`.
+#[repr(u8)]
+enum Flag {
+    Z = 0b1000_0000,
+    N = 0b0100_0000,
+    H = 0b0010_0000,
+    C = 0b0001_0000,
+}
+
+// Methods to access and set values of registers.
 impl Registers {
     pub fn get_af(&self) -> u16 {
         (self.a as u16) << 8 | self.f as u16
@@ -64,60 +74,46 @@ impl Registers {
         self.h = ((value & 0xFF00) >> 8) as u8;
         self.l = (value & 0x00FF) as u8;
     }
-    /// Set the zero flag `z` in the `f` register (pos 7).
-    /// The least significant bit of `value` is used.
-    pub fn set_flag_z(&mut self, value: u8) {
-        self.f = (self.f & 0b0111_1111) | ((value & 0b0000_0001) << 7)
+
+    /// Private function to set the state of a flag.
+    fn set_flag(&mut self, flag: Flag, value: bool) {
+        let v: u8 = if value { 1 } else { 0 };
+        self.f = (self.f & !(flag as u8)) | (v << 7)
+    }
+    /// Private function to get the state of a flag.
+    fn get_flag(&self, flag: Flag) -> bool {
+        self.f & (flag as u8) > 0
     }
     /// Set the zero flag `z`.
     pub fn z(&mut self, value: bool) {
-        let v: u8 = if value { 1 } else { 0 };
-        self.f = (self.f & 0b0111_1111) | (v << 7)
+        self.set_flag(Flag::Z, value);
     }
     /// Get the zero flag `z` from the `f` register (pos 7).
-    pub fn get_flag_z(&self) -> bool {
-        self.f & 0x80 > 0
-    }
-    /// Set the subtraction flag `n` in the `f` register (pos 6).
-    /// The least significant bit of `value` is used.
-    pub fn set_flag_n(&mut self, value: u8) {
-        self.f = (self.f & 0b1011_1111) | ((value & 0b0000_0001) << 6)
+    pub fn get_z(&self) -> bool {
+        self.get_flag(Flag::Z)
     }
     /// Set the subtraction flag `n`.
     pub fn n(&mut self, value: bool) {
-        let v: u8 = if value { 1 } else { 0 };
-        self.f = (self.f & 0b1011_1111) | (v << 6)
+        self.set_flag(Flag::N, value);
     }
     /// Get the subtraction flag `n` from the `f` register (pos 6).
-    pub fn get_flag_n(&self) -> bool {
-        self.f & 0x40 > 0
-    }
-    /// Set the half-carry flag `h` in the `f` register (pos 5).
-    /// The least significant bit of `value` is used.
-    pub fn set_flag_h(&mut self, value: u8) {
-        self.f = (self.f & 0b1101_1111) | ((value & 0b0000_0001) << 5)
+    pub fn get_n(&self) -> bool {
+        self.get_flag(Flag::N)
     }
     /// Set the half-carry flag `h`.
     pub fn h(&mut self, value: bool) {
-        let v: u8 = if value { 1 } else { 0 };
-        self.f = (self.f & 0b1101_1111) | (v << 5)
+        self.set_flag(Flag::H, value);
     }
     /// Get the half-carry flag `h` from the `f` register (pos 5).
-    pub fn get_flag_h(&self) -> bool {
-        self.f & 0x20 > 0
-    }
-    /// Set the carry flag `c` in the `f` register (pos 4).
-    /// The least significant bit of `value` is used.
-    pub fn set_flag_c(&mut self, value: u8) {
-        self.f = (self.f & 0b1110_1111) | ((value & 0b0000_0001) << 4)
+    pub fn get_h(&self) -> bool {
+        self.get_flag(Flag::H)
     }
     /// Set the carry flag `c`.
     pub fn c(&mut self, value: bool) {
-        let v: u8 = if value { 1 } else { 0 };
-        self.f = (self.f & 0b1110_1111) | (v << 4)
+        self.set_flag(Flag::C, value);
     }
     /// Get the carry flag `c` from the `f` register (pos 4).
-    pub fn get_flag_c(&self) -> bool {
-        self.f & 0x10 > 0
+    pub fn get_c(&self) -> bool {
+        self.get_flag(Flag::C)
     }
 }

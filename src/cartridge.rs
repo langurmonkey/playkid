@@ -1,12 +1,11 @@
 use std::fs::File;
-use std::io;
 use std::io::prelude::*;
-use std::io::Error;
+use std::io::{Error, ErrorKind, Result};
 
 /// A representation of a cartridge..
 pub struct Cartridge {
     /// Holds the ROM data in an array of bytes.
-    data: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 const LOGO: [u8; 48] = [
@@ -16,7 +15,7 @@ const LOGO: [u8; 48] = [
 ];
 
 impl Cartridge {
-    pub fn new(rom: &str, check_logo: bool) -> io::Result<Self> {
+    pub fn new(rom: &str, check_logo: bool) -> Result<Self> {
         let mut file = File::open(rom)?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
@@ -29,7 +28,10 @@ impl Cartridge {
             let mut i: usize = 0;
             for u in slice.iter().cloned() {
                 if u != LOGO[i] {
-                    return Err(Error::other("Incorrect logo sequence!"));
+                    return Err(Error::new(
+                        ErrorKind::InvalidData,
+                        "Incorrect logo sequence!",
+                    ));
                 }
                 i += 1;
             }
