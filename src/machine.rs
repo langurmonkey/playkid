@@ -27,6 +27,8 @@ pub struct GameBoy<'a> {
     running: bool,
     /// Debug mode flag.
     debug: bool,
+    /// Cycle counter.
+    cycles: u32,
 }
 
 impl<'a> GameBoy<'a> {
@@ -38,38 +40,37 @@ impl<'a> GameBoy<'a> {
             ei: 0,
             di: 0,
             running: false,
+            cycles: 0,
             debug,
         }
     }
     /// Starts the execution of the machine.
     pub fn start(&mut self) {
         self.running = true;
-        self.cycle();
+        while self.running {
+            self.cycles += self.cycle() as u32;
+        }
     }
     /// Main loop of the machine.
-    fn cycle(&mut self) {
-        while self.running {
-            // Fetch next instruction, and parse it.
-            let opcode = self.memory.read(self.registers.pc);
-            let instruction = Instruction::from_byte(opcode);
-            let msg = format!("Incorrect opcode: {:#04X}", opcode);
-            // Execute the instruction.
-            self.execute(instruction.expect(&msg), opcode);
-            // Move the program counter to the next location.
-            self.registers.pc += 1;
-        }
+    fn cycle(&mut self) -> u8 {
+        // Fetch next instruction, and parse it.
+        let opcode = self.read8();
+        let instruction = Instruction::from_byte(opcode);
+        let msg = format!("Incorrect opcode: {:#04X}", opcode);
+        // Execute the instruction.
+        self.execute(instruction.expect(&msg), opcode)
     }
 
     /// Execute a single instruction, and returns the number of cycles it takes.
     fn execute(&mut self, instr: Instruction, opcode: u8) -> u8 {
         // Debug if needed.
         if self.debug {
-            debug::debug(self.registers.pc, &self.memory, &instr, opcode);
+            debug::debug(self.registers.pc, &self.memory, &instr, opcode, self.cycles);
         }
 
         // Actually execute the instruction.
         match instr {
-            // NOP: do nothing
+            // NOP: no operation.
             Instruction::NOP() => 1,
             // STOP
             Instruction::STOP() => {
@@ -129,7 +130,7 @@ impl<'a> GameBoy<'a> {
                         1
                     }
                     R8::HL => {
-                        self.registers.b = self.memory.read(self.registers.get_hl());
+                        self.registers.b = self.memory.read8(self.registers.get_hl());
                         2
                     }
                     R8::A => {
@@ -160,7 +161,7 @@ impl<'a> GameBoy<'a> {
                         1
                     }
                     R8::HL => {
-                        self.registers.c = self.memory.read(self.registers.get_hl());
+                        self.registers.c = self.memory.read8(self.registers.get_hl());
                         2
                     }
                     R8::A => {
@@ -191,7 +192,7 @@ impl<'a> GameBoy<'a> {
                         1
                     }
                     R8::HL => {
-                        self.registers.d = self.memory.read(self.registers.get_hl());
+                        self.registers.d = self.memory.read8(self.registers.get_hl());
                         2
                     }
                     R8::A => {
@@ -222,7 +223,7 @@ impl<'a> GameBoy<'a> {
                         1
                     }
                     R8::HL => {
-                        self.registers.e = self.memory.read(self.registers.get_hl());
+                        self.registers.e = self.memory.read8(self.registers.get_hl());
                         2
                     }
                     R8::A => {
@@ -253,7 +254,7 @@ impl<'a> GameBoy<'a> {
                         1
                     }
                     R8::HL => {
-                        self.registers.h = self.memory.read(self.registers.get_hl());
+                        self.registers.h = self.memory.read8(self.registers.get_hl());
                         2
                     }
                     R8::A => {
@@ -284,7 +285,7 @@ impl<'a> GameBoy<'a> {
                     }
                     R8::L => 1,
                     R8::HL => {
-                        self.registers.l = self.memory.read(self.registers.get_hl());
+                        self.registers.l = self.memory.read8(self.registers.get_hl());
                         2
                     }
                     R8::A => {
@@ -349,7 +350,7 @@ impl<'a> GameBoy<'a> {
                         1
                     }
                     R8::HL => {
-                        self.registers.a = self.memory.read(self.registers.get_hl());
+                        self.registers.a = self.memory.read8(self.registers.get_hl());
                         2
                     }
                     R8::A => 1,
@@ -431,33 +432,33 @@ impl<'a> GameBoy<'a> {
             // LD A, x
             Instruction::LDtoA(r16ld) => match r16ld {
                 R16LD::BC => {
-                    self.registers.a = self.memory.read(self.registers.get_bc());
+                    self.registers.a = self.memory.read8(self.registers.get_bc());
                     2
                 }
                 R16LD::DE => {
-                    self.registers.a = self.memory.read(self.registers.get_de());
+                    self.registers.a = self.memory.read8(self.registers.get_de());
                     2
                 }
                 R16LD::HLp => {
-                    self.registers.a = self.memory.read(self.registers.get_hl_plus());
+                    self.registers.a = self.memory.read8(self.registers.get_hl_plus());
                     2
                 }
                 R16LD::HLm => {
-                    self.registers.a = self.memory.read(self.registers.get_hl_minus());
+                    self.registers.a = self.memory.read8(self.registers.get_hl_minus());
                     2
                 }
                 R16LD::A8 => {
                     let val = 0xFF00 | (self.read8() as u16);
-                    self.registers.a = self.memory.read(val);
+                    self.registers.a = self.memory.read8(val);
                     3
                 }
                 R16LD::C => {
-                    self.registers.a = self.memory.read(0xFF00 | (self.registers.c as u16));
+                    self.registers.a = self.memory.read8(0xFF00 | (self.registers.c as u16));
                     2
                 }
                 R16LD::A16 => {
                     let val = self.read16();
-                    self.registers.a = self.memory.read(val);
+                    self.registers.a = self.memory.read8(val);
                     4
                 }
             },
@@ -530,7 +531,7 @@ impl<'a> GameBoy<'a> {
                     1
                 }
                 R8::HL => {
-                    let val = self.memory.read(self.registers.get_hl());
+                    let val = self.memory.read8(self.registers.get_hl());
                     self.add(val, false);
                     2
                 }
@@ -566,7 +567,7 @@ impl<'a> GameBoy<'a> {
                     1
                 }
                 R8::HL => {
-                    let val = self.memory.read(self.registers.get_hl());
+                    let val = self.memory.read8(self.registers.get_hl());
                     self.add(val, false);
                     2
                 }
@@ -602,7 +603,7 @@ impl<'a> GameBoy<'a> {
                     1
                 }
                 R8::HL => {
-                    let val = self.memory.read(self.registers.get_hl());
+                    let val = self.memory.read8(self.registers.get_hl());
                     self.sub(val, false);
                     2
                 }
@@ -638,7 +639,7 @@ impl<'a> GameBoy<'a> {
                     1
                 }
                 R8::HL => {
-                    let val = self.memory.read(self.registers.get_hl());
+                    let val = self.memory.read8(self.registers.get_hl());
                     self.sub(val, false);
                     2
                 }
@@ -674,7 +675,7 @@ impl<'a> GameBoy<'a> {
                     1
                 }
                 R8::HL => {
-                    let val = self.memory.read(self.registers.get_hl());
+                    let val = self.memory.read8(self.registers.get_hl());
                     self.and(val);
                     2
                 }
@@ -710,7 +711,7 @@ impl<'a> GameBoy<'a> {
                     1
                 }
                 R8::HL => {
-                    let val = self.memory.read(self.registers.get_hl());
+                    let val = self.memory.read8(self.registers.get_hl());
                     self.xor(val);
                     2
                 }
@@ -746,7 +747,7 @@ impl<'a> GameBoy<'a> {
                     1
                 }
                 R8::HL => {
-                    let val = self.memory.read(self.registers.get_hl());
+                    let val = self.memory.read8(self.registers.get_hl());
                     self.or(val);
                     2
                 }
@@ -782,7 +783,7 @@ impl<'a> GameBoy<'a> {
                     1
                 }
                 R8::HL => {
-                    let val = self.memory.read(self.registers.get_hl());
+                    let val = self.memory.read8(self.registers.get_hl());
                     self.cp(val);
                     2
                 }
@@ -1000,7 +1001,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val_inc = self.inc(self.memory.read(hl));
+                    let val_inc = self.inc(self.memory.read8(hl));
                     self.memory.write(hl, val_inc);
                     3
                 }
@@ -1037,7 +1038,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val_dec = self.dec(self.memory.read(hl));
+                    let val_dec = self.dec(self.memory.read8(hl));
                     self.memory.write(hl, val_dec);
                     3
                 }
@@ -1370,7 +1371,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let value = self.memory.read(hl);
+                    let value = self.memory.read8(hl);
                     let value2 = self.rlc(value);
                     self.memory.write(hl, value2);
                     4
@@ -1407,7 +1408,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let value = self.memory.read(hl);
+                    let value = self.memory.read8(hl);
                     let value2 = self.rrc(value);
                     self.memory.write(hl, value2);
                     4
@@ -1444,7 +1445,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let value = self.memory.read(hl);
+                    let value = self.memory.read8(hl);
                     let value2 = self.rl(value);
                     self.memory.write(hl, value2);
                     4
@@ -1481,7 +1482,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let value = self.memory.read(hl);
+                    let value = self.memory.read8(hl);
                     let value2 = self.rr(value);
                     self.memory.write(hl, value2);
                     4
@@ -1518,7 +1519,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let value = self.memory.read(hl);
+                    let value = self.memory.read8(hl);
                     let value2 = self.sla(value);
                     self.memory.write(hl, value2);
                     4
@@ -1555,7 +1556,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let value = self.memory.read(hl);
+                    let value = self.memory.read8(hl);
                     let value2 = self.sra(value);
                     self.memory.write(hl, value2);
                     4
@@ -1592,7 +1593,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let value = self.memory.read(hl);
+                    let value = self.memory.read8(hl);
                     let value2 = self.swap(value);
                     self.memory.write(hl, value2);
                     4
@@ -1629,7 +1630,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let value = self.memory.read(hl);
+                    let value = self.memory.read8(hl);
                     let value2 = self.srl(value);
                     self.memory.write(hl, value2);
                     4
@@ -1665,7 +1666,7 @@ impl<'a> GameBoy<'a> {
                     2
                 }
                 R8::HL => {
-                    let value = self.memory.read(self.registers.get_hl());
+                    let value = self.memory.read8(self.registers.get_hl());
                     self.bit(value, 0);
                     3
                 }
@@ -1700,7 +1701,7 @@ impl<'a> GameBoy<'a> {
                     2
                 }
                 R8::HL => {
-                    let value = self.memory.read(self.registers.get_hl());
+                    let value = self.memory.read8(self.registers.get_hl());
                     self.bit(value, 1);
                     3
                 }
@@ -1735,7 +1736,7 @@ impl<'a> GameBoy<'a> {
                     2
                 }
                 R8::HL => {
-                    let value = self.memory.read(self.registers.get_hl());
+                    let value = self.memory.read8(self.registers.get_hl());
                     self.bit(value, 2);
                     3
                 }
@@ -1770,7 +1771,7 @@ impl<'a> GameBoy<'a> {
                     2
                 }
                 R8::HL => {
-                    let value = self.memory.read(self.registers.get_hl());
+                    let value = self.memory.read8(self.registers.get_hl());
                     self.bit(value, 3);
                     3
                 }
@@ -1805,7 +1806,7 @@ impl<'a> GameBoy<'a> {
                     2
                 }
                 R8::HL => {
-                    let value = self.memory.read(self.registers.get_hl());
+                    let value = self.memory.read8(self.registers.get_hl());
                     self.bit(value, 4);
                     3
                 }
@@ -1840,7 +1841,7 @@ impl<'a> GameBoy<'a> {
                     2
                 }
                 R8::HL => {
-                    let value = self.memory.read(self.registers.get_hl());
+                    let value = self.memory.read8(self.registers.get_hl());
                     self.bit(value, 5);
                     3
                 }
@@ -1875,7 +1876,7 @@ impl<'a> GameBoy<'a> {
                     2
                 }
                 R8::HL => {
-                    let value = self.memory.read(self.registers.get_hl());
+                    let value = self.memory.read8(self.registers.get_hl());
                     self.bit(value, 6);
                     3
                 }
@@ -1910,7 +1911,7 @@ impl<'a> GameBoy<'a> {
                     2
                 }
                 R8::HL => {
-                    let value = self.memory.read(self.registers.get_hl());
+                    let value = self.memory.read8(self.registers.get_hl());
                     self.bit(value, 7);
                     3
                 }
@@ -1946,7 +1947,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) & 0xFE;
+                    let val = self.memory.read8(hl) & 0xFE;
                     self.memory.write(hl, val);
                     4
                 }
@@ -1982,7 +1983,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) & 0xFD;
+                    let val = self.memory.read8(hl) & 0xFD;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2018,7 +2019,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) & 0xFB;
+                    let val = self.memory.read8(hl) & 0xFB;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2054,7 +2055,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) & 0xF7;
+                    let val = self.memory.read8(hl) & 0xF7;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2090,7 +2091,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) & 0xEF;
+                    let val = self.memory.read8(hl) & 0xEF;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2126,7 +2127,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) & 0xDF;
+                    let val = self.memory.read8(hl) & 0xDF;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2162,7 +2163,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) & 0xDF;
+                    let val = self.memory.read8(hl) & 0xDF;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2198,7 +2199,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) & 0x7F;
+                    let val = self.memory.read8(hl) & 0x7F;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2234,7 +2235,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) | 0x01;
+                    let val = self.memory.read8(hl) | 0x01;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2270,7 +2271,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) | 0x02;
+                    let val = self.memory.read8(hl) | 0x02;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2306,7 +2307,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) | 0x04;
+                    let val = self.memory.read8(hl) | 0x04;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2342,7 +2343,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) | 0x08;
+                    let val = self.memory.read8(hl) | 0x08;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2378,7 +2379,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) | 0x10;
+                    let val = self.memory.read8(hl) | 0x10;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2414,7 +2415,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) | 0x20;
+                    let val = self.memory.read8(hl) | 0x20;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2450,7 +2451,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) | 0x40;
+                    let val = self.memory.read8(hl) | 0x40;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2486,7 +2487,7 @@ impl<'a> GameBoy<'a> {
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read(hl) | 0x80;
+                    let val = self.memory.read8(hl) | 0x80;
                     self.memory.write(hl, val);
                     4
                 }
@@ -2501,15 +2502,19 @@ impl<'a> GameBoy<'a> {
     }
 
     /// TODO: implement this.
-    fn halt(&self) {}
+    fn halt(&mut self) {
+        self.running = false;
+    }
 
     /// TODO: implement this.
-    fn stop(&self) {}
+    fn stop(&mut self) {
+        self.running = false;
+    }
 
     /// Reads the next byte in memory at the location of `pc`, and
     /// increments `pc`.
     fn read8(&mut self) -> u8 {
-        let result = self.memory.read(self.registers.pc);
+        let result = self.memory.read8(self.registers.pc);
         self.registers.pc = self.registers.pc.wrapping_add(1);
         result
     }

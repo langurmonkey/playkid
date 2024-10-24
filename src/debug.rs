@@ -7,11 +7,12 @@ use memory::Memory;
 use std::io::{stdin, stdout, Read, Write};
 
 /// Helps with debugging instructions.
-pub fn debug(pc: u16, mem: &Memory, instr: &Instruction, opcode: u8) {
+pub fn debug(pc: u16, mem: &Memory, instr: &Instruction, opcode: u8, cycles: u32) {
     let next_word = mem.read16(pc);
-    println!("PC:          {:#x}", pc);
-    println!("Next word:   {:#x}", next_word);
-    println!("Opcode:      {:#x}", opcode);
+    println!("Cycle:       {}", cycles);
+    println!("PC:          {:#06X}", pc);
+    println!("Next word:   {:#06x}", next_word);
+    println!("Opcode:      {:#04x}", opcode);
     println!("Instruction: {:?}", instr);
     println!();
     pause();

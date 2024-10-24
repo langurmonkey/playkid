@@ -1,9 +1,7 @@
 use crate::cartridge;
 use crate::constants;
-use crate::machine;
 
 use cartridge::Cartridge;
-use machine::GameBoy;
 
 /// # Memory
 /// The Game Boy uses a 2-byte address space (0x0000 to 0xFFFF) to map the different
@@ -65,7 +63,7 @@ impl<'a> Memory<'a> {
     }
 
     /// Read a byte of memory at the given `address`.
-    pub fn read(&self, address: u16) -> u8 {
+    pub fn read8(&self, address: u16) -> u8 {
         match address {
             ..=0x3FFF => {
                 // 16kB bank #0 (cartridge).
@@ -110,7 +108,7 @@ impl<'a> Memory<'a> {
             ..=0xFEFF => {
                 // Empty, unusable.
                 panic!(
-                    "Attempted usage of forbidden area 0xFEA0-0xFEFE: {:#x}",
+                    "Attempted usage of forbidden area 0xFEA0-0xFEFE: {:#06X}",
                     address
                 )
             }
@@ -135,14 +133,14 @@ impl<'a> Memory<'a> {
     }
     /// Read two bytes of memory at the given `address`.
     pub fn read16(&self, address: u16) -> u16 {
-        (self.read(address) as u16) | ((self.read(address + 1) as u16) << 8)
+        (self.read8(address) as u16) | ((self.read8(address + 1) as u16) << 8)
     }
     /// Write the given byte `value` at the given `address`.
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
             ..=0x7FFF => {
                 // Cartridge (ROM + switchable banks).
-                panic!("Attempted to write to cartridge: {:#x}", address);
+                panic!("Attempted to write to cartridge: {:#06X}", address);
             }
             ..=0x9FFF => {
                 // 8kB VRAM.
@@ -150,7 +148,7 @@ impl<'a> Memory<'a> {
             }
             ..=0xBFFF => {
                 // 8kB switchable RAM bank (cartridge).
-                panic!("Attempted write to cartridge: {:#x}", address);
+                panic!("Attempted write to cartridge: {:#06X}", address);
             }
             ..=0xDFFF => {
                 // 8kB WRAM.
@@ -167,7 +165,7 @@ impl<'a> Memory<'a> {
             ..=0xFEFF => {
                 // Empty, unusable.
                 panic!(
-                    "Attempted usage of forbidden area 0xFEA0-0xFEFE: {:#x}",
+                    "Attempted usage of forbidden area 0xFEA0-0xFEFE: {:#06X}",
                     address
                 )
             }
