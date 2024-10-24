@@ -7,6 +7,8 @@ use std::str;
 pub struct Cartridge {
     /// Holds the ROM data in an array of bytes.
     pub data: Vec<u8>,
+    /// Cartridge type byte.
+    pub cart_type: u8,
 }
 
 const LOGO: [u8; 48] = [
@@ -46,6 +48,28 @@ impl Cartridge {
             println!("Title: {}", title);
         }
 
-        Ok(Self { data: buffer })
+        // Color or not color.
+        {
+            if buffer[0x143] == 0x80 {
+                // Color GB.
+                println!(" -> GB Color cartridge");
+            } else {
+                // Not color GB.
+                println!(" -> Regular GB cartridge");
+            }
+        }
+
+        // Cartridge type.
+        let t = buffer[0x147];
+        println!("Cartridge type: {}", t);
+
+        if t > 0 {
+            panic!("Only ROM ONLY cartridges supported (0)");
+        }
+
+        Ok(Self {
+            data: buffer,
+            cart_type: t,
+        })
     }
 }
