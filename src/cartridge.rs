@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind, Result};
+use std::str;
 
 /// A representation of a cartridge..
 pub struct Cartridge {
@@ -21,10 +22,10 @@ impl Cartridge {
         file.read_to_end(&mut buffer)?;
 
         // Check Nintendo logo in rom file.
-        // In 0x104 - 0x133 (260 to 307), with contents in LOGO.
+        // In 0x104 - 0x133, with contents in LOGO.
         if check_logo {
             //Cartridge::check_checksum(&buffer);
-            let slice = &buffer[260..307];
+            let slice = &buffer[0x104..0x133];
             let mut i: usize = 0;
             for u in slice.iter().cloned() {
                 if u != LOGO[i] {
@@ -36,6 +37,13 @@ impl Cartridge {
                 i += 1;
             }
             println!("Correct logo sequence");
+        }
+
+        // Get title.
+        {
+            let slice = &buffer[0x134..0x142];
+            let title = str::from_utf8(slice).expect("Error getting ROM title");
+            println!("Title: {}", title);
         }
 
         Ok(Self { data: buffer })
