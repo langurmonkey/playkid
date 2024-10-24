@@ -60,16 +60,55 @@ impl Cartridge {
         }
 
         // Cartridge type.
-        let t = buffer[0x147];
-        println!("Cartridge type: {}", t);
+        let mut cart_type;
+        {
+            let t = buffer[0x147];
+            println!("Cartridge type: {}", t);
 
-        if t > 0 {
+            cart_type = t;
+        }
+
+        // ROM size.
+        {
+            let rs: u8 = buffer[0x148];
+            let size = match rs {
+                0 => "256 kb",
+                1 => "512 Kb",
+                2 => "1 Mb",
+                3 => "2 Mb",
+                4 => "4 Mb",
+                5 => "8 Mb",
+                6 => "16 Mb",
+                0x52 => "9 Mb",
+                0x53 => "10 Mb",
+                0x54 => "12 Mb",
+                _ => "Unknown",
+            };
+            println!("ROM size: {}", size);
+        }
+
+        // RAM size.
+        {
+            let rs: u8 = buffer[0x149];
+            let size = match rs {
+                0 => "No RAM",
+                1 => "16 kb",
+                2 => "64 kb",
+                3 => "256 kb",
+                4 => "1 Mb",
+                _ => "Unknown",
+            };
+            println!("RAM size: {}", size);
+        }
+
+        // Check supported modes.
+        if cart_type > 0 {
             panic!("Only ROM ONLY cartridges supported (0)");
         }
 
         Ok(Self {
             data: buffer,
-            cart_type: t,
+            cart_type,
         })
     }
 }
