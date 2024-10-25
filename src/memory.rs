@@ -225,6 +225,8 @@ impl<'a> Memory<'a> {
                     address
                 )
             }
+            // VRAM registers.
+            0xFF40..=0xFF4F => self.ppu.read(address),
             0xFF00..=0xFF7F => {
                 // I/O registers.
                 self.io[(address - 0xFF00) as usize]
@@ -282,6 +284,8 @@ impl<'a> Memory<'a> {
                     address
                 )
             }
+            // VRAM registers.
+            0xFF40..=0xFF4F => self.ppu.write(address, value),
             0xFF00..=0xFF7F => {
                 // I/O registers.
                 self.io[(address - 0xFF00) as usize] = value;

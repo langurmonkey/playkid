@@ -110,6 +110,9 @@ impl PPU {
             0x8000..=0x9FFF => self.vram[(address - 0x8000) as usize],
             // OAM.
             0xFE00..=0xFE9F => self.oam[(address - 0xFE00) as usize],
+
+            // Bank select.
+            0xFF40 => 0xFF,
             _ => 0xFF,
         }
     }
