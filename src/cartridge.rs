@@ -18,14 +18,14 @@ const LOGO: [u8; 48] = [
 ];
 
 impl Cartridge {
-    pub fn new(rom: &str, check_logo: bool) -> Result<Self> {
+    pub fn new(rom: &str, skip_checksum: bool) -> Result<Self> {
         let mut file = File::open(rom)?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
         // Check Nintendo logo in rom file.
         // In 0x104 - 0x133, with contents in LOGO.
-        if check_logo {
+        if !skip_checksum {
             //Cartridge::check_checksum(&buffer);
             let slice = &buffer[0x104..0x133];
             let mut i: usize = 0;
@@ -33,12 +33,12 @@ impl Cartridge {
                 if u != LOGO[i] {
                     return Err(Error::new(
                         ErrorKind::InvalidData,
-                        "Incorrect logo sequence!",
+                        "Incorrect Nintendo logo sequence in 0x104-0x133!",
                     ));
                 }
                 i += 1;
             }
-            println!("Correct logo sequence");
+            println!("OK: Logo sequence");
         }
 
         // Get title.
@@ -59,11 +59,19 @@ impl Cartridge {
             }
         }
 
+        // Super Game Boy.
+        {
+            let sgbf = buffer[0x146];
+            if sgbf == 0x03 {
+                println!(" -> Super Game Boy functions supported");
+            }
+        }
+
         // Cartridge type.
-        let mut cart_type;
+        let cart_type;
         {
             let t = buffer[0x147];
-            println!("Cartridge type: {}", t);
+            println!(" -> Cartridge type: {}", t);
 
             cart_type = t;
         }
@@ -72,19 +80,21 @@ impl Cartridge {
         {
             let rs: u8 = buffer[0x148];
             let size = match rs {
-                0 => "256 kb",
-                1 => "512 Kb",
-                2 => "1 Mb",
-                3 => "2 Mb",
-                4 => "4 Mb",
-                5 => "8 Mb",
-                6 => "16 Mb",
-                0x52 => "9 Mb",
-                0x53 => "10 Mb",
-                0x54 => "12 Mb",
-                _ => "Unknown",
+                0 => "32 KiB (2 banks)",
+                1 => "64 KiB (4 banks)",
+                2 => "128 KiB (8 banks)",
+                3 => "256 KiB",
+                4 => "512 KiB",
+                5 => "1 MiB",
+                6 => "2 MiB",
+                7 => "4 MiB",
+                8 => "8 MiB",
+                0x52 => "1.1 MiB",
+                0x53 => "1.2 MiB",
+                0x54 => "1.5 MiB",
+                _ => &format!("Unknown ({:#04X})", rs),
             };
-            println!("ROM size: {}", size);
+            println!(" -> ROM size: {}", size);
         }
 
         // RAM size.
@@ -92,13 +102,58 @@ impl Cartridge {
             let rs: u8 = buffer[0x149];
             let size = match rs {
                 0 => "No RAM",
-                1 => "16 kb",
-                2 => "64 kb",
-                3 => "256 kb",
-                4 => "1 Mb",
-                _ => "Unknown",
+                1 => "Error, unused value!",
+                2 => "8 KiB (1 bank)",
+                3 => "32 KiB (4 banks of 8 KiB each)",
+                4 => "128 KiB (16 banks of 8 KiB each)",
+                5 => "64 KiB (8 banks of 8 KiB each)",
+                _ => &format!("Unknown ({:#04X})", rs),
             };
-            println!("RAM size: {}", size);
+            println!(" -> RAM size: {}", size);
+        }
+
+        // Destination code.
+        {
+            let dc: u8 = buffer[0x14A];
+            match dc {
+                0 => println!(" -> Destination code: Japan"),
+                1 => println!(" -> Destination code: Overseas only"),
+                _ => println!(" -> Desination code: Unknown ({:#04X})", dc),
+            }
+        }
+        // Header checksum.
+        if !skip_checksum {
+            let hc: u8 = buffer[0x14D];
+            let mut cs: i32 = 0;
+            for address in 0x134..0x14D {
+                cs = cs - buffer[address as usize] as i32 - 1
+            }
+            if hc != cs as u8 {
+                panic!(
+                    "Header checksum incorrect: [mem]{:#04X} != [cs]{:#04X}",
+                    hc, cs as u8
+                );
+            } else {
+                println!("OK: Header checksum: {:#04X}", cs as u8);
+            }
+        }
+        // Global checksum.
+        if !skip_checksum {
+            let gc: u16 = ((buffer[0x14E] as u16) << 8) | (buffer[0x14F] as u16);
+            let mut cs: u32 = 0;
+            for address in 0..buffer.len() {
+                if address != 0x14E && address != 0x14F {
+                    cs += buffer[address as usize] as u32;
+                }
+            }
+            if gc != cs as u16 {
+                panic!(
+                    "Global checksum incorrect: [mem]{:#06X} != [cs]{:#06X}",
+                    gc, cs as u16
+                );
+            } else {
+                println!("OK: Global checksum: {:#06X}", cs as u16);
+            }
         }
 
         // Check supported modes.

@@ -23,6 +23,9 @@ struct Args {
     /// Activate debug mode.
     #[arg(short, long)]
     debug: bool,
+    /// Skip global checksum, header checksum, and logo sequence check.
+    #[arg(short, long)]
+    skipcheck: bool,
 }
 
 fn main() -> io::Result<()> {
@@ -35,7 +38,7 @@ fn main() -> io::Result<()> {
     }
 
     // Load rom file into cartridge.
-    let cart = Cartridge::new(rom, true).expect("Error reading rom file");
+    let cart = Cartridge::new(rom, args.skipcheck).expect("Error reading rom file");
 
     // Create a game boy with the given cartridge.
     let mut gameboy = GameBoy::new(&cart, args.debug);
