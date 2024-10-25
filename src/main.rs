@@ -24,6 +24,9 @@ struct Args {
     /// Activate debug mode.
     #[arg(short, long)]
     debug: bool,
+    /// If debug mode is active, this enables step-by-step execution.
+    #[arg(long)]
+    step: bool,
     /// Skip global checksum, header checksum, and logo sequence check.
     #[arg(short, long)]
     skipcheck: bool,
@@ -42,7 +45,7 @@ fn main() -> io::Result<()> {
     let cart = Cartridge::new(rom, args.skipcheck).expect("Error reading rom file");
 
     // Create a game boy with the given cartridge.
-    let mut gameboy = GameBoy::new(&cart, args.debug);
+    let mut gameboy = GameBoy::new(&cart, args.debug, args.step);
     // Initialize the Game Boy state.
     gameboy.init();
     // Start the machine.

@@ -6,7 +6,7 @@ use memory::Memory;
 
 use std::io::{stdin, stdout, Read, Write};
 
-/// Helps with debugging instructions.
+/// Prints debug information for a given instruction.
 pub fn debug(pc: u16, mem: &Memory, instr: &Instruction, opcode: u8, cycles: u32) {
     let next_word = mem.read16(pc);
     println!("Cycle:       {}", cycles);
@@ -15,6 +15,11 @@ pub fn debug(pc: u16, mem: &Memory, instr: &Instruction, opcode: u8, cycles: u32
     println!("Opcode:      {:#04x}", opcode);
     println!("Instruction: {:?}", instr);
     println!();
+}
+/// Prints debug information for a given instruction, and pauses the
+/// execution until user input.
+pub fn debug_step(pc: u16, mem: &Memory, instr: &Instruction, opcode: u8, cycles: u32) {
+    debug(pc, mem, instr, opcode, cycles);
     pause();
 }
 

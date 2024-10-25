@@ -5,17 +5,24 @@ use sdl2::rect::Rect;
 use sdl2::{pixels::Color, EventPump};
 use sdl2::{render::Canvas, video::Window};
 
+/// A palette holds four colors.
+pub struct Palette {
+    c1: Color,
+    c2: Color,
+    c3: Color,
+    c4: Color,
+}
+
 /// Holds the display data, and renders the image.
 pub struct Display {
     pub canvas: Canvas<Window>,
     pub event_pump: EventPump,
     pub scale: u32,
-    pub fgcol: Color,
-    pub bgcol: Color,
+    pub palette: Palette,
 }
 
 impl Display {
-    pub fn new(window_title: &str, scale: u32, fg_col: (u8, u8, u8), bg_col: (u8, u8, u8)) -> Self {
+    pub fn new(window_title: &str, scale: u32) -> Self {
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
         let event_pump = sdl_context.event_pump().unwrap();
@@ -31,18 +38,25 @@ impl Display {
 
         let canvas = window.into_canvas().build().unwrap();
 
+        // The default palette.
+        let palette = Palette {
+            c1: Color::RGB(8, 24, 32),
+            c2: Color::RGB(52, 104, 86),
+            c3: Color::RGB(136, 192, 112),
+            c4: Color::RGB(224, 248, 208),
+        };
+
         Display {
             canvas,
             event_pump,
             scale,
-            fgcol: Color::RGB(fg_col.0, fg_col.1, fg_col.2),
-            bgcol: Color::RGB(bg_col.0, bg_col.1, bg_col.2),
+            palette,
         }
     }
 
     // Clears the display to black
     pub fn clear(&mut self) {
-        self.canvas.set_draw_color(self.bgcol);
+        self.canvas.set_draw_color(self.palette.c1);
         self.canvas.clear();
         self.canvas.present();
     }
@@ -55,7 +69,7 @@ impl Display {
             for y in 0..constants::DISPLAY_HEIGHT {
                 if buffer[y * constants::DISPLAY_WIDTH + x] > 0 {
                     // Foreground
-                    self.canvas.set_draw_color(self.fgcol);
+                    self.canvas.set_draw_color(self.palette.c1);
                     self.canvas
                         .fill_rect(Rect::new(
                             (x * scl) as i32,
@@ -66,7 +80,7 @@ impl Display {
                         .unwrap();
                 } else {
                     // Background
-                    self.canvas.set_draw_color(self.bgcol);
+                    self.canvas.set_draw_color(self.palette.c4);
                     self.canvas
                         .fill_rect(Rect::new(
                             (x * scl) as i32,

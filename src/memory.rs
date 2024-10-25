@@ -8,11 +8,11 @@ use cartridge::Cartridge;
 /// types of memory (RAM, VRAM, Cartridge memory, etc.)
 
 /// ## Memory map
-/// 0x0000-0x3FFF: 16kB bank #0                 (cartridge)
-/// 0x4000-0x7FFF: 16kB switchable ROM bank     (cartridge)
-/// 0x8000-0x9FFF: 8kB video RAM                (VRAM)
-/// 0xA000-0xBFFF: 8kB switchable RAM bank      (cartridge)
-/// 0xC000-0xDFFF: 8kB work RAM                 (WRAM)
+/// 0x0000-0x3FFF: 16 KiB bank #0                 (cartridge)
+/// 0x4000-0x7FFF: 16 KiB switchable ROM bank     (cartridge)
+/// 0x8000-0x9FFF: 8 KiB video RAM                (VRAM)
+/// 0xA000-0xBFFF: 8 KiB switchable RAM bank      (cartridge)
+/// 0xC000-0xDFFF: 8 KiB work RAM                 (WRAM)
 /// 0xE000-0xFDFF: Echo RAM                     (mirror of 0xC000-0xDFFF)
 /// 0xFE00-0xFE9F: Object attribute memory      (OAM)
 /// 0xFEA0-0xFEFF: Empty, not usable
@@ -22,9 +22,15 @@ use cartridge::Cartridge;
 /// 0xFF80-0xFFFF: Interrupt Enable Register    (IER)
 
 /// ## Video RAM
-/// The Video RAM, or VRAM, are 8kB located in addresses 0x8000 to 0xA000.
+/// The Video RAM, or VRAM, are 8 KiB located in addresses 0x8000 to 0xA000.
 /// A **memory bank** contains 384 tiles, or 3 tile blocks, so 6 KiB of tile data.
-/// After that, it  has two maps of 1024 bytes each.
+/// After that, it  has two maps of 1024 bytes each (32 rows of 32 bytes each), the
+/// Background Tile Map. Each byte contains the tile number to be displayed.
+/// The tiles are taken from the Tile Data Table, which is at either 0x8000-0x8FFF,
+/// or 0x8800-ox97FF. In the first case, tiles are numbered as unsigned bytes (u8).
+/// In the second case, the numbers are signed (i8), and tile 0 lies at 0x9000.
+/// The Tile Data Table address can be selected via the LCDC register.
+///
 /// In total, a bank has 8 KiB of memory.
 ///
 /// - A **tile** has 8x8 pixels, with a color depth of 2 bpp. Each tile is 16 bytes.
@@ -176,6 +182,16 @@ impl<'a> Memory<'a> {
         self.write(0xFFFF, 0x00);
     }
 
+    /// Gets the value of the IE register.
+    pub fn get_ie(&self) -> u8 {
+        self.read8(0xFFFF)
+    }
+    /// Gets the address of the Tile Data Table for the background,
+    /// which is in register LCDC.
+    pub fn get_lcdc(&self) -> u16 {
+        self.read16(0xFF40)
+    }
+
     /// Read a byte of memory at the given `address`.
     pub fn read8(&self, address: u16) -> u8 {
         match address {
@@ -254,7 +270,7 @@ impl<'a> Memory<'a> {
         match address {
             ..=0x7FFF => {
                 // Cartridge (ROM + switchable banks).
-                panic!("Attempted to write to cartridge: {:#06X}", address);
+                println!("Attempted to write to cartridge ROM: {:#06X}", address);
             }
             ..=0x9FFF => {
                 // 8kB VRAM.
@@ -262,7 +278,7 @@ impl<'a> Memory<'a> {
             }
             ..=0xBFFF => {
                 // 8kB switchable RAM bank (cartridge).
-                panic!("Attempted write to cartridge: {:#06X}", address);
+                println!("Write to cartridge RAM: {:#06X}", address);
             }
             ..=0xDFFF => {
                 // 8kB WRAM.

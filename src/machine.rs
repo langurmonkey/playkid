@@ -1,14 +1,15 @@
 use crate::cartridge;
 use crate::debug;
+use crate::display;
 use crate::instruction;
 use crate::memory;
 use crate::registers;
 
 use cartridge::Cartridge;
+use display::Display;
 use instruction::{Instruction, CC, R16, R16EXT, R16LD, R8, TGT3};
 use memory::Memory;
 use registers::Registers;
-use std::io;
 
 /// This is our machine, which contains the registers and the memory, and
 /// executes the operations.
@@ -17,6 +18,8 @@ pub struct GameBoy<'a> {
     registers: Registers,
     /// The main memory.
     memory: Memory<'a>,
+    /// The display.
+    display: Display,
     /// Interrupt master enable flag.
     pub ime: bool,
     /// Interrupt master enable flag: EI.
@@ -25,24 +28,28 @@ pub struct GameBoy<'a> {
     di: u32,
     /// Flag that holds the running status.
     running: bool,
-    /// Debug mode flag.
-    debug: bool,
     /// Cycle counter.
     cycles: u32,
+    /// Debug mode flag.
+    debug: bool,
+    /// Step-by-step debug.
+    step: bool,
 }
 
 impl<'a> GameBoy<'a> {
     /// Create a new instance of the Game Boy.
-    pub fn new(cart: &'a Cartridge, debug: bool) -> Self {
+    pub fn new(cart: &'a Cartridge, debug: bool, step: bool) -> Self {
         GameBoy {
             registers: Registers::new(),
             memory: Memory::new(cart),
+            display: Display::new("PlayKid emulator", 5),
             ime: false,
             ei: 0,
             di: 0,
             running: false,
             cycles: 0,
             debug,
+            step,
         }
     }
 
@@ -55,7 +62,10 @@ impl<'a> GameBoy<'a> {
     pub fn start(&mut self) {
         self.running = true;
         while self.running {
+            // Run a CPU cycle.
             self.cycles += self.cycle() as u32;
+            // Clear display.
+            self.display.clear();
         }
     }
     /// Main loop of the machine.
@@ -72,7 +82,11 @@ impl<'a> GameBoy<'a> {
     fn execute(&mut self, instr: Instruction, opcode: u8) -> u8 {
         // Debug if needed.
         if self.debug {
-            debug::debug(self.registers.pc, &self.memory, &instr, opcode, self.cycles);
+            if self.step {
+                debug::debug_step(self.registers.pc, &self.memory, &instr, opcode, self.cycles);
+            } else {
+                debug::debug(self.registers.pc, &self.memory, &instr, opcode, self.cycles);
+            }
         }
 
         // Actually execute the instruction.
@@ -431,8 +445,8 @@ impl<'a> GameBoy<'a> {
                     2
                 }
                 R16LD::A16 => {
-                    let val = self.read16();
-                    self.memory.write(val, self.registers.a);
+                    let addr = self.read16();
+                    self.memory.write(addr, self.registers.a);
                     4
                 }
             },
