@@ -11,6 +11,7 @@ pub struct Cartridge {
     pub cart_type: u8,
 }
 
+/// Game Boy logo sequence.
 const LOGO: [u8; 48] = [
     0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
     0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
@@ -20,14 +21,14 @@ const LOGO: [u8; 48] = [
 impl Cartridge {
     pub fn new(rom: &str, skip_checksum: bool) -> Result<Self> {
         let mut file = File::open(rom)?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
+        let mut data = Vec::new();
+        file.read_to_end(&mut data)?;
 
         // Check Nintendo logo in rom file.
         // In 0x104 - 0x133, with contents in LOGO.
         if !skip_checksum {
             //Cartridge::check_checksum(&buffer);
-            let slice = &buffer[0x104..0x133];
+            let slice = &data[0x104..0x133];
             let mut i: usize = 0;
             for u in slice.iter().cloned() {
                 if u != LOGO[i] {
@@ -43,14 +44,14 @@ impl Cartridge {
 
         // Get title.
         {
-            let slice = &buffer[0x134..0x142];
+            let slice = &data[0x134..0x142];
             let title = str::from_utf8(slice).expect("Error getting ROM title");
             println!("Title: {}", title);
         }
 
         // Color or not color.
         {
-            if buffer[0x143] == 0x80 {
+            if data[0x143] == 0x80 {
                 // Color GB.
                 println!(" -> GB Color cartridge");
             } else {
@@ -61,7 +62,7 @@ impl Cartridge {
 
         // Super Game Boy.
         {
-            let sgbf = buffer[0x146];
+            let sgbf = data[0x146];
             if sgbf == 0x03 {
                 println!(" -> Super Game Boy functions supported");
             }
@@ -70,15 +71,46 @@ impl Cartridge {
         // Cartridge type.
         let cart_type;
         {
-            let t = buffer[0x147];
-            println!(" -> Cartridge type: {}", t);
+            let t = data[0x147];
+            let ct = match t {
+                0x00 => "ROM ONLY",
+                0x01 => "MBC1",
+                0x02 => "MBC1+RAM",
+                0x03 => "MBC1+RAM+BATTERY",
+                0x05 => "MBC2",
+                0x06 => "MBC2+BATTERY",
+                0x08 => "ROM+RAM",
+                0x09 => "ROM+RAM+BATTERY",
+                0x0B => "MMM01",
+                0x0C => "MMM01+RAM",
+                0x0D => "MMM01+RAM+BATTERY",
+                0x0F => "MBC3+TIMER+BATTERY",
+                0x10 => "MBC3+TIMER+RAM+BATTERY",
+                0x11 => "MBC3",
+                0x12 => "MBC3+RAM",
+                0x13 => "MBC3+RAM+BATTERY",
+                0x19 => "MBC5",
+                0x1A => "MBC5+RAM",
+                0x1B => "MBC5+RAM+BATTERY",
+                0x1C => "MBC5+RUMBLE",
+                0x1D => "MBC5+RUMBLE+RAM",
+                0x1E => "MBC5+RUMBLE+RAM+BATTERY",
+                0x20 => "MBC6",
+                0x22 => "MBC7+SENSOR+RUMBLE+RAM+BATTERY",
+                0xFC => "POCKET CAMERA",
+                0xFD => "BANDAI TAMA5",
+                0xFE => "HuC3",
+                0xFF => "MuC1+RAM+BATTERY",
+                _ => &format!("Unknown ({:#40X})", t),
+            };
+            println!(" -> Cartridge type: {} ({})", ct, t);
 
             cart_type = t;
         }
 
         // ROM size.
         {
-            let rs: u8 = buffer[0x148];
+            let rs: u8 = data[0x148];
             let size = match rs {
                 0 => "32 KiB (2 banks)",
                 1 => "64 KiB (4 banks)",
@@ -99,7 +131,7 @@ impl Cartridge {
 
         // RAM size.
         {
-            let rs: u8 = buffer[0x149];
+            let rs: u8 = data[0x149];
             let size = match rs {
                 0 => "No RAM",
                 1 => "Error, unused value!",
@@ -114,7 +146,7 @@ impl Cartridge {
 
         // Destination code.
         {
-            let dc: u8 = buffer[0x14A];
+            let dc: u8 = data[0x14A];
             match dc {
                 0 => println!(" -> Destination code: Japan"),
                 1 => println!(" -> Destination code: Overseas only"),
@@ -123,10 +155,10 @@ impl Cartridge {
         }
         // Header checksum.
         if !skip_checksum {
-            let hc: u8 = buffer[0x14D];
+            let hc: u8 = data[0x14D];
             let mut cs: i32 = 0;
             for address in 0x134..0x14D {
-                cs = cs - buffer[address as usize] as i32 - 1
+                cs = cs - data[address as usize] as i32 - 1
             }
             if hc != cs as u8 {
                 panic!(
@@ -139,11 +171,11 @@ impl Cartridge {
         }
         // Global checksum.
         if !skip_checksum {
-            let gc: u16 = ((buffer[0x14E] as u16) << 8) | (buffer[0x14F] as u16);
+            let gc: u16 = ((data[0x14E] as u16) << 8) | (data[0x14F] as u16);
             let mut cs: u32 = 0;
-            for address in 0..buffer.len() {
+            for address in 0..data.len() {
                 if address != 0x14E && address != 0x14F {
-                    cs += buffer[address as usize] as u32;
+                    cs += data[address as usize] as u32;
                 }
             }
             if gc != cs as u16 {
@@ -161,9 +193,6 @@ impl Cartridge {
             panic!("Only ROM ONLY cartridges supported (0)");
         }
 
-        Ok(Self {
-            data: buffer,
-            cart_type,
-        })
+        Ok(Self { data, cart_type })
     }
 }
