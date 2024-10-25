@@ -5,7 +5,7 @@ pub const MEM_SIZE: usize = 0xFFFF;
 /// Work RAM size (8 KiB).
 pub const WRAM_SIZE: usize = 8192;
 /// Video RAM size (8 KiB).
-pub const VRAM_SIZE: usize = 8192;
+pub const VRAM_SIZE: usize = 8 * 1024;
 // High RAM size (128 bytes).
 pub const HRAM_SIZE: usize = 128;
 // OAM size (160 bytes).

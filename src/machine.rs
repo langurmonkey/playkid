@@ -13,7 +13,7 @@ use registers::Registers;
 
 /// This is our machine, which contains the registers and the memory, and
 /// executes the operations.
-pub struct GameBoy<'a> {
+pub struct Machine<'a> {
     /// Our registers.
     registers: Registers,
     /// The main memory.
@@ -36,10 +36,10 @@ pub struct GameBoy<'a> {
     step: bool,
 }
 
-impl<'a> GameBoy<'a> {
+impl<'a> Machine<'a> {
     /// Create a new instance of the Game Boy.
     pub fn new(cart: &'a Cartridge, debug: bool, step: bool) -> Self {
-        GameBoy {
+        Machine {
             registers: Registers::new(),
             memory: Memory::new(cart),
             display: Display::new("PlayKid emulator", 5),

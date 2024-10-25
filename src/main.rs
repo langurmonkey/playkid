@@ -5,11 +5,12 @@ mod display;
 mod instruction;
 mod machine;
 mod memory;
+mod ppu;
 mod registers;
 
 use cartridge::Cartridge;
 use clap::Parser;
-use machine::GameBoy;
+use machine::Machine;
 use std::io;
 use std::path::PathBuf;
 
@@ -45,7 +46,7 @@ fn main() -> io::Result<()> {
     let cart = Cartridge::new(rom, args.skipcheck).expect("Error reading rom file");
 
     // Create a game boy with the given cartridge.
-    let mut gameboy = GameBoy::new(&cart, args.debug, args.step);
+    let mut gameboy = Machine::new(&cart, args.debug, args.step);
     // Initialize the Game Boy state.
     gameboy.init();
     // Start the machine.
