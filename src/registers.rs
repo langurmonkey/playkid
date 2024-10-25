@@ -37,19 +37,21 @@ enum Flag {
 // Methods to access and set values of registers.
 impl Registers {
     pub fn new() -> Self {
+        // Initialize registers as per DMG.
         Registers {
-            a: 0,
-            b: 0,
-            c: 0,
-            d: 0,
-            e: 0,
-            f: 0,
-            h: 0,
-            l: 0,
-            sp: 0,
+            a: 0x01,
+            b: 0x00,
+            c: 0x13,
+            d: 0x00,
+            e: 0xD8,
+            f: 0xB0,
+            h: 0x01,
+            l: 0x4D,
+            // Points to the beginning of the stack, at 0xFFFE.
+            sp: 0xFFFE,
             // We start at the 0x0100 location, which is te
             // begin code execution point.
-            pc: 0x0100,
+            pc: 0x100,
         }
     }
     pub fn get_af(&self) -> u16 {

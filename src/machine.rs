@@ -32,6 +32,7 @@ pub struct GameBoy<'a> {
 }
 
 impl<'a> GameBoy<'a> {
+    /// Create a new instance of the Game Boy.
     pub fn new(cart: &'a Cartridge, debug: bool) -> Self {
         GameBoy {
             registers: Registers::new(),
@@ -44,6 +45,12 @@ impl<'a> GameBoy<'a> {
             debug,
         }
     }
+
+    /// Initialize the Game Boy.
+    pub fn init(&mut self) {
+        self.memory.initialize_hw_registers();
+    }
+
     /// Starts the execution of the machine.
     pub fn start(&mut self) {
         self.running = true;

@@ -24,3 +24,7 @@ pub const TILE_SIZE: usize = 16;
 pub const TILE_BLOCK_SIZE: usize = 128 * TILE_SIZE;
 /// Map size in bytes.
 pub const MAP_SIZE: usize = 1024;
+/// Display width.
+pub const DISPLAY_WIDTH: usize = 160;
+/// Display height.
+pub const DISPLAY_HEIGHT: usize = 144;

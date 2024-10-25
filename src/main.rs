@@ -1,6 +1,7 @@
 mod cartridge;
 mod constants;
 mod debug;
+mod display;
 mod instruction;
 mod machine;
 mod memory;
@@ -42,6 +43,8 @@ fn main() -> io::Result<()> {
 
     // Create a game boy with the given cartridge.
     let mut gameboy = GameBoy::new(&cart, args.debug);
+    // Initialize the Game Boy state.
+    gameboy.init();
     // Start the machine.
     gameboy.start();
 
