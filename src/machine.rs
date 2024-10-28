@@ -10,6 +10,8 @@ use display::Display;
 use instruction::{Instruction, CC, R16, R16EXT, R16LD, R8, TGT3};
 use memory::Memory;
 use registers::Registers;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
 
 /// This is our machine, which contains the registers and the memory, and
 /// executes the operations.
@@ -61,14 +63,37 @@ impl<'a> Machine<'a> {
     /// Starts the execution of the machine.
     pub fn start(&mut self) {
         self.running = true;
-        while self.running {
-            // Run a CPU cycle.
-            self.cycles += self.cycle() as u32;
+        'mainloop: while self.running {
+            // Event loop
+            for event in self.display.event_pump.poll_iter() {
+                match event {
+                    Event::Quit { .. }
+                    | Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    }
+                    | Event::KeyDown {
+                        keycode: Some(Keycode::CapsLock),
+                        ..
+                    } => return,
+                    _ => {}
+                }
+            }
+            self.cycles = self.machine_cycle();
             // Clear display.
             self.display.clear();
             self.display.render(&self.memory);
         }
+
+        println!("Bye bye!");
     }
+
+    fn machine_cycle(&mut self) -> u32 {
+        // Run a CPU cycle.
+        let cycles = self.cycle() as u32;
+        self.memory.cycle(cycles * 4)
+    }
+
     /// Main loop of the machine.
     fn cycle(&mut self) -> u8 {
         // Fetch next instruction, and parse it.
@@ -2539,6 +2564,8 @@ impl<'a> Machine<'a> {
 
     /// TODO: implement this.
     fn stop(&mut self) {
+        // Reset DIV register.
+        self.memory.write8(0xFF04, 0x00);
         self.running = false;
     }
 

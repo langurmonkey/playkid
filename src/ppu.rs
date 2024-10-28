@@ -228,7 +228,23 @@ impl PPU {
         //self.stat01 = self.stat & 0b0000_0011;
     }
 
+    /// Gets the starting index of the tile data region. May be 0 (lcdc4 == 1, 0x8000-0x8FFF),
+    /// or -128 (lcdc4 == 0, 0x8800-0x97FF, with 0 at 0x9000).
+    pub fn get_bgwin_index(&self) -> i32 {
+        if self.lcdc4 == 0x8000 {
+            0
+        } else if self.lcdc4 == 0x9000 {
+            -128
+        } else {
+            panic!(
+                "LCDC(4) does not contain a valid tile data address: {:#06X}",
+                self.lcdc4
+            );
+        }
+    }
+
     /// Gets the address in bit 4 of LCDC register.
+    /// This is the background and window tile data address.
     pub fn get_bgwin_tiledata_addr(&self) -> u16 {
         self.lcdc4
     }

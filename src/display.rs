@@ -70,10 +70,11 @@ impl Display {
         // Window tile map area.
         let win_map_addr = ppu.get_win_tilemap_addr();
 
-        let mut i: u16 = 0;
+        // Background rendering.
+        let mut i: i32 = ppu.get_bgwin_index();
         for x in 0..32 {
             for y in 0..32 {
-                let tile_id = mem.read8(bg_map_addr + i) as u16;
+                let tile_id = mem.read8((bg_map_addr as i32 + i) as u16) as u16;
                 let tile_addr = addr + tile_id;
                 // Each tile is 8 lines of 2 bytes each.
                 for line in 0..8 {

@@ -1,9 +1,11 @@
 use crate::cartridge;
 use crate::constants;
 use crate::ppu;
+use crate::timer;
 
 use cartridge::Cartridge;
 use ppu::PPU;
+use timer::Timer;
 
 /// # Memory
 /// The Game Boy uses a 2-byte address space (0x0000 to 0xFFFF) to map the different
@@ -36,6 +38,8 @@ pub struct Memory<'a> {
     pub cart: &'a Cartridge,
     /// Our PPU, picture processing unit.
     pub ppu: PPU,
+    /// The timer.
+    pub timer: Timer,
 }
 
 impl<'a> Memory<'a> {
@@ -48,6 +52,7 @@ impl<'a> Memory<'a> {
             ime: false,
             cart,
             ppu: PPU::new(),
+            timer: Timer::new(),
         }
     }
 
@@ -230,6 +235,9 @@ impl<'a> Memory<'a> {
                 );
                 0
             }
+            // Timer registers.
+            0xFF04..=0xFF07 => self.timer.read(address),
+
             // VRAM registers.
             0xFF40..=0xFF4F => self.ppu.read(address),
             0xFF50..=0xFF7F => {
@@ -289,6 +297,9 @@ impl<'a> Memory<'a> {
                     address
                 )
             }
+            // Timer registers.
+            0xFF04..=0xFF07 => self.timer.write(address, value),
+
             // OAM DMA.
             0xFF46 => {
                 // ROM/RAM to OAM.
@@ -323,5 +334,13 @@ impl<'a> Memory<'a> {
     pub fn write16(&mut self, address: u16, value: u16) {
         self.write8(address, (value & 0xFF) as u8);
         self.write8(address + 1, (value >> 8) as u8);
+    }
+
+    pub fn cycle(&mut self, cycles: u32) -> u32 {
+        let vram_cycles = 0;
+        let ppu_cycles = cycles + vram_cycles;
+        self.timer.cycle(cycles);
+
+        ppu_cycles
     }
 }

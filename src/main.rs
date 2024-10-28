@@ -7,6 +7,7 @@ mod machine;
 mod memory;
 mod ppu;
 mod registers;
+mod timer;
 
 use cartridge::Cartridge;
 use clap::Parser;
