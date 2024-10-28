@@ -28,3 +28,7 @@ pub const MAP_SIZE: usize = 1024;
 pub const DISPLAY_WIDTH: usize = 160;
 /// Display height.
 pub const DISPLAY_HEIGHT: usize = 144;
+/// CPU frequency [Hz].
+pub const CPU_FREQ_HZ: usize = 4194304;
+/// CPU period [s].
+pub const CPU_PERIOD_S: f64 = 1.0 / CPU_FREQ_HZ as f64;

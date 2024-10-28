@@ -42,7 +42,7 @@ impl<'a> Machine<'a> {
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart),
-            display: Display::new("PlayKid emulator", 5),
+            display: Display::new("PlayKid emulator", 3),
             ime: false,
             ei: 0,
             di: 0,
@@ -66,6 +66,7 @@ impl<'a> Machine<'a> {
             self.cycles += self.cycle() as u32;
             // Clear display.
             self.display.clear();
+            self.display.render(&self.memory);
         }
     }
     /// Main loop of the machine.
@@ -316,32 +317,39 @@ impl<'a> Machine<'a> {
                 },
                 R8::HL => match r8_1 {
                     R8::B => {
-                        self.memory.write(self.registers.get_hl(), self.registers.b);
+                        self.memory
+                            .write8(self.registers.get_hl(), self.registers.b);
                         2
                     }
                     R8::C => {
-                        self.memory.write(self.registers.get_hl(), self.registers.c);
+                        self.memory
+                            .write8(self.registers.get_hl(), self.registers.c);
                         2
                     }
                     R8::D => {
-                        self.memory.write(self.registers.get_hl(), self.registers.d);
+                        self.memory
+                            .write8(self.registers.get_hl(), self.registers.d);
                         2
                     }
                     R8::E => {
-                        self.memory.write(self.registers.get_hl(), self.registers.e);
+                        self.memory
+                            .write8(self.registers.get_hl(), self.registers.e);
                         2
                     }
                     R8::H => {
-                        self.memory.write(self.registers.get_hl(), self.registers.h);
+                        self.memory
+                            .write8(self.registers.get_hl(), self.registers.h);
                         2
                     }
                     R8::L => {
-                        self.memory.write(self.registers.get_hl(), self.registers.l);
+                        self.memory
+                            .write8(self.registers.get_hl(), self.registers.l);
                         2
                     }
                     R8::HL => 1,
                     R8::A => {
-                        self.memory.write(self.registers.get_hl(), self.registers.a);
+                        self.memory
+                            .write8(self.registers.get_hl(), self.registers.a);
                         2
                     }
                 },
@@ -405,7 +413,7 @@ impl<'a> Machine<'a> {
                 }
                 R8::HL => {
                     let val = self.read8();
-                    self.memory.write(self.registers.get_hl(), val);
+                    self.memory.write8(self.registers.get_hl(), val);
                     3
                 }
                 R8::A => {
@@ -417,36 +425,38 @@ impl<'a> Machine<'a> {
             // LD x, A
             Instruction::LDfromA(r16ld) => match r16ld {
                 R16LD::BC => {
-                    self.memory.write(self.registers.get_bc(), self.registers.a);
+                    self.memory
+                        .write8(self.registers.get_bc(), self.registers.a);
                     2
                 }
                 R16LD::DE => {
-                    self.memory.write(self.registers.get_de(), self.registers.a);
+                    self.memory
+                        .write8(self.registers.get_de(), self.registers.a);
                     2
                 }
                 R16LD::HLp => {
                     self.memory
-                        .write(self.registers.get_hl_plus(), self.registers.a);
+                        .write8(self.registers.get_hl_plus(), self.registers.a);
                     2
                 }
                 R16LD::HLm => {
                     self.memory
-                        .write(self.registers.get_hl_minus(), self.registers.a);
+                        .write8(self.registers.get_hl_minus(), self.registers.a);
                     2
                 }
                 R16LD::A8 => {
                     let val = 0xFF00 | (self.read8() as u16);
-                    self.memory.write(val, self.registers.a);
+                    self.memory.write8(val, self.registers.a);
                     3
                 }
                 R16LD::C => {
                     self.memory
-                        .write(0xFF00 | (self.registers.c as u16), self.registers.a);
+                        .write8(0xFF00 | (self.registers.c as u16), self.registers.a);
                     2
                 }
                 R16LD::A16 => {
                     let addr = self.read16();
-                    self.memory.write(addr, self.registers.a);
+                    self.memory.write8(addr, self.registers.a);
                     4
                 }
             },
@@ -1023,7 +1033,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val_inc = self.inc(self.memory.read8(hl));
-                    self.memory.write(hl, val_inc);
+                    self.memory.write8(hl, val_inc);
                     3
                 }
                 R8::A => {
@@ -1060,7 +1070,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val_dec = self.dec(self.memory.read8(hl));
-                    self.memory.write(hl, val_dec);
+                    self.memory.write8(hl, val_dec);
                     3
                 }
                 R8::A => {
@@ -1394,7 +1404,7 @@ impl<'a> Machine<'a> {
                     let hl = self.registers.get_hl();
                     let value = self.memory.read8(hl);
                     let value2 = self.rlc(value);
-                    self.memory.write(hl, value2);
+                    self.memory.write8(hl, value2);
                     4
                 }
                 R8::A => {
@@ -1431,7 +1441,7 @@ impl<'a> Machine<'a> {
                     let hl = self.registers.get_hl();
                     let value = self.memory.read8(hl);
                     let value2 = self.rrc(value);
-                    self.memory.write(hl, value2);
+                    self.memory.write8(hl, value2);
                     4
                 }
                 R8::A => {
@@ -1468,7 +1478,7 @@ impl<'a> Machine<'a> {
                     let hl = self.registers.get_hl();
                     let value = self.memory.read8(hl);
                     let value2 = self.rl(value);
-                    self.memory.write(hl, value2);
+                    self.memory.write8(hl, value2);
                     4
                 }
                 R8::A => {
@@ -1505,7 +1515,7 @@ impl<'a> Machine<'a> {
                     let hl = self.registers.get_hl();
                     let value = self.memory.read8(hl);
                     let value2 = self.rr(value);
-                    self.memory.write(hl, value2);
+                    self.memory.write8(hl, value2);
                     4
                 }
                 R8::A => {
@@ -1542,7 +1552,7 @@ impl<'a> Machine<'a> {
                     let hl = self.registers.get_hl();
                     let value = self.memory.read8(hl);
                     let value2 = self.sla(value);
-                    self.memory.write(hl, value2);
+                    self.memory.write8(hl, value2);
                     4
                 }
                 R8::A => {
@@ -1579,7 +1589,7 @@ impl<'a> Machine<'a> {
                     let hl = self.registers.get_hl();
                     let value = self.memory.read8(hl);
                     let value2 = self.sra(value);
-                    self.memory.write(hl, value2);
+                    self.memory.write8(hl, value2);
                     4
                 }
                 R8::A => {
@@ -1616,7 +1626,7 @@ impl<'a> Machine<'a> {
                     let hl = self.registers.get_hl();
                     let value = self.memory.read8(hl);
                     let value2 = self.swap(value);
-                    self.memory.write(hl, value2);
+                    self.memory.write8(hl, value2);
                     4
                 }
                 R8::A => {
@@ -1653,7 +1663,7 @@ impl<'a> Machine<'a> {
                     let hl = self.registers.get_hl();
                     let value = self.memory.read8(hl);
                     let value2 = self.srl(value);
-                    self.memory.write(hl, value2);
+                    self.memory.write8(hl, value2);
                     4
                 }
                 R8::A => {
@@ -1969,7 +1979,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) & 0xFE;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2005,7 +2015,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) & 0xFD;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2041,7 +2051,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) & 0xFB;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2077,7 +2087,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) & 0xF7;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2113,7 +2123,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) & 0xEF;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2149,7 +2159,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) & 0xDF;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2185,7 +2195,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) & 0xDF;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2221,7 +2231,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) & 0x7F;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2257,7 +2267,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) | 0x01;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2293,7 +2303,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) | 0x02;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2329,7 +2339,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) | 0x04;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2365,7 +2375,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) | 0x08;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2401,7 +2411,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) | 0x10;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2437,7 +2447,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) | 0x20;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2473,7 +2483,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) | 0x40;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
@@ -2509,7 +2519,7 @@ impl<'a> Machine<'a> {
                 R8::HL => {
                     let hl = self.registers.get_hl();
                     let val = self.memory.read8(hl) | 0x80;
-                    self.memory.write(hl, val);
+                    self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {

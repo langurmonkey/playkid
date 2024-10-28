@@ -4,7 +4,7 @@ use crate::constants;
 /// The PPU is the picture processing unit of our machine.
 ///
 /// ## Video RAM
-/// The Video RAM, or VRAM, are 8 KiB located in addresses 0x8000 to 0xA000.
+/// The Video RAM, or VRAM, are 8 KiB located in addresses 0x8000 to 0x9FFF.
 /// A **memory bank** contains 384 tiles, or 3 tile blocks, so 6 KiB of tile data.
 /// After that, it  has two maps of 1024 bytes each (32 rows of 32 bytes each), the
 /// Background Tile Map. Each byte contains the tile number to be displayed.
@@ -28,13 +28,14 @@ pub struct PPU {
     mode: u8,
 
     // The LCDC byte.
+    lcdc: u8,
     /// LCD & PPU enable.
     lcdc7: bool,
     /// Window tile map.
     lcdc6: u16,
     /// Window enable.
     lcdc5: bool,
-    /// BG & Window tiles.
+    /// BG & Window tile address.
     lcdc4: u16,
     /// BG tile map.
     lcdc3: u16,
@@ -51,6 +52,7 @@ pub struct PPU {
     lyc: u8,
 
     /// STAT: LCD status.
+    stat: u8,
     /// STAT6: LYC int select.
     stat6: bool,
     /// STAT5: Mode2 int select.
@@ -66,7 +68,7 @@ pub struct PPU {
 
     /// SCY: Scroll Y position. Top coordinate of the visible 160x144 area within the BG map.
     scy: u8,
-    /// SCX: Scroll X posiiton. Left coordinate of the visible 160x144 area within the BG map.
+    /// SCX: Scroll X position. Left coordinate of the visible 160x144 area within the BG map.
     scx: u8,
 
     /// WY: Window Y position.
@@ -81,6 +83,7 @@ impl PPU {
             oam: [0; constants::OAM_SIZE],
             vram: [0; constants::VRAM_SIZE],
             mode: 0,
+            lcdc: 0,
             lcdc7: true,
             lcdc6: 0,
             lcdc5: true,
@@ -91,6 +94,7 @@ impl PPU {
             lcdc0: true,
             ly: 0,
             lyc: 0,
+            stat: 0,
             stat6: false,
             stat5: false,
             stat4: false,
@@ -110,9 +114,26 @@ impl PPU {
             0x8000..=0x9FFF => self.vram[(address - 0x8000) as usize],
             // OAM.
             0xFE00..=0xFE9F => self.oam[(address - 0xFE00) as usize],
+            // LCDC.
+            0xFF40 => self.lcdc,
+            // STAT.
+            0xFF41 => self.stat,
+            // SCY.
+            0xFF42 => self.scy,
+            // SCX.
+            0xFF43 => self.scx,
+            // LY.
+            0xFF44 => self.ly,
+            // LCY.
+            0xFF45 => self.lyc,
+            // DMA.
+            0xFF46 => 0,
 
-            // Bank select.
-            0xFF40 => 0xFF,
+            // WX.
+            0xFF4A => self.wx,
+            // WY.
+            0xFF4B => self.wy,
+
             _ => 0xFF,
         }
     }
@@ -127,7 +148,101 @@ impl PPU {
                 // OAM.
                 self.oam[(address - 0xFE00) as usize] = value;
             }
+            // LCDC.
+            0xFF40 => {
+                self.lcdc = value;
+                self.update_lcdc_flags();
+            }
+            0xFF41 => {
+                self.stat = value;
+                self.update_stat_flags();
+            }
+            // SCY.
+            0xFF42 => self.scy = value,
+            // SCX.
+            0xFF43 => self.scx = value,
+            // LCY.
+            0xFF45 => self.lyc = value,
+            // DMA.
+            0xFF46 => {
+                // Writing to this register starts a DMA transfer from ROM/RAM to OAM.
+                // The written value specifies the transfer source address divided by $100.
+                // Source: $XX00-$XX9F (where XX is the written value).
+                // Dest:   $FE00-FE9F
+                // This is implemented in `memory.rs`.
+            }
+
+            // WX.
+            0xFF4A => self.wx = value,
+            // WY.
+            0xFF4B => self.wy = value,
             _ => {}
         }
+    }
+
+    /// This method updates the LCDC flags from the current value
+    /// in the byte `self.lcdc`.
+    fn update_lcdc_flags(&mut self) {
+        self.lcdc7 = self.lcdc & 0b1000_0000 == 0;
+        self.lcdc6 = if self.lcdc & 0b0100_0000 == 0 {
+            0x9800
+        } else {
+            0x9C00
+        };
+        self.lcdc5 = self.lcdc & 0b0010_0000 == 0;
+        self.lcdc4 = if self.lcdc & 0b0001_0000 == 0 {
+            // Signed access.
+            0x9000
+        } else {
+            // Unsigned access.
+            0x8000
+        };
+        self.lcdc3 = if self.lcdc & 0b0000_1000 == 0 {
+            0x9800
+        } else {
+            0x9C00
+        };
+        self.lcdc2 = if self.lcdc & 0b0000_0100 == 0 {
+            64
+        } else {
+            128
+        };
+        self.lcdc1 = self.lcdc & 0b0000_0010 == 0;
+        self.lcdc0 = self.lcdc & 0b0000_0001 == 0;
+    }
+
+    /// This method updates the STAT flags from the current value
+    /// in the byte `self.stat`.
+    fn update_stat_flags(&mut self) {
+        // LYC int select (rw).
+        self.stat6 = self.stat & 0b0100_0000 == 0;
+        // Mode 2 int select (rw).
+        self.stat5 = self.stat & 0b0010_0000 == 0;
+        // Mode 1 int select (rw).
+        self.stat4 = self.stat & 0b0001_0000 == 0;
+        // Mode 0 int select (rw).
+        self.stat3 = self.stat & 0b0000_1000 == 0;
+        // LYC == LY flag (read only).
+        //self.stat2 = self.stat & 0b0000_0100 == 0;
+        // PPU Mode (read only).
+        //self.stat01 = self.stat & 0b0000_0011;
+    }
+
+    /// Gets the address in bit 4 of LCDC register.
+    pub fn get_bgwin_tiledata_addr(&self) -> u16 {
+        self.lcdc4
+    }
+    /// Gets the address of the background tile map.
+    pub fn get_bg_tilemap_addr(&self) -> u16 {
+        self.lcdc3
+    }
+    /// Gets the address of the window tile map.
+    pub fn get_win_tilemap_addr(&self) -> u16 {
+        self.lcdc6
+    }
+
+    /// Are the LCD and the PPU enabled?
+    pub fn is_ppu_enabled(&self) -> bool {
+        self.lcdc7
     }
 }
