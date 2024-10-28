@@ -224,10 +224,11 @@ impl<'a> Memory<'a> {
             }
             0xFEA0..=0xFEFF => {
                 // Empty, unusable.
-                panic!(
+                println!(
                     "Attempted usage of forbidden area 0xFEA0-0xFEFE: {:#06X}",
                     address
-                )
+                );
+                0
             }
             // VRAM registers.
             0xFF40..=0xFF4F => self.ppu.read(address),
@@ -283,7 +284,7 @@ impl<'a> Memory<'a> {
             }
             0xFEA0..=0xFEFF => {
                 // Empty, unusable.
-                panic!(
+                println!(
                     "Attempted usage of forbidden area 0xFEA0-0xFEFE: {:#06X}",
                     address
                 )
@@ -313,7 +314,7 @@ impl<'a> Memory<'a> {
                 match value {
                     0 => self.ime = false,
                     1 => self.ime = true,
-                    _ => panic!("Attempted IME write with non-0 or -1 value: {}", value),
+                    _ => println!("Attempted IME write with non-0 or -1 value: {}", value),
                 }
             }
         }

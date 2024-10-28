@@ -63,10 +63,6 @@ impl Display {
         let scl = self.scale as usize;
         let ppu: &PPU = mem.ppu();
 
-        if !ppu.is_ppu_enabled() {
-            return;
-        }
-
         // Get addresses of first and second tile blocks for Window and Background.
         let addr = ppu.get_bgwin_tiledata_addr();
         // BG tile map area.
