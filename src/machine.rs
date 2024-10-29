@@ -79,7 +79,7 @@ impl<'a> Machine<'a> {
                     _ => {}
                 }
             }
-            self.cycles = self.machine_cycle();
+            self.cycles += self.machine_cycle();
             // Clear display.
             self.display.clear();
             self.display.render(&self.memory);
@@ -97,24 +97,39 @@ impl<'a> Machine<'a> {
     /// Main loop of the machine.
     fn cycle(&mut self) -> u8 {
         // Fetch next instruction, and parse it.
+        let pc = self.registers.pc;
         let opcode = self.read8();
         let instruction = Instruction::from_byte(opcode);
         let msg = format!("Incorrect opcode: {:#04X}", opcode);
+        let instr = instruction.expect(&msg);
+        // Debug if needed.
+        if self.debug {
+            if self.step {
+                debug::debug_step(
+                    pc,
+                    &self.registers,
+                    &self.memory,
+                    &instr,
+                    opcode,
+                    self.cycles,
+                );
+            } else {
+                debug::debug(
+                    pc,
+                    &self.registers,
+                    &self.memory,
+                    &instr,
+                    opcode,
+                    self.cycles,
+                );
+            }
+        }
         // Execute the instruction.
-        self.execute(instruction.expect(&msg), opcode)
+        self.execute(instr, opcode)
     }
 
     /// Execute a single instruction, and returns the number of cycles it takes.
     fn execute(&mut self, instr: Instruction, opcode: u8) -> u8 {
-        // Debug if needed.
-        if self.debug {
-            if self.step {
-                debug::debug_step(self.registers.pc, &self.memory, &instr, opcode, self.cycles);
-            } else {
-                debug::debug(self.registers.pc, &self.memory, &instr, opcode, self.cycles);
-            }
-        }
-
         // Actually execute the instruction.
         match instr {
             // NOP: no operation.

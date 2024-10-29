@@ -95,8 +95,11 @@ impl Registers {
 
     /// Private function to set the state of a flag.
     fn set_flag(&mut self, flag: Flag, value: bool) {
-        let v: u8 = if value { 1 } else { 0 };
-        self.f = (self.f & !(flag as u8)) | (v << 7)
+        match value {
+            true => self.f |= flag as u8,
+            false => self.f &= !(flag as u8),
+        }
+        self.f &= 0xF0;
     }
     /// Private function to get the state of a flag.
     fn get_flag(&self, flag: Flag) -> bool {

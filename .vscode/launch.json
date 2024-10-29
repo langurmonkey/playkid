@@ -7,7 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'playkid'",
+            "name": "Debug PlayKid (no cargo)",
+            "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
+            "args": ["-d", "/home/tsagrista/Documents/roms/Tetris.gb"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug PlayKid",
             "cargo": {
                 "args": [
                     "build",
@@ -19,7 +27,7 @@
                     "kind": "bin"
                 }
             },
-            "args": ["/home/tsagrista/Documents/roms/Tetris.gb"],
+            "args": ["-d", "/home/tsagrista/Documents/roms/Tetris.gb"],
             "cwd": "${workspaceFolder}"
         },
         {
