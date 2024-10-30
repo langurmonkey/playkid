@@ -1,10 +1,13 @@
 use crate::cartridge;
 use crate::constants;
+use crate::joypad;
 use crate::ppu;
 use crate::timer;
 
 use cartridge::Cartridge;
+use joypad::Joypad;
 use ppu::PPU;
+use sdl2::Sdl;
 use timer::Timer;
 
 /// # Memory
@@ -25,34 +28,40 @@ use timer::Timer;
 /// 0xFF80-0xFFFE: High RAM                     (HRAM)
 /// 0xFF80-0xFFFF: Interrupt Enable Register    (IER)
 
-pub struct Memory<'a> {
+pub struct Memory<'a, 'b> {
     /// Work RAM.
     pub wram: [u8; constants::WRAM_SIZE],
     // High RAM.
     pub hram: [u8; constants::HRAM_SIZE],
     // I/O registers.
     pub io: [u8; constants::IO_SIZE],
-    // IME flag.
-    pub ime: bool,
+    // IF: interrupt flag.
+    pub iff: u8,
+    // IE flag: interrupt enable.
+    pub ie: u8,
     // Cartridge reference.
     pub cart: &'a Cartridge,
     /// Our PPU, picture processing unit.
     pub ppu: PPU,
     /// The timer.
     pub timer: Timer,
+    /// The joypad.
+    pub joypad: Joypad<'b>,
 }
 
-impl<'a> Memory<'a> {
+impl<'a, 'b> Memory<'a, 'b> {
     /// Create a new memory instance.
-    pub fn new(cart: &'a Cartridge) -> Self {
+    pub fn new(cart: &'a Cartridge, sdl: &'b Sdl) -> Self {
         Memory {
             wram: [0; constants::WRAM_SIZE],
             hram: [0; constants::HRAM_SIZE],
             io: [0; constants::IO_SIZE],
-            ime: false,
+            iff: 0,
+            ie: 0,
             cart,
             ppu: PPU::new(),
             timer: Timer::new(),
+            joypad: Joypad::new(sdl),
         }
     }
 
@@ -62,7 +71,7 @@ impl<'a> Memory<'a> {
 
     pub fn initialize_hw_registers(&mut self) {
         // Initialize hardware registers in the I/O ports region.
-        // P1
+        // P1/JOYPAD
         self.write8(0xFF00, 0xCF);
         // SB
         self.write8(0xFF01, 0x00);
@@ -200,7 +209,7 @@ impl<'a> Memory<'a> {
                 *self
                     .cart
                     .data
-                    .get(address as usize)
+                    .get((address - 0x4000) as usize)
                     .expect("Error getting cartridge data")
             }
             0x8000..=0x9FFF => {
@@ -212,7 +221,7 @@ impl<'a> Memory<'a> {
                 *self
                     .cart
                     .data
-                    .get(address as usize)
+                    .get((address - 0xA000) as usize)
                     .expect("Error getting cartridge data")
             }
             0xC000..=0xDFFF => {
@@ -235,8 +244,12 @@ impl<'a> Memory<'a> {
                 );
                 0
             }
+            // Joypad.
+            0xFF00 => self.joypad.read(address),
             // Timer registers.
             0xFF04..=0xFF07 => self.timer.read(address),
+            // Interrupt flag.
+            0xFF0F => self.iff | 0b1110_0000,
 
             // VRAM registers.
             0xFF40..=0xFF4F => self.ppu.read(address),
@@ -248,14 +261,8 @@ impl<'a> Memory<'a> {
                 // High RAM.
                 self.hram[(address - 0xFF80) as usize]
             }
-            0xFFFF => {
-                // IME flag.
-                if self.ime {
-                    1
-                } else {
-                    0
-                }
-            }
+            // IE
+            0xFFFF => self.ie,
             _ => 0xFF,
         }
     }
@@ -297,8 +304,12 @@ impl<'a> Memory<'a> {
                     address
                 )
             }
+            // Joypad.
+            0xFF00 => self.joypad.write(address, value),
             // Timer registers.
             0xFF04..=0xFF07 => self.timer.write(address, value),
+            // IF: interrupt flag.
+            0xFF0F => self.iff = value,
 
             // OAM DMA.
             0xFF46 => {
@@ -320,14 +331,8 @@ impl<'a> Memory<'a> {
                 // High RAM.
                 self.hram[(address - 0xFF80) as usize] = value;
             }
-            0xFFFF => {
-                // IME flag.
-                match value {
-                    0 => self.ime = false,
-                    1 => self.ime = true,
-                    _ => println!("Attempted IME write with non-0 or -1 value: {}", value),
-                }
-            }
+            // IE: interrupt enable.
+            0xFFFF => self.ie = value,
         }
     }
     /// Write the given word `value` at the given `address`.
@@ -337,9 +342,20 @@ impl<'a> Memory<'a> {
     }
 
     pub fn cycle(&mut self, cycles: u32) -> u32 {
+        self.joypad.update();
+
         let vram_cycles = 0;
         let ppu_cycles = cycles + vram_cycles;
+
+        // Time.
         self.timer.cycle(cycles);
+        self.iff |= self.timer.i_mask;
+        self.timer.i_mask = 0;
+
+        // PPU
+        self.ppu.cycle(cycles);
+        self.iff |= self.ppu.i_mask;
+        self.ppu.i_mask = 0;
 
         ppu_cycles
     }

@@ -1,5 +1,3 @@
-use sdl2::sys::uint_fast32_t;
-
 /// The timer registers and logic.
 pub struct Timer {
     /// Divider.
@@ -16,8 +14,8 @@ pub struct Timer {
     i_div: u32,
     /// Internal counter.
     i_tima: u32,
-    /// Interrupt,
-    pub interrupt: u8,
+    /// Timer interrupt mask for registers IE and IF.
+    pub i_mask: u8,
 }
 
 const T4: u32 = 4 * 4;
@@ -35,7 +33,7 @@ impl Timer {
             step: 1024,
             i_div: 0,
             i_tima: 0,
-            interrupt: 0,
+            i_mask: 0,
         }
     }
 
@@ -94,9 +92,10 @@ impl Timer {
 
             while self.i_tima >= self.step {
                 self.tima = self.tima.wrapping_add(1);
+                // Timer interrupt requested when TIMA overflows.
                 if self.tima == 0 {
                     self.tima = self.tma;
-                    self.interrupt |= 0x04;
+                    self.i_mask |= 0b0000_0100;
                 }
                 self.i_tima -= self.step;
             }

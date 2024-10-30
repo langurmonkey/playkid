@@ -75,6 +75,8 @@ pub struct PPU {
     wy: u8,
     /// WX: Window X position plus 7.
     wx: u8,
+    /// LCD interrupt mask for registers IE and IF.
+    pub i_mask: u8,
 }
 
 impl PPU {
@@ -105,6 +107,7 @@ impl PPU {
             scx: 0,
             wy: 0,
             wx: 7,
+            i_mask: 0,
         }
     }
 
@@ -180,48 +183,67 @@ impl PPU {
         }
     }
 
+    /// Performs a GPU cycle.
+    pub fn cycle(&self, cycles: u32) {
+        if !self.is_ppu_enabled() {
+            return;
+        }
+
+        let mut cycle_count = cycles;
+        while cycle_count > 0 {
+            let current_cycles = if cycle_count >= 80 { 80 } else { cycle_count };
+            cycle_count -= current_cycles;
+        }
+    }
+
+    fn check_interrupt_lyc(&mut self) {
+        // if self.stat6 && self.line == self.lyc {
+        //     self.i_mask |= 0b0000_0010;
+        // }
+    }
+
     /// This method updates the LCDC flags from the current value
     /// in the byte `self.lcdc`.
     fn update_lcdc_flags(&mut self) {
-        self.lcdc7 = self.lcdc & 0b1000_0000 == 0;
-        self.lcdc6 = if self.lcdc & 0b0100_0000 == 0 {
+        self.lcdc7 = self.lcdc & 0b1000_0000 != 0;
+        self.lcdc6 = if self.lcdc & 0b0100_0000 != 0 {
             0x9800
         } else {
             0x9C00
         };
-        self.lcdc5 = self.lcdc & 0b0010_0000 == 0;
-        self.lcdc4 = if self.lcdc & 0b0001_0000 == 0 {
+        self.lcdc5 = self.lcdc & 0b0010_0000 != 0;
+        self.lcdc4 = if self.lcdc & 0b0001_0000 != 0 {
             // Signed access.
             0x9000
         } else {
             // Unsigned access.
             0x8000
         };
-        self.lcdc3 = if self.lcdc & 0b0000_1000 == 0 {
+        self.lcdc3 = if self.lcdc & 0b0000_1000 != 0 {
             0x9800
         } else {
             0x9C00
         };
-        self.lcdc2 = if self.lcdc & 0b0000_0100 == 0 {
+        self.lcdc2 = if self.lcdc & 0b0000_0100 != 0 {
             64
         } else {
             128
         };
-        self.lcdc1 = self.lcdc & 0b0000_0010 == 0;
-        self.lcdc0 = self.lcdc & 0b0000_0001 == 0;
+        self.lcdc1 = self.lcdc & 0b0000_0010 != 0;
+        self.lcdc0 = self.lcdc & 0b0000_0001 != 0;
     }
 
     /// This method updates the STAT flags from the current value
     /// in the byte `self.stat`.
     fn update_stat_flags(&mut self) {
         // LYC int select (rw).
-        self.stat6 = self.stat & 0b0100_0000 == 0;
+        self.stat6 = self.stat & 0b0100_0000 != 0;
         // Mode 2 int select (rw).
-        self.stat5 = self.stat & 0b0010_0000 == 0;
+        self.stat5 = self.stat & 0b0010_0000 != 0;
         // Mode 1 int select (rw).
-        self.stat4 = self.stat & 0b0001_0000 == 0;
+        self.stat4 = self.stat & 0b0001_0000 != 0;
         // Mode 0 int select (rw).
-        self.stat3 = self.stat & 0b0000_1000 == 0;
+        self.stat3 = self.stat & 0b0000_1000 != 0;
         // LYC == LY flag (read only).
         //self.stat2 = self.stat & 0b0000_0100 == 0;
         // PPU Mode (read only).

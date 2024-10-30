@@ -12,13 +12,24 @@ use std::io::{stdin, stdout, Read, Write};
 pub fn debug(pc: u16, reg: &Registers, mem: &Memory, instr: &Instruction, opcode: u8, cycles: u32) {
     // pc = reg.pc - 1, because we send in the pc before parsing the instruction.
     let next_word = mem.read16(reg.pc);
+    println!(
+        "Joypad:    {} {} {} {} {} {} {} {}",
+        if mem.joypad.up { "↑" } else { "_" },
+        if mem.joypad.down { "↓" } else { "_" },
+        if mem.joypad.left { "←" } else { "_" },
+        if mem.joypad.right { "→" } else { "_" },
+        if mem.joypad.a { "A" } else { "_" },
+        if mem.joypad.b { "B" } else { "_" },
+        if mem.joypad.start { "S" } else { "_" },
+        if mem.joypad.select { "s" } else { "_" }
+    );
     println!("Cycle:     {}", cycles);
     println!(
-        "Reg:       BC:{:02X} {:02X} 
-           DE:{:02X} {:02X} 
-           HL:{:02X} {:02X} 
-           AF:{:02X} {:02X}",
-        reg.b, reg.c, reg.d, reg.e, reg.h, reg.l, reg.a, reg.f
+        "Reg:       AF: {:02X} {:02X}
+           BC: {:02X} {:02X}
+           DE: {:02X} {:02X}
+           HL: {:02X} {:02X}",
+        reg.a, reg.f, reg.b, reg.c, reg.d, reg.e, reg.h, reg.l
     );
     println!(
         "Flags:     {} {} {} {}",

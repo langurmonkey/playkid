@@ -10,24 +10,23 @@ use display::Display;
 use instruction::{Instruction, CC, R16, R16EXT, R16LD, R8, TGT3};
 use memory::Memory;
 use registers::Registers;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
+use sdl2::Sdl;
 
 /// This is our machine, which contains the registers and the memory, and
 /// executes the operations.
-pub struct Machine<'a> {
+pub struct Machine<'a, 'b> {
     /// Our registers.
     registers: Registers,
     /// The main memory.
-    memory: Memory<'a>,
+    memory: Memory<'a, 'b>,
     /// The display.
     display: Display,
     /// Interrupt master enable flag.
-    pub ime: bool,
-    /// Interrupt master enable flag: EI.
-    ei: u32,
-    /// Interrupt master enable falg: DI.
-    di: u32,
+    ime: bool,
+    /// EI operation is delayed by one instruction, so we use this counter.
+    ei: u8,
+    /// DI operation is delayed by one instruction, so we use this counter.
+    di: u8,
     /// Flag that holds the running status.
     running: bool,
     /// Cycle counter.
@@ -38,13 +37,13 @@ pub struct Machine<'a> {
     step: bool,
 }
 
-impl<'a> Machine<'a> {
+impl<'a, 'b> Machine<'a, 'b> {
     /// Create a new instance of the Game Boy.
-    pub fn new(cart: &'a Cartridge, debug: bool, step: bool) -> Self {
+    pub fn new(cart: &'a Cartridge, sdl: &'b Sdl, debug: bool, step: bool) -> Self {
         Machine {
             registers: Registers::new(),
-            memory: Memory::new(cart),
-            display: Display::new("PlayKid emulator", 3),
+            memory: Memory::new(cart, sdl),
+            display: Display::new("PlayKid emulator", 3, sdl),
             ime: false,
             ei: 0,
             di: 0,
@@ -64,34 +63,128 @@ impl<'a> Machine<'a> {
     pub fn start(&mut self) {
         self.running = true;
         'mainloop: while self.running {
-            // Event loop
-            for event in self.display.event_pump.poll_iter() {
-                match event {
-                    Event::Quit { .. }
-                    | Event::KeyDown {
-                        keycode: Some(Keycode::Escape),
-                        ..
-                    }
-                    | Event::KeyDown {
-                        keycode: Some(Keycode::CapsLock),
-                        ..
-                    } => return,
-                    _ => {}
-                }
-            }
             self.cycles += self.machine_cycle();
             // Clear display.
             self.display.clear();
             self.display.render(&self.memory);
         }
+    }
 
-        println!("Bye bye!");
+    /// Updates the IME (Interrupt Master Enable) flag.
+    /// This is necessary because the effect of the EI and DI instructions
+    /// is delayed by one instruction.
+    fn ime_update(&mut self) {
+        self.di = match self.di {
+            2 => 1,
+            1 => {
+                self.ime = false;
+                0
+            }
+            _ => 0,
+        };
+        self.ei = match self.ei {
+            2 => 1,
+            1 => {
+                self.ime = true;
+                0
+            }
+            _ => 0,
+        };
+    }
+    /// Interrupt handling. The IF bit corresponding to this interrupt, and the IME flag
+    /// are reset by the CUP. IF acknowledges the interrupt, and IME prevents any other
+    /// interrupts from being handled until re-enabled (with RETI).
+    /// In this case, the corresponding interrupt handler is called by pushing the PC
+    /// to the stack, and then setting it to the address of the interrupt handler.
+    fn interrupt_handling(&mut self) -> u32 {
+        if !self.ime && self.running {
+            // Do nothing.
+            return 0;
+        }
+
+        let mask = self.memory.ie & self.memory.iff;
+        if mask == 0 {
+            return 0;
+        }
+
+        self.running = true;
+        if self.ime {
+            // Reset IME.
+            self.ime = false;
+
+            // IE and IF have the following format:
+            //
+            // | 7  6  5 |    4   |    3   |   2   |   1  |    0   |
+            // |    1    | Joypad | Serial | Timer |  LCD | VBlank |
+            //
+
+            match mask {
+                // VBlank.
+                0x00 => {
+                    self.memory.iff &= 0b1111_1110;
+                    let pc = self.registers.pc;
+                    self.push_stack(pc);
+                    self.registers.pc = 0x0040;
+                }
+                // STAT (LCD).
+                0x02 => {
+                    self.memory.iff &= 0b1111_1101;
+                    let pc = self.registers.pc;
+                    self.push_stack(pc);
+                    self.registers.pc = 0x0048;
+                }
+                // Timer.
+                0x04 => {
+                    self.memory.iff &= 0b1111_1011;
+                    let pc = self.registers.pc;
+                    self.push_stack(pc);
+                    self.registers.pc = 0x0050;
+                }
+                // Serial.
+                0x08 => {
+                    self.memory.iff &= 0b1111_0111;
+                    let pc = self.registers.pc;
+                    self.push_stack(pc);
+                    self.registers.pc = 0x0058;
+                }
+                // Joypad.
+                0x10 => {
+                    self.memory.iff &= 0b1110_1111;
+                    let pc = self.registers.pc;
+                    self.push_stack(pc);
+                    self.registers.pc = 0x0060;
+                }
+                _ => {
+                    panic!("Invalid interrupt!");
+                }
+            }
+
+            5
+        } else {
+            // IME is not enabled.
+            0
+        }
     }
 
     fn machine_cycle(&mut self) -> u32 {
-        // Run a CPU cycle.
-        let cycles = self.cycle() as u32;
-        self.memory.cycle(cycles * 4)
+        // Update IME.
+        self.ime_update();
+        // Handle interrupts if necessary.
+        let i_c = self.interrupt_handling();
+        if i_c > 0 {
+            return i_c;
+        }
+
+        let cycles = if self.running {
+            // Run a CPU cycle.
+            self.cycle() as u32
+        } else {
+            // NOOP instruction.
+            1
+        } * 4;
+
+        // Memory cycle.
+        self.memory.cycle(cycles)
     }
 
     /// Main loop of the machine.
@@ -2572,7 +2665,7 @@ impl<'a> Machine<'a> {
         }
     }
 
-    /// TODO: implement this.
+    /// Halt the machine by setting the running flag.
     fn halt(&mut self) {
         self.running = false;
     }

@@ -3,6 +3,7 @@ mod constants;
 mod debug;
 mod display;
 mod instruction;
+mod joypad;
 mod machine;
 mod memory;
 mod ppu;
@@ -46,8 +47,9 @@ fn main() -> io::Result<()> {
     // Load rom file into cartridge.
     let cart = Cartridge::new(rom, args.skipcheck).expect("Error reading rom file");
 
+    let sdl_context = sdl2::init().unwrap();
     // Create a game boy with the given cartridge.
-    let mut gameboy = Machine::new(&cart, args.debug, args.step);
+    let mut gameboy = Machine::new(&cart, &sdl_context, args.debug, args.step);
     // Initialize the Game Boy state.
     gameboy.init();
     // Start the machine.

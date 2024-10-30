@@ -842,9 +842,6 @@ impl Instruction {
             0xFD => Some(Instruction::SET7(R8::L)),
             0xFE => Some(Instruction::SET7(R8::HL)),
             0xFF => Some(Instruction::SET7(R8::A)),
-
-            // Not found!
-            _ => panic!("0xCB instruction is not implemented: {:#04X}", byte),
         }
     }
 }

@@ -6,22 +6,20 @@ use memory::Memory;
 use ppu::PPU;
 use sdl2;
 use sdl2::rect::Rect;
+use sdl2::Sdl;
 use sdl2::{pixels::Color, EventPump};
 use sdl2::{render::Canvas, video::Window};
 
 /// Holds the display data, and renders the image.
 pub struct Display {
     pub canvas: Canvas<Window>,
-    pub event_pump: EventPump,
     pub scale: u32,
     pub palette: [Color; 4],
 }
 
 impl Display {
-    pub fn new(window_title: &str, scale: u32) -> Self {
-        let sdl_context = sdl2::init().unwrap();
-        let video_subsystem = sdl_context.video().unwrap();
-        let event_pump = sdl_context.event_pump().unwrap();
+    pub fn new(window_title: &str, scale: u32, sdl: &Sdl) -> Self {
+        let video_subsystem = sdl.video().unwrap();
         let window = video_subsystem
             .window(
                 window_title,
@@ -44,7 +42,6 @@ impl Display {
 
         Display {
             canvas,
-            event_pump,
             scale,
             palette,
         }
