@@ -5,13 +5,14 @@ use crate::registers;
 use instruction::Instruction;
 use memory::Memory;
 use registers::Registers;
+use std::collections::HashSet;
 
 use std::io::{stdin, stdout, Read, Write};
 
 pub struct DebugMonitor {
     debug: bool,
     step: bool,
-    breakpoint: u16,
+    breakpoint: HashSet<u16>,
 }
 
 impl DebugMonitor {
@@ -19,7 +20,7 @@ impl DebugMonitor {
         DebugMonitor {
             debug,
             step,
-            breakpoint: 0x2b0,
+            breakpoint: HashSet::new(),
         }
     }
 
@@ -34,12 +35,9 @@ impl DebugMonitor {
         reg: &Registers,
     ) {
         // Debug if needed.
-        let stop = pc == self.breakpoint;
-        if stop {
-            self.debug = true;
-        }
+        let stop = self.breakpoint.contains(&pc);
         if self.debug || stop {
-            if self.step {
+            if self.step || stop {
                 self.debug_step(pc, reg, mem, instr, opcode, cycles);
             } else {
                 self.debug(pc, reg, mem, instr, opcode, cycles);

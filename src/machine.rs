@@ -33,8 +33,10 @@ pub struct Machine<'a, 'b> {
     di: u8,
     /// Flag that holds the running status.
     running: bool,
-    /// Cycle counter.
-    cycles: u32,
+    /// T-states, basic unit of time, and 1:1 with the clock.
+    t_cycles: u32,
+    /// M-cycles, base unit for CPU instructions, and 1:4 with the clock.
+    m_cycles: u32,
     /// The debug monitor
     debug: DebugMonitor,
 }
@@ -50,7 +52,8 @@ impl<'a, 'b> Machine<'a, 'b> {
             ei: 0,
             di: 0,
             running: false,
-            cycles: 0,
+            t_cycles: 0,
+            m_cycles: 0,
             debug: DebugMonitor::new(debug, step),
         }
     }
@@ -65,7 +68,9 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.running = true;
         self.display.present();
         'mainloop: while self.running {
-            self.cycles += self.machine_cycle();
+            let (t, m) = self.machine_cycle();
+            self.m_cycles += m;
+            self.t_cycles += t;
             // Clear display.
             //self.display.clear();
             //self.display.render(&self.memory);
@@ -168,39 +173,41 @@ impl<'a, 'b> Machine<'a, 'b> {
         }
     }
 
-    fn machine_cycle(&mut self) -> u32 {
+    /// Runs
+    fn machine_cycle(&mut self) -> (u32, u32) {
         let start = SystemTime::now();
 
         // Update IME.
         self.ime_update();
 
         // Handle interrupts if necessary.
-        let i_c = self.interrupt_handling();
-        if i_c > 0 {
-            return i_c;
+        let interrupt_m_cycles = self.interrupt_handling();
+        if interrupt_m_cycles > 0 {
+            return (interrupt_m_cycles * 4, interrupt_m_cycles);
         }
 
         // One machine cycle (M-cycle) is 4 clock cycles.
-        let clock_cycles = if self.running {
-            // Run a CPU cycle.
+        let m_cycles = if self.running {
+            // Run next CPU instruction.
             self.cycle() as u32
         } else {
             // NOOP instruction.
             1
-        } * 4;
+        };
 
         // Memory cycle.
-        self.memory.cycle(clock_cycles);
+        let t_cycles = m_cycles * 4;
+        self.memory.cycle(t_cycles);
 
-        // Compute the time we need to stop to hit the right frequency.
-        let elapsed = start.elapsed().expect("Error getting time.") / clock_cycles;
-        let (resting_ns, of) = constants::CPU_CLOCK_NS.overflowing_sub(elapsed.as_nanos());
+        // Compute the time we spent per t-cycle.
+        let t_cycle_t_ns = start.elapsed().expect("Error getting time.") / t_cycles;
+        let (resting_ns, of) = constants::CPU_CLOCK_NS.overflowing_sub(t_cycle_t_ns.as_nanos());
         if !of {
             // Wait to run at true speed.
             thread::sleep(Duration::from_nanos(resting_ns as u64));
         };
 
-        clock_cycles
+        (t_cycles, m_cycles)
     }
 
     /// Main loop of the machine.
@@ -212,7 +219,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         let msg = format!("Incorrect opcode: {:#04X}", opcode);
         let instr = instruction.expect(&msg);
         self.debug.cycle(
-            self.cycles,
+            self.m_cycles,
             pc,
             &instr,
             opcode,

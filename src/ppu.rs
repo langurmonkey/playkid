@@ -25,7 +25,14 @@ pub struct PPU {
     /// Video RAM.
     pub vram: [u8; constants::VRAM_SIZE],
 
+    /// There are four modes:
+    /// - 0: HBlank
+    /// - 1: VBlank
+    /// - 2: OAM scan
+    /// - 3: HDraw
     mode: u8,
+    /// Current dot in a frame.
+    dot: u32,
 
     // The LCDC byte.
     pub lcdc: u8,
@@ -47,7 +54,7 @@ pub struct PPU {
     lcdc0: bool,
 
     /// LX: LCD X coordinate.
-    pub lx: u8,
+    pub lx: u32,
     /// LY: LCD Y coordinate.
     pub ly: u8,
     /// LYC: LY compare.
@@ -87,6 +94,7 @@ impl PPU {
             oam: [0; constants::OAM_SIZE],
             vram: [0; constants::VRAM_SIZE],
             mode: 0,
+            dot: 0,
             lcdc: 0,
             lcdc7: true,
             lcdc6: 0,
@@ -188,17 +196,33 @@ impl PPU {
         }
     }
 
-    /// Performs a GPU cycle with the given number of clock cycles, or dots.
-    pub fn cycle(&self, cycles: u32) {
+    /// Performs a GPU cycle with the given number of t-cycles, or dots.
+    /// 1 m-cycle has 4 dots, or t-cycles.
+    /// Timing is divided between 154 lines, 144 during VDraw (modes 0, 2, 3),
+    /// and 10 during VBlank. Each line takes 456 dots, and one frame takes
+    /// 70224 dots.
+    pub fn cycle(&mut self, t_cycles: u32) {
         if !self.is_ppu_enabled() {
             return;
         }
 
-        let mut cycle_count = cycles;
-        while cycle_count > 0 {
-            let current_cycles = if cycle_count >= 80 { 80 } else { cycle_count };
-            cycle_count -= current_cycles;
+        self.mode = match self.ly {
+            0..=143 => match self.lx {
+                0..=79 => 2,
+                80..=252 => 3,
+                253..=456 => 0,
+                _ => 10,
+            },
+            144..=153 => 1,
+            _ => 10,
+        };
+        if self.dot == 0 {
+            self.mode = 2;
         }
+
+        self.dot += t_cycles;
+        self.lx = self.dot % 456;
+        self.ly = (self.dot / 456) as u8;
     }
 
     fn check_interrupt_lyc(&mut self) {
