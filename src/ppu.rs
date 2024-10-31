@@ -28,7 +28,7 @@ pub struct PPU {
     mode: u8,
 
     // The LCDC byte.
-    lcdc: u8,
+    pub lcdc: u8,
     /// LCD & PPU enable.
     lcdc7: bool,
     /// Window tile map.
@@ -46,13 +46,15 @@ pub struct PPU {
     /// BG & Window enable/priority.
     lcdc0: bool,
 
+    /// LX: LCD X coordinate.
+    pub lx: u8,
     /// LY: LCD Y coordinate.
-    ly: u8,
+    pub ly: u8,
     /// LYC: LY compare.
-    lyc: u8,
+    pub lyc: u8,
 
     /// STAT: LCD status.
-    stat: u8,
+    pub stat: u8,
     /// STAT6: LYC int select.
     stat6: bool,
     /// STAT5: Mode2 int select.
@@ -94,6 +96,7 @@ impl PPU {
             lcdc2: 0,
             lcdc1: true,
             lcdc0: true,
+            lx: 0,
             ly: 0,
             lyc: 0,
             stat: 0,
@@ -164,6 +167,8 @@ impl PPU {
             0xFF42 => self.scy = value,
             // SCX.
             0xFF43 => self.scx = value,
+            // LY.
+            0xFF44 => self.ly = value,
             // LCY.
             0xFF45 => self.lyc = value,
             // DMA.
@@ -183,7 +188,7 @@ impl PPU {
         }
     }
 
-    /// Performs a GPU cycle.
+    /// Performs a GPU cycle with the given number of clock cycles, or dots.
     pub fn cycle(&self, cycles: u32) {
         if !self.is_ppu_enabled() {
             return;

@@ -80,6 +80,7 @@ impl Timer {
             _ => panic!("Timer does not know address: {:#04X}", address),
         };
     }
+
     pub fn cycle(&mut self, cycles: u32) {
         self.i_div += cycles;
         while self.i_div >= 256 {
@@ -100,5 +101,9 @@ impl Timer {
                 self.i_tima -= self.step;
             }
         }
+    }
+
+    pub fn div(&self) -> u8 {
+        self.div
     }
 }

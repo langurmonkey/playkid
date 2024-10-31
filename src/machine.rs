@@ -1,4 +1,5 @@
 use crate::cartridge;
+use crate::constants;
 use crate::debug;
 use crate::display;
 use crate::instruction;
@@ -6,11 +7,14 @@ use crate::memory;
 use crate::registers;
 
 use cartridge::Cartridge;
+use debug::DebugMonitor;
 use display::Display;
 use instruction::{Instruction, CC, R16, R16EXT, R16LD, R8, TGT3};
 use memory::Memory;
 use registers::Registers;
 use sdl2::Sdl;
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 /// This is our machine, which contains the registers and the memory, and
 /// executes the operations.
@@ -31,10 +35,8 @@ pub struct Machine<'a, 'b> {
     running: bool,
     /// Cycle counter.
     cycles: u32,
-    /// Debug mode flag.
-    debug: bool,
-    /// Step-by-step debug.
-    step: bool,
+    /// The debug monitor
+    debug: DebugMonitor,
 }
 
 impl<'a, 'b> Machine<'a, 'b> {
@@ -49,8 +51,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             di: 0,
             running: false,
             cycles: 0,
-            debug,
-            step,
+            debug: DebugMonitor::new(debug, step),
         }
     }
 
@@ -62,11 +63,12 @@ impl<'a, 'b> Machine<'a, 'b> {
     /// Starts the execution of the machine.
     pub fn start(&mut self) {
         self.running = true;
+        self.display.present();
         'mainloop: while self.running {
             self.cycles += self.machine_cycle();
             // Clear display.
-            self.display.clear();
-            self.display.render(&self.memory);
+            //self.display.clear();
+            //self.display.render(&self.memory);
         }
     }
 
@@ -167,15 +169,19 @@ impl<'a, 'b> Machine<'a, 'b> {
     }
 
     fn machine_cycle(&mut self) -> u32 {
+        let start = SystemTime::now();
+
         // Update IME.
         self.ime_update();
+
         // Handle interrupts if necessary.
         let i_c = self.interrupt_handling();
         if i_c > 0 {
             return i_c;
         }
 
-        let cycles = if self.running {
+        // One machine cycle (M-cycle) is 4 clock cycles.
+        let clock_cycles = if self.running {
             // Run a CPU cycle.
             self.cycle() as u32
         } else {
@@ -184,7 +190,17 @@ impl<'a, 'b> Machine<'a, 'b> {
         } * 4;
 
         // Memory cycle.
-        self.memory.cycle(cycles)
+        self.memory.cycle(clock_cycles);
+
+        // Compute the time we need to stop to hit the right frequency.
+        let elapsed = start.elapsed().expect("Error getting time.") / clock_cycles;
+        let (resting_ns, of) = constants::CPU_CLOCK_NS.overflowing_sub(elapsed.as_nanos());
+        if !of {
+            // Wait to run at true speed.
+            thread::sleep(Duration::from_nanos(resting_ns as u64));
+        };
+
+        clock_cycles
     }
 
     /// Main loop of the machine.
@@ -195,28 +211,14 @@ impl<'a, 'b> Machine<'a, 'b> {
         let instruction = Instruction::from_byte(opcode);
         let msg = format!("Incorrect opcode: {:#04X}", opcode);
         let instr = instruction.expect(&msg);
-        // Debug if needed.
-        if self.debug {
-            if self.step {
-                debug::debug_step(
-                    pc,
-                    &self.registers,
-                    &self.memory,
-                    &instr,
-                    opcode,
-                    self.cycles,
-                );
-            } else {
-                debug::debug(
-                    pc,
-                    &self.registers,
-                    &self.memory,
-                    &instr,
-                    opcode,
-                    self.cycles,
-                );
-            }
-        }
+        self.debug.cycle(
+            self.cycles,
+            pc,
+            &instr,
+            opcode,
+            &self.memory,
+            &self.registers,
+        );
         // Execute the instruction.
         self.execute(instr, opcode)
     }

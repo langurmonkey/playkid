@@ -1,68 +1,4 @@
-/// Enumerates the r8 registers.
-#[derive(Debug)]
-pub enum R8 {
-    A,
-    B,
-    C,
-    D,
-    E,
-    H,
-    L,
-    HL,
-}
-
-/// Enumerates the r16 registers.
-#[derive(Debug)]
-pub enum R16 {
-    BC,
-    DE,
-    HL,
-    SP,
-}
-
-/// Enumerates r16 registers for POP and PUSH, which contain AF.
-#[derive(Debug)]
-pub enum R16EXT {
-    BC,
-    DE,
-    HL,
-    AF,
-}
-
-/// Enumerates the R16 registers to be used in (some) load operations.
-#[derive(Debug)]
-pub enum R16LD {
-    BC,
-    DE,
-    HLp,
-    HLm,
-    A8,
-    C,
-    A16,
-}
-
-/// Enumerates jump conditions, mostly flags.
-#[derive(Debug)]
-pub enum CC {
-    NONE,
-    NZ,
-    Z,
-    NC,
-    C,
-}
-
-/// RST's target address, divided by 8.
-#[derive(Debug)]
-pub enum TGT3 {
-    T0,
-    T1,
-    T2,
-    T3,
-    T4,
-    T5,
-    T6,
-    T7,
-}
+use std::fmt;
 
 /// # Instruction
 /// This enum contains all supported instructions.
@@ -225,6 +161,72 @@ pub enum Instruction {
     SET6(R8),
     // SET7 r8
     SET7(R8),
+}
+
+/// Enumerates the r8 registers.
+#[derive(Debug)]
+pub enum R8 {
+    A,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+    HL,
+}
+
+/// Enumerates the r16 registers.
+#[derive(Debug)]
+pub enum R16 {
+    BC,
+    DE,
+    HL,
+    SP,
+}
+
+/// Enumerates r16 registers for POP and PUSH, which contain AF.
+#[derive(Debug)]
+pub enum R16EXT {
+    BC,
+    DE,
+    HL,
+    AF,
+}
+
+/// Enumerates the R16 registers to be used in (some) load operations.
+#[derive(Debug)]
+pub enum R16LD {
+    BC,
+    DE,
+    HLp,
+    HLm,
+    A8,
+    C,
+    A16,
+}
+
+/// Enumerates jump conditions, mostly flags.
+#[derive(Debug)]
+pub enum CC {
+    NONE,
+    NZ,
+    Z,
+    NC,
+    C,
+}
+
+/// RST's target address, divided by 8.
+#[derive(Debug)]
+pub enum TGT3 {
+    T0,
+    T1,
+    T2,
+    T3,
+    T4,
+    T5,
+    T6,
+    T7,
 }
 
 impl Instruction {
@@ -842,6 +844,51 @@ impl Instruction {
             0xFD => Some(Instruction::SET7(R8::L)),
             0xFE => Some(Instruction::SET7(R8::HL)),
             0xFF => Some(Instruction::SET7(R8::A)),
+        }
+    }
+}
+
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Instruction::NOP() => write!(f, "NOP"),
+            Instruction::STOP() => write!(f, "STOP"),
+            Instruction::HALT() => write!(f, "HALT"),
+            Instruction::JPHL() => write!(f, "JP HL"),
+            Instruction::JP(cc) => match cc {
+                CC::NONE => write!(f, "JP a16"),
+                _ => write!(f, "JP {:?}, a16", cc),
+            },
+            Instruction::JR(cc) => match cc {
+                CC::NONE => write!(f, "JR s8"),
+                _ => write!(f, "JR {:?}, s8", cc),
+            },
+            Instruction::XOR(r8) => write!(f, "XOR {:?}", r8),
+            Instruction::LD16(r16) => write!(f, "LD {:?}, d16", r16),
+            Instruction::LD(r8) => write!(f, "LD {:?}, d8", r8),
+            Instruction::LDfromA(r16ld) => {
+                let op = format!("{:?}", r16ld);
+                write!(
+                    f,
+                    "LD ({}), A",
+                    op.replace("m", "-").replace("p", "+").replace("A", "a")
+                )
+            }
+            Instruction::LDtoA(r16ld) => {
+                let op = format!("{:?}", r16ld);
+                write!(
+                    f,
+                    "LD A, ({})",
+                    op.replace("m", "-").replace("p", "+").replace("A", "a")
+                )
+            }
+            Instruction::INC16(r16) => write!(f, "INC {:?}", r16),
+            Instruction::INC(r8) => write!(f, "INC {:?}", r8),
+            Instruction::DEC16(r16) => write!(f, "DEC {:?}", r16),
+            Instruction::DEC(r8) => write!(f, "DEC {:?}", r8),
+            Instruction::CPimm() => write!(f, "CP d8"),
+
+            _ => write!(f, "{:?} (*)", self),
         }
     }
 }

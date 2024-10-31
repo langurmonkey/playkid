@@ -47,6 +47,11 @@ impl Display {
         }
     }
 
+    // Present the canvas.
+    pub fn present(&mut self) {
+        self.canvas.present();
+    }
+
     // Clears the display to black.
     pub fn clear(&mut self) {
         self.canvas.set_draw_color(self.palette[0]);
