@@ -1,3 +1,4 @@
+use colored::Colorize;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind, Result};
@@ -39,24 +40,24 @@ impl Cartridge {
                 }
                 i += 1;
             }
-            println!("OK: Logo sequence");
+            println!("{}: {}", "OK".green(), "Logo sequence");
         }
 
         // Get title.
         {
             let slice = &data[0x134..0x142];
             let title = str::from_utf8(slice).expect("Error getting ROM title");
-            println!("Title: {}", title);
+            println!("Title: {}", title.bright_blue());
         }
 
         // Color or not color.
         {
             if data[0x143] == 0x80 {
                 // Color GB.
-                println!(" -> GB Color cartridge");
+                println!(" -> {}", "GB Color cartridge");
             } else {
                 // Not color GB.
-                println!(" -> Regular GB cartridge");
+                println!(" -> {}", "Regular GB cartridge");
             }
         }
 
@@ -64,7 +65,7 @@ impl Cartridge {
         {
             let sgbf = data[0x146];
             if sgbf == 0x03 {
-                println!(" -> Super Game Boy functions supported");
+                println!(" -> {}", "Super Game Boy functions supported");
             }
         }
 
@@ -101,9 +102,9 @@ impl Cartridge {
                 0xFD => "BANDAI TAMA5",
                 0xFE => "HuC3",
                 0xFF => "MuC1+RAM+BATTERY",
-                _ => &format!("Unknown ({:#40X})", t),
+                _ => &format!("Unknown ({:#40x})", t),
             };
-            println!(" -> Cartridge type: {} ({})", ct, t);
+            println!(" -> Cartridge type: {} ({})", ct.yellow(), t);
 
             cart_type = t;
         }
@@ -124,7 +125,7 @@ impl Cartridge {
                 0x52 => "1.1 MiB",
                 0x53 => "1.2 MiB",
                 0x54 => "1.5 MiB",
-                _ => &format!("Unknown ({:#04X})", rs),
+                _ => &format!("Unknown ({:#04x})", rs),
             };
             println!(" -> ROM size: {}", size);
         }
@@ -139,7 +140,7 @@ impl Cartridge {
                 3 => "32 KiB (4 banks of 8 KiB each)",
                 4 => "128 KiB (16 banks of 8 KiB each)",
                 5 => "64 KiB (8 banks of 8 KiB each)",
-                _ => &format!("Unknown ({:#04X})", rs),
+                _ => &format!("Unknown ({:#04x})", rs),
             };
             println!(" -> RAM size: {}", size);
         }
@@ -150,7 +151,7 @@ impl Cartridge {
             match dc {
                 0 => println!(" -> Destination code: Japan"),
                 1 => println!(" -> Destination code: Overseas only"),
-                _ => println!(" -> Desination code: Unknown ({:#04X})", dc),
+                _ => println!(" -> Desination code: Unknown ({:#04x})", dc),
             }
         }
         // Header checksum.
@@ -162,11 +163,11 @@ impl Cartridge {
             }
             if hc != cs as u8 {
                 panic!(
-                    "Header checksum incorrect: [mem]{:#04X} != [cs]{:#04X}",
+                    "Header checksum incorrect: [mem]{:#04x} != [cs]{:#04x}",
                     hc, cs as u8
                 );
             } else {
-                println!("OK: Header checksum: {:#04X}", cs as u8);
+                println!("{}: {}: {:#04x}", "OK".green(), "Header checksum", cs as u8);
             }
         }
         // Global checksum.
@@ -180,11 +181,13 @@ impl Cartridge {
             }
             if gc != cs as u16 {
                 panic!(
-                    "Global checksum incorrect: [mem]{:#06X} != [cs]{:#06X}",
-                    gc, cs as u16
+                    "{}: Global checksum incorrect: [mem]{:#06x} != [cs]{:#06X}",
+                    "KO".red(),
+                    gc,
+                    cs as u16
                 );
             } else {
-                println!("OK: Global checksum: {:#06X}", cs as u16);
+                println!("{}: {}: {:#04x}", "OK".green(), "Global checksum", cs as u8);
             }
         }
 

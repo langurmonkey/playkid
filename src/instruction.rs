@@ -1,3 +1,10 @@
+use crate::memory;
+use crate::registers;
+
+use colored::ColoredString;
+use colored::Colorize;
+use memory::Memory;
+use registers::Registers;
 use std::fmt;
 
 /// # Instruction
@@ -551,7 +558,7 @@ impl Instruction {
             0xCB => Some(Instruction::OPCODE16()),
 
             // Not found!
-            _ => panic!("Instruction is not implemented: {:#04X}", byte),
+            _ => panic!("Instruction is not implemented: {:#04x}", byte),
         }
     }
 
@@ -851,44 +858,247 @@ impl Instruction {
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Instruction::NOP() => write!(f, "NOP"),
-            Instruction::STOP() => write!(f, "STOP"),
-            Instruction::HALT() => write!(f, "HALT"),
-            Instruction::JPHL() => write!(f, "JP HL"),
+            Instruction::NOP() => write!(f, "{}", op("NOP")),
+            Instruction::STOP() => write!(f, "{}", op("STOP")),
+            Instruction::HALT() => write!(f, "{}", op("HALT")),
+            Instruction::JPHL() => write!(f, "{} {}", op("JP"), arg1("HL")),
             Instruction::JP(cc) => match cc {
-                CC::NONE => write!(f, "JP a16"),
-                _ => write!(f, "JP {:?}, a16", cc),
+                CC::NONE => write!(f, "{} {}", op("JP"), arg1("a16")),
+                _ => {
+                    let ccf = format!("{:?}", cc);
+                    write!(f, "{} {}, {}", op("JP"), arg1(ccf), arg2("a16"))
+                }
             },
             Instruction::JR(cc) => match cc {
-                CC::NONE => write!(f, "JR s8"),
-                _ => write!(f, "JR {:?}, s8", cc),
+                CC::NONE => write!(f, "{} {}", op("JR"), arg1("s8")),
+                _ => {
+                    let ccf = format!("{:?}", cc);
+                    write!(f, "{} {}, {}", op("JR"), arg1(ccf), arg2("s8"))
+                }
             },
-            Instruction::XOR(r8) => write!(f, "XOR {:?}", r8),
-            Instruction::LD16(r16) => write!(f, "LD {:?}, d16", r16),
-            Instruction::LD(r8) => write!(f, "LD {:?}, d8", r8),
+            Instruction::LD(r8)
+            | Instruction::XOR(r8)
+            | Instruction::AND(r8)
+            | Instruction::CP(r8)
+            | Instruction::INC(r8)
+            | Instruction::DEC(r8)
+            | Instruction::ADC(r8)
+            | Instruction::SUB(r8)
+            | Instruction::SBC(r8)
+            | Instruction::ADD(r8)
+            | Instruction::RLC(r8)
+            | Instruction::RRC(r8)
+            | Instruction::RL(r8)
+            | Instruction::RR(r8)
+            | Instruction::SLA(r8)
+            | Instruction::SRA(r8)
+            | Instruction::SWAP(r8)
+            | Instruction::SRL(r8)
+            | Instruction::BIT0(r8)
+            | Instruction::BIT1(r8)
+            | Instruction::BIT2(r8)
+            | Instruction::BIT3(r8)
+            | Instruction::BIT4(r8)
+            | Instruction::BIT5(r8)
+            | Instruction::BIT6(r8)
+            | Instruction::BIT7(r8)
+            | Instruction::RES0(r8)
+            | Instruction::RES1(r8)
+            | Instruction::RES2(r8)
+            | Instruction::RES3(r8)
+            | Instruction::RES4(r8)
+            | Instruction::RES5(r8)
+            | Instruction::RES6(r8)
+            | Instruction::RES7(r8)
+            | Instruction::SET0(r8)
+            | Instruction::SET1(r8)
+            | Instruction::SET2(r8)
+            | Instruction::SET3(r8)
+            | Instruction::SET4(r8)
+            | Instruction::SET5(r8)
+            | Instruction::SET6(r8)
+            | Instruction::SET7(r8) => match r8 {
+                R8::HL => {
+                    let r8f = format!("({:?})", r8);
+                    write!(f, "{} {}", op("XOR"), arg1(r8f))
+                }
+                _ => {
+                    let r8f = format!("{:?}", r8);
+                    write!(f, "{} {}", op("XOR"), arg1(r8f))
+                }
+            },
+            Instruction::LD16(r16) => {
+                let r16f = format!("{:?}", r16);
+                write!(f, "{} {}, {}", op("LD"), arg1(r16f), arg2("d16"))
+            }
             Instruction::LDfromA(r16ld) => {
-                let op = format!("{:?}", r16ld);
+                let operand = format!("({:?})", r16ld);
                 write!(
                     f,
-                    "LD ({}), A",
-                    op.replace("m", "-").replace("p", "+").replace("A", "a")
+                    "{} {}, {}",
+                    op("LD"),
+                    arg1(
+                        operand
+                            .replace("m", "-")
+                            .replace("p", "+")
+                            .replace("A", "a")
+                    ),
+                    arg2("A")
                 )
             }
             Instruction::LDtoA(r16ld) => {
-                let op = format!("{:?}", r16ld);
+                let operand = format!("({:?})", r16ld);
                 write!(
                     f,
-                    "LD A, ({})",
-                    op.replace("m", "-").replace("p", "+").replace("A", "a")
+                    "{} {}, {}",
+                    op("LD"),
+                    arg1("A"),
+                    arg2(
+                        operand
+                            .replace("m", "-")
+                            .replace("p", "+")
+                            .replace("A", "a")
+                    )
                 )
             }
-            Instruction::INC16(r16) => write!(f, "INC {:?}", r16),
-            Instruction::INC(r8) => write!(f, "INC {:?}", r8),
-            Instruction::DEC16(r16) => write!(f, "DEC {:?}", r16),
-            Instruction::DEC(r8) => write!(f, "DEC {:?}", r8),
-            Instruction::CPimm() => write!(f, "CP d8"),
+            Instruction::ADDSP() => write!(f, "{} {}, {}", op("ADD"), arg1("SP"), arg2("s8")),
+            Instruction::INC16(r16) => write!(f, "{} {:?}", op("INC"), r16),
+            Instruction::DEC16(r16) => write!(f, "{} {:?}", op("DEC"), r16),
+            Instruction::CPimm() => write!(f, "{} {}", op("CP"), arg1("d8")),
 
             _ => write!(f, "{:?} (*)", self),
         }
     }
+}
+
+/// Operand data of an instruction. This can be a byte or a word.
+/// Typically, this is either the next byte/word, or the contents
+/// of memory with a given address.
+pub enum OperandData {
+    op8(u8),
+    op16(u16),
+    none(),
+}
+
+/// A representation of an instruction bundled with the data it acts on.
+pub struct RunInstr {
+    pub instr: Instruction,
+    data: OperandData,
+}
+
+impl RunInstr {
+    pub fn new(opcode: u8, mem: &Memory, reg: &Registers) -> RunInstr {
+        let instruction = Instruction::from_byte(opcode);
+        let msg = format!("Incorrect opcode: {:#04x}", opcode);
+        let instr = instruction.expect(&msg);
+        let data = match instr {
+            Instruction::ADDimm()
+            | Instruction::ADCimm()
+            | Instruction::SUBimm()
+            | Instruction::SBCimm() => OperandData::op8(mem.read8(reg.pc)),
+            Instruction::LD16(_)
+            | Instruction::JP(_)
+            | Instruction::CALL(_)
+            | Instruction::ADD16(_) => OperandData::op16(mem.read16(reg.pc)),
+            Instruction::LD(ref r8)
+            | Instruction::XOR(ref r8)
+            | Instruction::AND(ref r8)
+            | Instruction::CP(ref r8)
+            | Instruction::INC(ref r8)
+            | Instruction::DEC(ref r8)
+            | Instruction::ADC(ref r8)
+            | Instruction::SUB(ref r8)
+            | Instruction::SBC(ref r8)
+            | Instruction::ADD(ref r8)
+            | Instruction::RLC(ref r8)
+            | Instruction::RRC(ref r8)
+            | Instruction::RL(ref r8)
+            | Instruction::RR(ref r8)
+            | Instruction::SLA(ref r8)
+            | Instruction::SRA(ref r8)
+            | Instruction::SWAP(ref r8)
+            | Instruction::SRL(ref r8)
+            | Instruction::BIT0(ref r8)
+            | Instruction::BIT1(ref r8)
+            | Instruction::BIT2(ref r8)
+            | Instruction::BIT3(ref r8)
+            | Instruction::BIT4(ref r8)
+            | Instruction::BIT5(ref r8)
+            | Instruction::BIT6(ref r8)
+            | Instruction::BIT7(ref r8)
+            | Instruction::RES0(ref r8)
+            | Instruction::RES1(ref r8)
+            | Instruction::RES2(ref r8)
+            | Instruction::RES3(ref r8)
+            | Instruction::RES4(ref r8)
+            | Instruction::RES5(ref r8)
+            | Instruction::RES6(ref r8)
+            | Instruction::RES7(ref r8)
+            | Instruction::SET0(ref r8)
+            | Instruction::SET1(ref r8)
+            | Instruction::SET2(ref r8)
+            | Instruction::SET3(ref r8)
+            | Instruction::SET4(ref r8)
+            | Instruction::SET5(ref r8)
+            | Instruction::SET6(ref r8)
+            | Instruction::SET7(ref r8) => match r8 {
+                R8::HL => OperandData::op16(reg.get_hl()),
+                _ => OperandData::none(),
+            },
+            Instruction::LDfromA(ref r16ld) => match r16ld {
+                R16LD::BC => OperandData::op16(mem.read16(reg.get_bc())),
+                R16LD::DE => OperandData::op16(mem.read16(reg.get_de())),
+                R16LD::HLp => OperandData::op16(reg.get_hl()),
+                R16LD::HLm => OperandData::op16(reg.get_hl()),
+                R16LD::A16 => OperandData::op16(mem.read16(reg.pc)),
+                R16LD::C => OperandData::op16(mem.read16(0xFF00 | reg.c as u16)),
+                R16LD::A8 => OperandData::op16(mem.read16(0xFF00 | mem.read8(reg.pc) as u16)),
+            },
+            Instruction::LDtoA(ref r16ld) => match r16ld {
+                R16LD::BC => OperandData::op16(mem.read16(reg.get_bc())),
+                R16LD::DE => OperandData::op16(mem.read16(reg.get_de())),
+                R16LD::HLp => OperandData::op16(mem.read16(reg.get_hl())),
+                R16LD::HLm => OperandData::op16(mem.read16(reg.get_hl())),
+                R16LD::A16 => OperandData::op16(mem.read16(reg.pc)),
+                R16LD::C => OperandData::op16(mem.read16(0xFF00 | reg.c as u16)),
+                R16LD::A8 => OperandData::op16(mem.read16(0xFF00 | mem.read8(reg.pc) as u16)),
+            },
+            Instruction::JR(_) | Instruction::ADDSP() => OperandData::op8(mem.read8(reg.pc)),
+            _ => OperandData::none(),
+        };
+        RunInstr { instr, data }
+    }
+}
+
+impl fmt::Display for RunInstr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.data {
+            OperandData::op8(u8) => {
+                let d = format!("{:#04x}", u8);
+                write!(f, "{}   {}", self.instr, dat(d))
+            }
+            OperandData::op16(u16) => {
+                let d = format!("{:#06x}", u16);
+                write!(f, "{}   {}", self.instr, dat(d))
+            }
+            _ => write!(f, "{}", self.instr),
+        }
+    }
+}
+
+/// Formats the operation name.
+fn op<S: AsRef<str>>(name: S) -> ColoredString {
+    name.as_ref().bold().blue()
+}
+/// Formats the first operand.
+fn arg1<S: AsRef<str>>(name: S) -> ColoredString {
+    name.as_ref().italic().magenta()
+}
+/// Formats the second operand.
+fn arg2<S: AsRef<str>>(name: S) -> ColoredString {
+    name.as_ref().italic().purple()
+}
+/// Formats the operand data.
+fn dat<S: AsRef<str>>(name: S) -> ColoredString {
+    name.as_ref().italic().truecolor(110, 110, 110)
 }

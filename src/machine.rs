@@ -9,7 +9,7 @@ use crate::registers;
 use cartridge::Cartridge;
 use debug::DebugMonitor;
 use display::Display;
-use instruction::{Instruction, CC, R16, R16EXT, R16LD, R8, TGT3};
+use instruction::{Instruction, RunInstr, CC, R16, R16EXT, R16LD, R8, TGT3};
 use memory::Memory;
 use registers::Registers;
 use sdl2::Sdl;
@@ -47,7 +47,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
-            display: Display::new("PlayKid emulator", 3, sdl),
+            display: Display::new("PlayKid emulator", 4, sdl),
             ime: false,
             ei: 0,
             di: 0,
@@ -72,8 +72,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             self.m_cycles += m;
             self.t_cycles += t;
             // Clear display.
-            //self.display.clear();
-            //self.display.render(&self.memory);
+            self.display.render(m, &self.memory);
         }
     }
 
@@ -215,25 +214,24 @@ impl<'a, 'b> Machine<'a, 'b> {
         // Fetch next instruction, and parse it.
         let pc = self.registers.pc;
         let opcode = self.read8();
-        let instruction = Instruction::from_byte(opcode);
-        let msg = format!("Incorrect opcode: {:#04X}", opcode);
-        let instr = instruction.expect(&msg);
+
+        let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
         self.debug.cycle(
             self.m_cycles,
             pc,
-            &instr,
+            &run_instr,
             opcode,
             &self.memory,
             &self.registers,
         );
         // Execute the instruction.
-        self.execute(instr, opcode)
+        self.execute(run_instr, opcode)
     }
 
     /// Execute a single instruction, and returns the number of cycles it takes.
-    fn execute(&mut self, instr: Instruction, opcode: u8) -> u8 {
+    fn execute(&mut self, run_instr: RunInstr, opcode: u8) -> u8 {
         // Actually execute the instruction.
-        match instr {
+        match run_instr.instr {
             // NOP: no operation.
             Instruction::NOP() => 1,
             // STOP

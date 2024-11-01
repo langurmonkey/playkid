@@ -69,7 +69,10 @@ impl<'b> Joypad<'b> {
                 | Event::KeyDown {
                     keycode: Some(Keycode::CapsLock),
                     ..
-                } => process::exit(0),
+                } => {
+                    println!("Bye bye!");
+                    process::exit(0);
+                }
 
                 // DOWN
                 Event::KeyDown {

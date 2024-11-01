@@ -5,9 +5,9 @@ use crate::ppu;
 use memory::Memory;
 use ppu::PPU;
 use sdl2;
+use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::Sdl;
-use sdl2::{pixels::Color, EventPump};
 use sdl2::{render::Canvas, video::Window};
 
 /// Holds the display data, and renders the image.
@@ -52,15 +52,8 @@ impl Display {
         self.canvas.present();
     }
 
-    // Clears the display to black.
-    pub fn clear(&mut self) {
-        self.canvas.set_draw_color(self.palette[0]);
-        self.canvas.clear();
-        self.canvas.present();
-    }
-
     // Renders the given buffer to the display.
-    pub fn render(&mut self, mem: &Memory) {
+    pub fn render(&mut self, m_cycle: u32, mem: &Memory) {
         // Fill with buffer
         let scl = self.scale as usize;
         let ppu: &PPU = mem.ppu();
@@ -73,32 +66,23 @@ impl Display {
         let win_map_addr = ppu.get_win_tilemap_addr();
 
         // Background rendering.
-        let mut i: i32 = ppu.get_bgwin_index();
-        for x in 0..32 {
-            for y in 0..32 {
-                let tile_id = mem.read8((bg_map_addr as i32 + i) as u16) as u16;
-                let tile_addr = addr + tile_id;
-                // Each tile is 8 lines of 2 bytes each.
-                for line in 0..8 {
-                    let b0 = mem.read8(tile_addr + line);
-                    let b1 = mem.read8(tile_addr + line + 1);
-                    let ba0 = self.get_bits_of_byte(b0);
-                    let ba1 = self.get_bits_of_byte(b1);
-                    for pixel in 8..0 {
-                        let col_id = (ba0[pixel] | (ba1[pixel] << 1)) as usize;
-                        self.canvas.set_draw_color(self.palette[col_id]);
-                        self.canvas
-                            .fill_rect(Rect::new(
-                                (x * scl) as i32,
-                                (y * scl) as i32,
-                                scl as u32,
-                                scl as u32,
-                            ))
-                            .unwrap();
-                    }
-                }
-                i += 2;
+        self.canvas.clear();
+        let mut col_idx = (m_cycle as usize) % self.palette.len();
+        for x in 0..constants::DISPLAY_WIDTH {
+            for y in 0..constants::DISPLAY_HEIGHT {
+                let color = self.palette[col_idx];
+                self.canvas.set_draw_color(color);
+                self.canvas
+                    .fill_rect(Rect::new(
+                        (x * scl) as i32,
+                        (y * scl) as i32,
+                        scl as u32,
+                        scl as u32,
+                    ))
+                    .unwrap();
+                col_idx = (col_idx + 1) % self.palette.len();
             }
+            col_idx = (col_idx + 1) % self.palette.len();
         }
 
         self.canvas.present();
