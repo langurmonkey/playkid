@@ -10,3 +10,4 @@ sdl2 = "0.37.*"
 clap = { version = "4.5.*", features = ["derive"] }
 clap_derive = { version = "4.0.0-rc.1"}
 colored = "2.*"
+hex = "0.4.*"

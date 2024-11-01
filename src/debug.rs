@@ -6,14 +6,13 @@ use colored::{ColoredString, Colorize};
 use instruction::RunInstr;
 use memory::Memory;
 use registers::Registers;
-use std::collections::HashSet;
 use std::io::{stdin, stdout, Read, Write};
 use std::process;
 
 pub struct DebugMonitor {
     debug: bool,
     step: bool,
-    breakpoint: HashSet<u16>,
+    breakpoints: Vec<u16>,
 }
 
 impl DebugMonitor {
@@ -21,7 +20,7 @@ impl DebugMonitor {
         DebugMonitor {
             debug,
             step,
-            breakpoint: HashSet::new(),
+            breakpoints: Vec::new(),
         }
     }
 
@@ -36,7 +35,7 @@ impl DebugMonitor {
         reg: &Registers,
     ) {
         // Debug if needed.
-        let stop = self.breakpoint.contains(&pc);
+        let stop = self.breakpoints.contains(&pc);
         if self.debug || stop {
             if self.step || stop {
                 self.debug_step(pc, reg, mem, run_instr, opcode, cycles);
@@ -167,22 +166,75 @@ impl DebugMonitor {
     fn pause(&mut self) {
         let mut buf = String::new();
         let mut stdout = stdout();
-        stdout
-            .write(b"(c) continue, (any) step, (q) quit: ")
-            .unwrap();
+        println!();
+        println!("{}", "===========".bold());
+        println!("({})    step", "enter".green());
+        println!("({})        continue", "c".green());
+        println!(
+            "({} {})  add breakpoint to $ADDR",
+            "b".green(),
+            "$ADDR".blue()
+        );
+        println!("({})   list breakpoints", "b list".green());
+        println!("({})        quit", "q".red());
+        stdout.write(b"$ ").unwrap();
         stdout.flush().unwrap();
         match stdin().read_line(&mut buf) {
             Ok(bytes) => {
                 if bytes <= 0 {
                     self.pause();
                 } else {
-                    match buf.as_str() {
-                        "c\n" => self.step = false,
-                        "q\n" => {
+                    let first = &buf[0..1];
+                    match first {
+                        "c" => self.step = false,
+                        "b" => {
+                            // Breakpoint.
+                            let b = buf.strip_suffix("\n").unwrap();
+                            let mut spl = b.split(" ");
+                            spl.next();
+                            let second = spl.next();
+                            match second {
+                                Some(subcommand) => {
+                                    match subcommand {
+                                        "list" => {
+                                            // List breakpoints.
+                                            println!("{}:", "Breakpoints".bold());
+                                            for (i, addr) in self.breakpoints.iter().enumerate() {
+                                                println!("{}: ${:x}", i, addr);
+                                            }
+                                        }
+                                        _ => {
+                                            let value = match subcommand.strip_prefix("$") {
+                                                Some(s) => s,
+                                                None => subcommand,
+                                            };
+                                            match u16::from_str_radix(value, 16) {
+                                                Ok(addr) => {
+                                                    self.breakpoints.push(addr);
+                                                    println!("Breakpoint set at: ${:x}", addr);
+                                                }
+                                                Err(err) => {
+                                                    println!(
+                                            "Error parsing address (must be a 2-byte hex!) ({:?})",
+                                            err.kind()
+                                        )
+                                                }
+                                            };
+                                        }
+                                    }
+                                }
+                                None => {
+                                    println!("Error parsing breakpoint.");
+                                }
+                            }
+                            self.pause();
+                        }
+                        "q" => {
                             println!("Bye bye!");
                             process::exit(0);
                         }
-                        _ => self.step = true,
+                        "\n" => self.step = true,
+                        _ => self.pause(),
                     }
                 }
             }
