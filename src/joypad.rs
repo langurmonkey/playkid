@@ -5,16 +5,27 @@ use std::process;
 
 /// Describes the current state of the Game Boy joypad.
 pub struct Joypad<'b> {
+    /// The P1/JOYP register.
     pub joyp: u8,
+    /// Bits 0-4 contain the state of SsAB.
     pub select_buttons: bool,
+    /// Bits 0-4 contain the state of the D-Pad.
     pub select_dpad: bool,
+    /// Start button.
     pub start: bool,
+    /// Select button.
     pub select: bool,
+    /// A button.
     pub a: bool,
+    /// B button.
     pub b: bool,
+    /// D-pad down.
     pub down: bool,
+    /// D-pad up.
     pub up: bool,
+    /// D-pad left.
     pub left: bool,
+    /// D-pad right.
     pub right: bool,
     sdl: &'b Sdl,
 }
@@ -208,7 +219,7 @@ impl<'b> Joypad<'b> {
                     keycode: Some(Keycode::B),
                     ..
                 } => {
-                    // Unset left.
+                    // Unset B.
                     if self.select_buttons {
                         self.joyp = self.joyp | 0x02;
                     }
