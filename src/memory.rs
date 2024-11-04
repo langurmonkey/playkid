@@ -341,19 +341,19 @@ impl<'a, 'b> Memory<'a, 'b> {
         self.write8(address + 1, (value >> 8) as u8);
     }
 
-    pub fn cycle(&mut self, cycles: u32) -> u32 {
+    pub fn cycle(&mut self, t_cycles: u32) -> u32 {
         self.joypad.update();
 
         let vram_cycles = 0;
-        let ppu_cycles = cycles + vram_cycles;
+        let ppu_cycles = t_cycles + vram_cycles;
 
         // Time.
-        self.timer.cycle(cycles);
+        self.timer.cycle(t_cycles);
         self.iff |= self.timer.i_mask;
         self.timer.i_mask = 0;
 
         // PPU
-        self.ppu.cycle(cycles);
+        self.ppu.cycle(t_cycles);
         self.iff |= self.ppu.i_mask;
         self.ppu.i_mask = 0;
 

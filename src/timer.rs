@@ -1,10 +1,12 @@
 /// The timer registers and logic.
 pub struct Timer {
-    /// Divider.
-    div: u8,
-    /// Timer counter.
+    /// Divider. It is incremented internally every T-cycle, but only the upper 8 bits
+    /// are readable.
+    div: u16,
+    /// Timer counter. The most common software interface to the timers. It can be configured
+    /// using TAC to increment at different rates.
     tima: u8,
-    /// Modulo.
+    /// Modulo. When TIMA overflows, it is reset to the value in here.
     tma: u8,
     /// Enabled.
     enabled: bool,
@@ -39,7 +41,8 @@ impl Timer {
 
     pub fn read(&self, address: u16) -> u8 {
         match address {
-            0xFF04 => self.div,
+            // Only the upper 8 bits of DIV are mapped to memory.
+            0xFF04 => (self.div >> 8) as u8,
             0xFF05 => self.tima,
             0xFF06 => self.tma,
             0xFF07 => {
@@ -81,15 +84,16 @@ impl Timer {
         };
     }
 
-    pub fn cycle(&mut self, cycles: u32) {
-        self.i_div += cycles;
+    /// Advances the timer(s) by the given amount of T-cycles.
+    pub fn cycle(&mut self, t_cycles: u32) {
+        self.i_div += t_cycles;
         while self.i_div >= 256 {
             self.div = self.div.wrapping_add(1);
             self.i_div -= 256;
         }
 
         if self.enabled {
-            self.i_tima += cycles;
+            self.i_tima += t_cycles;
 
             while self.i_tima >= self.step {
                 self.tima = self.tima.wrapping_add(1);
@@ -104,6 +108,9 @@ impl Timer {
     }
 
     pub fn div(&self) -> u8 {
+        (self.div >> 8) as u8
+    }
+    pub fn div16(&self) -> u16 {
         self.div
     }
 }
