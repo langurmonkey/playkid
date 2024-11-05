@@ -876,8 +876,23 @@ impl fmt::Display for Instruction {
                     write!(f, "{} {}, {}", op("JR"), arg1(ccf), arg2("s8"))
                 }
             },
-            Instruction::LD(r8)
-            | Instruction::XOR(r8)
+            Instruction::LD(r8) => match r8 {
+                R8::HL => write!(
+                    f,
+                    "{} {}, {}",
+                    op("LD"),
+                    arg1(format!("({:?})", r8)),
+                    arg2("r8")
+                ),
+                _ => write!(
+                    f,
+                    "{} {}, {}",
+                    op("LD"),
+                    arg1(format!("{:?}", r8)),
+                    arg2("r8")
+                ),
+            },
+            Instruction::XOR(r8)
             | Instruction::AND(r8)
             | Instruction::CP(r8)
             | Instruction::INC(r8)
@@ -920,11 +935,11 @@ impl fmt::Display for Instruction {
             | Instruction::SET7(r8) => match r8 {
                 R8::HL => {
                     let r8f = format!("({:?})", r8);
-                    write!(f, "{} {}", op("XOR"), arg1(r8f))
+                    write!(f, "{} {}", op(format!("{:?}", self)), arg1(r8f))
                 }
                 _ => {
                     let r8f = format!("{:?}", r8);
-                    write!(f, "{} {}", op("XOR"), arg1(r8f))
+                    write!(f, "{} {}", op(format!("{:?}", self)), arg1(r8f))
                 }
             },
             Instruction::LD16(r16) => {
@@ -1000,8 +1015,8 @@ impl RunInstr {
             | Instruction::JP(_)
             | Instruction::CALL(_)
             | Instruction::ADD16(_) => OperandData::op16(mem.read16(reg.pc)),
-            Instruction::LD(ref r8)
-            | Instruction::XOR(ref r8)
+            Instruction::LD(_) => OperandData::op8(mem.read8(reg.pc)),
+            Instruction::XOR(ref r8)
             | Instruction::AND(ref r8)
             | Instruction::CP(ref r8)
             | Instruction::INC(ref r8)
@@ -1052,7 +1067,7 @@ impl RunInstr {
                 R16LD::HLm => OperandData::op16(reg.get_hl()),
                 R16LD::A16 => OperandData::op16(mem.read16(reg.pc)),
                 R16LD::C => OperandData::op16(mem.read16(0xFF00 | reg.c as u16)),
-                R16LD::A8 => OperandData::op16(mem.read16(0xFF00 | mem.read8(reg.pc) as u16)),
+                R16LD::A8 => OperandData::op16(0xFF00 | (mem.read8(reg.pc) as u16)),
             },
             Instruction::LDtoA(ref r16ld) => match r16ld {
                 R16LD::BC => OperandData::op16(mem.read16(reg.get_bc())),
@@ -1061,9 +1076,13 @@ impl RunInstr {
                 R16LD::HLm => OperandData::op16(mem.read16(reg.get_hl())),
                 R16LD::A16 => OperandData::op16(mem.read16(reg.pc)),
                 R16LD::C => OperandData::op16(mem.read16(0xFF00 | reg.c as u16)),
-                R16LD::A8 => OperandData::op16(mem.read16(0xFF00 | mem.read8(reg.pc) as u16)),
+                R16LD::A8 => OperandData::op16(0xFF00 | mem.read8(reg.pc) as u16),
             },
-            Instruction::JR(_) | Instruction::ADDSP() => OperandData::op8(mem.read8(reg.pc)),
+            Instruction::ADDSP() => OperandData::op8(mem.read8(reg.pc)),
+            Instruction::JR(_) => {
+                let j = mem.read8(reg.pc) as i8;
+                OperandData::op16(((reg.pc as i32) + (j as i32)) as u16)
+            }
             _ => OperandData::none(),
         };
         RunInstr { instr, data }

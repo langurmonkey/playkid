@@ -59,7 +59,7 @@ impl DebugMonitor {
         let next_byte = mem.read8(reg.pc);
         let next_word = mem.read16(reg.pc);
         println!("Instr:     {}", run_instr);
-        println!("Cycle:     {}", cycles);
+        println!("T-cycles:  {}", cycles);
         println!(
             "Reg:       {}: {:02x} {:02x}
            {}: {:02x} {:02x}
@@ -189,106 +189,123 @@ impl DebugMonitor {
                 if bytes <= 0 {
                     self.pause();
                 } else {
-                    let b = buf.strip_suffix("\n").unwrap();
-                    let mut spl = b.split(" ");
-                    match spl.next() {
-                        Some(command) => match command {
-                            "c" => self.step = false,
-                            "b" => {
-                                // Breakpoint.
-                                let b = buf.strip_suffix("\n").unwrap();
-                                let mut spl = b.split(" ");
-                                spl.next();
-                                match spl.next() {
-                                    Some(subcommand) => {
-                                        match subcommand {
-                                            "list" => {
-                                                // List breakpoints.
-                                                self.breakpoint_list();
-                                            }
-                                            "del" => {
-                                                // Delete given breakpoint.
-                                                match spl.next() {
-                                                    Some(addr) => {
-                                                        let value = match addr.strip_prefix("$") {
-                                                            Some(s) => s,
-                                                            None => addr,
-                                                        };
-                                                        match u16::from_str_radix(value, 16) {
-                                                            Ok(addr) => {
-                                                                self.breakpoints
-                                                                    .retain(|&x| x != addr);
-                                                                println!(
+                    match buf.as_str() {
+                        "\n" => {
+                            self.step = true;
+                            self.debug = true;
+                        }
+                        _ => {
+                            let b = buf.strip_suffix("\n").unwrap();
+                            let mut spl = b.split(" ");
+                            match spl.next() {
+                                Some(command) => match command {
+                                    "c" => {
+                                        self.step = false;
+                                        self.debug = false;
+                                    }
+                                    "b" => {
+                                        // Breakpoint.
+                                        let b = buf.strip_suffix("\n").unwrap();
+                                        let mut spl = b.split(" ");
+                                        spl.next();
+                                        match spl.next() {
+                                            Some(subcommand) => {
+                                                match subcommand {
+                                                    "list" => {
+                                                        // List breakpoints.
+                                                        self.breakpoint_list();
+                                                    }
+                                                    "del" => {
+                                                        // Delete given breakpoint.
+                                                        match spl.next() {
+                                                            Some(addr) => {
+                                                                let value =
+                                                                    match addr.strip_prefix("$") {
+                                                                        Some(s) => s,
+                                                                        None => addr,
+                                                                    };
+                                                                match u16::from_str_radix(value, 16)
+                                                                {
+                                                                    Ok(addr) => {
+                                                                        self.breakpoints
+                                                                            .retain(|&x| x != addr);
+                                                                        println!(
                                                                     "Breakpoint deleted: ${:x}",
                                                                     addr
                                                                 );
-                                                                self.breakpoint_list();
-                                                            }
-                                                            Err(err) => {
-                                                                println!(
+                                                                        self.breakpoint_list();
+                                                                    }
+                                                                    Err(err) => {
+                                                                        println!(
                                             "{} ({:?})",
                                             "Error parsing address (must be a 2-byte hex)".red(),
                                             err.kind()
                                         )
+                                                                    }
+                                                                };
                                                             }
-                                                        };
-                                                    }
-                                                    None => {
-                                                        println!(
-                                                            "{}",
-                                                            "You must give an address.".red()
-                                                        );
-                                                    }
-                                                }
-                                            }
-                                            _ => {
-                                                // Add breakpoint.
-                                                let value = match subcommand.strip_prefix("$") {
-                                                    Some(s) => s,
-                                                    None => subcommand,
-                                                };
-                                                match u16::from_str_radix(value, 16) {
-                                                    Ok(addr) => {
-                                                        if !self.breakpoints.contains(&addr) {
-                                                            self.breakpoints.push(addr);
-                                                            println!(
-                                                                "Breakpoint set at: ${:x}",
-                                                                addr
-                                                            );
-                                                            self.breakpoint_list();
-                                                        } else {
-                                                            println!(
-                                                                "{}: ${:x}",
-                                                                "Breakpoint already exists".red(),
-                                                                addr
-                                                            );
+                                                            None => {
+                                                                println!(
+                                                                    "{}",
+                                                                    "You must give an address."
+                                                                        .red()
+                                                                );
+                                                            }
                                                         }
                                                     }
-                                                    Err(err) => {
-                                                        println!(
+                                                    _ => {
+                                                        // Add breakpoint.
+                                                        let value =
+                                                            match subcommand.strip_prefix("$") {
+                                                                Some(s) => s,
+                                                                None => subcommand,
+                                                            };
+                                                        match u16::from_str_radix(value, 16) {
+                                                            Ok(addr) => {
+                                                                if !self.breakpoints.contains(&addr)
+                                                                {
+                                                                    self.breakpoints.push(addr);
+                                                                    println!(
+                                                                        "Breakpoint set at: ${:x}",
+                                                                        addr
+                                                                    );
+                                                                    self.breakpoint_list();
+                                                                } else {
+                                                                    println!(
+                                                                        "{}: ${:x}",
+                                                                        "Breakpoint already exists"
+                                                                            .red(),
+                                                                        addr
+                                                                    );
+                                                                }
+                                                            }
+                                                            Err(err) => {
+                                                                println!(
                                             "{} ({:?})",
                                             "Error parsing address (must be a 2-byte hex!)".red(),
                                             err.kind()
                                         )
+                                                            }
+                                                        };
                                                     }
-                                                };
+                                                }
+                                            }
+                                            None => {
+                                                println!("Error parsing breakpoint.");
                                             }
                                         }
+                                        self.pause();
                                     }
-                                    None => {
-                                        println!("Error parsing breakpoint.");
+                                    "q" => {
+                                        println!("Bye bye!");
+                                        process::exit(0);
                                     }
+                                    _ => self.pause(),
+                                },
+                                None => {
+                                    self.step = true;
                                 }
-                                self.pause();
                             }
-                            "q" => {
-                                println!("Bye bye!");
-                                process::exit(0);
-                            }
-                            _ => self.pause(),
-                        },
-                        None => {
-                            self.step = true;
                         }
                     }
                 }

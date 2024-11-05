@@ -52,7 +52,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             ei: 0,
             di: 0,
             running: false,
-            t_cycles: 0,
+            t_cycles: 324,
             m_cycles: 0,
             debug: DebugMonitor::new(debug, step),
         }
@@ -71,8 +71,10 @@ impl<'a, 'b> Machine<'a, 'b> {
             let (t, m) = self.machine_cycle();
             self.m_cycles += m;
             self.t_cycles += t;
-            // Clear display.
-            self.display.render(m, &self.memory);
+            if self.t_cycles % 50 == 0 {
+                // Render?.
+                self.display.render(m, &self.memory);
+            }
         }
     }
 
@@ -217,7 +219,7 @@ impl<'a, 'b> Machine<'a, 'b> {
 
         let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
         self.debug.cycle(
-            self.m_cycles,
+            self.t_cycles,
             pc,
             &run_instr,
             opcode,

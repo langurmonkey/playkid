@@ -89,12 +89,11 @@ pub struct PPU {
 }
 
 impl PPU {
-    pub fn new() -> Self {
+    pub fn new(start_dot: u32) -> Self {
         PPU {
             oam: [0; constants::OAM_SIZE],
             vram: [0; constants::VRAM_SIZE],
             mode: 0,
-            dot: 0,
             lcdc: 0,
             lcdc7: true,
             lcdc6: 0,
@@ -104,7 +103,8 @@ impl PPU {
             lcdc2: 0,
             lcdc1: true,
             lcdc0: true,
-            lx: 0,
+            dot: start_dot,
+            lx: start_dot,
             ly: 0,
             lyc: 0,
             stat: 0,
@@ -206,7 +206,16 @@ impl PPU {
             return;
         }
 
-        self.mode = match self.ly {
+        self.dot += t_cycles;
+        self.update_mode();
+
+        self.lx = self.dot % 456;
+        self.ly = (self.dot / 456) as u8;
+        self.check_interrupt_lyc();
+    }
+
+    fn update_mode(&mut self) {
+        let new_mode = match self.ly {
             0..=143 => match self.lx {
                 0..=79 => 2,
                 80..=252 => 3,
@@ -216,19 +225,44 @@ impl PPU {
             144..=153 => 1,
             _ => 10,
         };
-        if self.dot == 0 {
-            self.mode = 2;
+        // Interrupts.
+        if new_mode != self.mode {
+            match new_mode {
+                0 => {
+                    if self.stat3 {
+                        // STAT mode 0.
+                        self.i_mask |= 0b0000_0010;
+                    }
+                }
+                1 => {
+                    if self.stat4 {
+                        // STAT mode 1.
+                        self.i_mask |= 0b0000_0010;
+                    }
+                    // V-Blank.
+                    self.i_mask |= 0b0000_0001;
+                }
+                2 => {
+                    if self.stat5 {
+                        // STAT mode 2.
+                        self.i_mask |= 0b0000_0010;
+                    }
+                }
+                _ => {}
+            }
         }
-
-        self.dot += t_cycles;
-        self.lx = self.dot % 456;
-        self.ly = (self.dot / 456) as u8;
+        self.mode = new_mode;
     }
 
+    /// Update STAT bit 2 (LYC==LY).
     fn check_interrupt_lyc(&mut self) {
-        // if self.stat6 && self.line == self.lyc {
-        //     self.i_mask |= 0b0000_0010;
-        // }
+        if self.ly == self.lyc {
+            self.stat = self.stat | 0b0000_0100;
+            self.stat2 = true;
+            if self.stat6 {
+                self.i_mask |= 0b0000_0010;
+            }
+        }
     }
 
     /// This method updates the LCDC flags from the current value

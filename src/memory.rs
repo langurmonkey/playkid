@@ -59,7 +59,7 @@ impl<'a, 'b> Memory<'a, 'b> {
             iff: 0,
             ie: 0,
             cart,
-            ppu: PPU::new(),
+            ppu: PPU::new(0x194),
             timer: Timer::new(),
             joypad: Joypad::new(sdl),
         }
@@ -132,13 +132,13 @@ impl<'a, 'b> Memory<'a, 'b> {
         // LCDC
         self.write8(0xFF40, 0x91);
         // STAT
-        self.write8(0xFF41, 0x81);
+        self.write8(0xFF41, 0x85);
         // SCY
         self.write8(0xFF42, 0x00);
         // SCX
         self.write8(0xFF43, 0x00);
         // LY
-        self.write8(0xFF44, 0x91);
+        self.write8(0xFF44, 0x00);
         // LYC
         self.write8(0xFF45, 0x00);
         // DMA
