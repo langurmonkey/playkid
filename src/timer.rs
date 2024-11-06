@@ -39,6 +39,18 @@ impl Timer {
         }
     }
 
+    /// Resets the state of the timer.
+    pub fn reset(&mut self) {
+        self.div = 0;
+        self.tima = 0;
+        self.tma = 0;
+        self.enabled = false;
+        self.step = 1024;
+        self.i_div = 0;
+        self.i_tima = 0;
+        self.i_mask = 0;
+    }
+
     pub fn read(&self, address: u16) -> u8 {
         match address {
             // Only the upper 8 bits of DIV are mapped to memory.

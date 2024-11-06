@@ -6,7 +6,7 @@ use colored::{ColoredString, Colorize};
 use instruction::RunInstr;
 use memory::Memory;
 use registers::Registers;
-use std::io::{stdin, stdout, Read, Write};
+use std::io::{stdin, stdout, Write};
 use std::process;
 
 pub struct DebugMonitor {
@@ -25,6 +25,7 @@ impl DebugMonitor {
     }
 
     /// Performs a cycle.
+    /// Returns whether the machine must be reset.
     pub fn cycle(
         &mut self,
         cycles: u32,
@@ -33,16 +34,17 @@ impl DebugMonitor {
         opcode: u8,
         mem: &Memory,
         reg: &Registers,
-    ) {
+    ) -> bool {
         // Debug if needed.
         let stop = self.breakpoints.contains(&pc);
         if self.debug || stop {
             if self.step || stop {
-                self.debug_step(pc, reg, mem, run_instr, opcode, cycles);
+                return self.debug_step(pc, reg, mem, run_instr, opcode, cycles);
             } else {
                 self.debug(pc, reg, mem, run_instr, opcode, cycles);
             }
         }
+        false
     }
 
     /// Prints debug information for a given instruction.
@@ -149,6 +151,7 @@ impl DebugMonitor {
     }
     /// Prints debug information for a given instruction, and pauses the
     /// execution until user input.
+    /// Returns true if the machine must be reset, and false otherwise.
     fn debug_step(
         &mut self,
         pc: u16,
@@ -157,13 +160,14 @@ impl DebugMonitor {
         instr: &RunInstr,
         opcode: u8,
         cycles: u32,
-    ) {
+    ) -> bool {
         self.debug(pc, reg, mem, instr, opcode, cycles);
-        self.pause();
+        self.pause()
     }
 
     /// Pauses until there is a new command.
-    fn pause(&mut self) {
+    /// Returns true if the machine must be reset, and false otherwise.
+    fn pause(&mut self) -> bool {
         let mut buf = String::new();
         let mut stdout = stdout();
         println!();
@@ -181,7 +185,8 @@ impl DebugMonitor {
             "b del".green(),
             "$ADDR".blue()
         );
-        println!("({})             quit", "q".red());
+        println!("({})             reset emulator", "r".yellow());
+        println!("({})             quit", "q".yellow());
         stdout.write(b"$ ").unwrap();
         stdout.flush().unwrap();
         match stdin().read_line(&mut buf) {
@@ -199,7 +204,22 @@ impl DebugMonitor {
                             let mut spl = b.split(" ");
                             match spl.next() {
                                 Some(command) => match command {
+                                    "q" => {
+                                        // Quit.
+                                        println!("Bye bye!");
+                                        process::exit(0);
+                                    }
+                                    "r" => {
+                                        // Reset.
+                                        println!();
+                                        println!("###############################");
+                                        println!("######## Machine reset ########");
+                                        println!("###############################");
+                                        println!();
+                                        return true;
+                                    }
                                     "c" => {
+                                        // Continue.
                                         self.step = false;
                                         self.debug = false;
                                     }
@@ -294,13 +314,9 @@ impl DebugMonitor {
                                                 println!("Error parsing breakpoint.");
                                             }
                                         }
-                                        self.pause();
+                                        return self.pause();
                                     }
-                                    "q" => {
-                                        println!("Bye bye!");
-                                        process::exit(0);
-                                    }
-                                    _ => self.pause(),
+                                    _ => return self.pause(),
                                 },
                                 None => {
                                     self.step = true;
@@ -314,6 +330,7 @@ impl DebugMonitor {
                 println!("Error: {:?}", err);
             }
         }
+        false
     }
 
     fn breakpoint_list(&self) {

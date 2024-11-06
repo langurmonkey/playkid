@@ -52,6 +52,11 @@ impl Display {
         self.canvas.present();
     }
 
+    pub fn clear(&mut self) {
+        self.canvas.set_draw_color(self.palette[3]);
+        self.canvas.clear();
+    }
+
     // Renders the given buffer to the display.
     pub fn render(&mut self, m_cycle: u32, mem: &Memory) {
         // Fill with buffer

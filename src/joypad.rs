@@ -48,6 +48,14 @@ impl<'b> Joypad<'b> {
         }
     }
 
+    /// Resets the state of the joypad.
+    pub fn reset(&mut self) {
+        self.joyp = 0xFF;
+        self.select_buttons = false;
+        self.select_dpad = false;
+        self.update_buttons();
+    }
+
     pub fn read(&self, address: u16) -> u8 {
         match address {
             0xFF00 => self.joyp,

@@ -20,9 +20,9 @@ use std::time::{Duration, SystemTime};
 /// executes the operations.
 pub struct Machine<'a, 'b> {
     /// Our registers.
-    registers: Registers,
+    pub registers: Registers,
     /// The main memory.
-    memory: Memory<'a, 'b>,
+    pub memory: Memory<'a, 'b>,
     /// The display.
     display: Display,
     /// Interrupt master enable flag.
@@ -58,6 +58,18 @@ impl<'a, 'b> Machine<'a, 'b> {
         }
     }
 
+    /// Resets the state of the machine and all its components.
+    pub fn reset(&mut self) {
+        self.registers.reset();
+        self.memory.reset();
+        self.ime = false;
+        self.ei = 0;
+        self.di = 0;
+        self.running = true;
+        self.t_cycles = 324;
+        self.m_cycles = 0;
+    }
+
     /// Initialize the Game Boy.
     pub fn init(&mut self) {
         self.memory.initialize_hw_registers();
@@ -66,6 +78,7 @@ impl<'a, 'b> Machine<'a, 'b> {
     /// Starts the execution of the machine.
     pub fn start(&mut self) {
         self.running = true;
+        self.display.clear();
         self.display.present();
         'mainloop: while self.running {
             let (t, m) = self.machine_cycle();
@@ -73,6 +86,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             self.t_cycles += t;
             if self.t_cycles % 50 == 0 {
                 // Render?.
+                self.display.clear();
                 self.display.render(m, &self.memory);
             }
         }
@@ -218,14 +232,18 @@ impl<'a, 'b> Machine<'a, 'b> {
         let opcode = self.read8();
 
         let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
-        self.debug.cycle(
+        if self.debug.cycle(
             self.t_cycles,
             pc,
             &run_instr,
             opcode,
             &self.memory,
             &self.registers,
-        );
+        ) {
+            self.reset();
+            self.display.clear();
+            self.display.present();
+        }
         // Execute the instruction.
         self.execute(run_instr, opcode)
     }

@@ -69,6 +69,24 @@ impl<'a, 'b> Memory<'a, 'b> {
         &self.ppu
     }
 
+    pub fn reset(&mut self) {
+        self.ppu.reset();
+        self.timer.reset();
+        self.joypad.reset();
+        self.reset_memory();
+        self.initialize_hw_registers();
+    }
+
+    /// Resets both WRAM and HRAM.
+    pub fn reset_memory(&mut self) {
+        self.wram.fill(0);
+        self.hram.fill(0);
+        self.io.fill(0);
+        self.iff = 0;
+        self.ie = 0;
+    }
+
+    /// Initializes the HW registers.
     pub fn initialize_hw_registers(&mut self) {
         // Initialize hardware registers in the I/O ports region.
         // P1/JOYPAD

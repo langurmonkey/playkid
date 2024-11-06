@@ -31,6 +31,8 @@ pub struct PPU {
     /// - 2: OAM scan
     /// - 3: HDraw
     mode: u8,
+    /// Start dot of the PPU.
+    start_dot: u32,
     /// Current dot in a frame.
     dot: u32,
 
@@ -103,6 +105,7 @@ impl PPU {
             lcdc2: 0,
             lcdc1: true,
             lcdc0: true,
+            start_dot,
             dot: start_dot,
             lx: start_dot,
             ly: 0,
@@ -120,6 +123,23 @@ impl PPU {
             wx: 7,
             i_mask: 0,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.oam.fill(0);
+        self.vram.fill(0);
+        self.mode = 0;
+        self.lcdc = 0;
+        self.dot = self.start_dot;
+        self.ly = 0;
+        self.lx = self.start_dot;
+        self.lyc = 0;
+        self.stat = 0;
+        self.scx = 0;
+        self.scy = 0;
+        self.wx = 0;
+        self.wy = 0;
+        self.i_mask = 0;
     }
 
     pub fn read(&self, address: u16) -> u8 {
