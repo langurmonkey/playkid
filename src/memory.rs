@@ -227,7 +227,7 @@ impl<'a, 'b> Memory<'a, 'b> {
                 *self
                     .cart
                     .data
-                    .get((address - 0x4000) as usize)
+                    .get(address as usize)
                     .expect("Error getting cartridge data")
             }
             0x8000..=0x9FFF => {
@@ -256,11 +256,9 @@ impl<'a, 'b> Memory<'a, 'b> {
             }
             0xFEA0..=0xFEFF => {
                 // Empty, unusable.
-                println!(
-                    "Attempted usage of forbidden area 0xFEA0-0xFEFE: {:#06X}",
-                    address
-                );
-                0
+                println!("Forbidden read ($FEA0-$FEFE): ${:04x}", address);
+                // Return 0xFF, the default value in the Game Boy main data bus.
+                0xFF
             }
             // Joypad.
             0xFF00 => self.joypad.read(address),
@@ -293,7 +291,7 @@ impl<'a, 'b> Memory<'a, 'b> {
         match address {
             0x0000..=0x7FFF => {
                 // Cartridge (ROM + switchable banks).
-                println!("Attempted to write to cartridge ROM: {:#06X}", address);
+                println!("Attempted to write to cartridge ROM: ${:04x}", address);
             }
             0x8000..=0x9FFF => {
                 // VRAM.
@@ -301,7 +299,7 @@ impl<'a, 'b> Memory<'a, 'b> {
             }
             0xA000..=0xBFFF => {
                 // 8kB switchable RAM bank (cartridge).
-                println!("Write to cartridge RAM: {:#06X}", address);
+                println!("Write to cartridge RAM: ${:04x}", address);
             }
             0xC000..=0xDFFF => {
                 // 8kB WRAM.
@@ -317,10 +315,7 @@ impl<'a, 'b> Memory<'a, 'b> {
             }
             0xFEA0..=0xFEFF => {
                 // Empty, unusable.
-                println!(
-                    "Attempted usage of forbidden area 0xFEA0-0xFEFE: {:#06X}",
-                    address
-                )
+                println!("Forbidden write ($FEA0-$FEFE): ${:04x}", address)
             }
             // Joypad.
             0xFF00 => self.joypad.write(address, value),

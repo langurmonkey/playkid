@@ -2,7 +2,7 @@
 pub struct Timer {
     /// Divider. It is incremented internally every T-cycle, but only the upper 8 bits
     /// are readable.
-    div: u16,
+    div: u8,
     /// Timer counter. The most common software interface to the timers. It can be configured
     /// using TAC to increment at different rates.
     tima: u8,
@@ -54,7 +54,7 @@ impl Timer {
     pub fn read(&self, address: u16) -> u8 {
         match address {
             // Only the upper 8 bits of DIV are mapped to memory.
-            0xFF04 => (self.div >> 8) as u8,
+            0xFF04 => self.div,
             0xFF05 => self.tima,
             0xFF06 => self.tma,
             0xFF07 => {
@@ -74,6 +74,7 @@ impl Timer {
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0xFF04 => {
+                self.i_div = 0;
                 self.div = 0;
             }
             0xFF05 => {
@@ -101,7 +102,7 @@ impl Timer {
         self.i_div += t_cycles;
         while self.i_div >= 256 {
             self.div = self.div.wrapping_add(1);
-            self.i_div -= 256;
+            self.i_div = 0;
         }
 
         if self.enabled {
@@ -120,9 +121,9 @@ impl Timer {
     }
 
     pub fn div(&self) -> u8 {
-        (self.div >> 8) as u8
+        self.div
     }
     pub fn div16(&self) -> u16 {
-        self.div
+        self.i_div as u16
     }
 }

@@ -861,6 +861,22 @@ impl fmt::Display for Instruction {
             Instruction::NOP() => write!(f, "{}", op("NOP")),
             Instruction::STOP() => write!(f, "{}", op("STOP")),
             Instruction::HALT() => write!(f, "{}", op("HALT")),
+            Instruction::CPL() => write!(f, "{}", op("CPL")),
+            Instruction::EI() => write!(f, "{}", op("EI")),
+            Instruction::RET(cc) => match cc {
+                CC::NONE => write!(f, "{}", op("RET")),
+                _ => {
+                    let ccf = format!("{:?}", cc);
+                    write!(f, "{} {}", op("RET"), arg1(ccf))
+                }
+            },
+            Instruction::CALL(cc) => match cc {
+                CC::NONE => write!(f, "{} {}", op("CALL"), arg1("a16")),
+                _ => {
+                    let ccf = format!("{:?}", cc);
+                    write!(f, "{} {}, {}", op("CALL"), arg1(ccf), arg2("a16"))
+                }
+            },
             Instruction::JPHL() => write!(f, "{} {}", op("JP"), arg1("HL")),
             Instruction::JP(cc) => match cc {
                 CC::NONE => write!(f, "{} {}", op("JP"), arg1("a16")),
@@ -894,6 +910,7 @@ impl fmt::Display for Instruction {
             },
             Instruction::XOR(r8)
             | Instruction::AND(r8)
+            | Instruction::OR(r8)
             | Instruction::CP(r8)
             | Instruction::INC(r8)
             | Instruction::DEC(r8)
@@ -1010,12 +1027,17 @@ impl RunInstr {
             Instruction::ADDimm()
             | Instruction::ADCimm()
             | Instruction::SUBimm()
-            | Instruction::SBCimm() => OperandData::op8(mem.read8(reg.pc)),
+            | Instruction::SBCimm()
+            | Instruction::CPimm()
+            | Instruction::ORimm()
+            | Instruction::XORimm()
+            | Instruction::ANDimm()
+            | Instruction::LD(_) => OperandData::op8(mem.read8(reg.pc)),
             Instruction::LD16(_)
             | Instruction::JP(_)
             | Instruction::CALL(_)
             | Instruction::ADD16(_) => OperandData::op16(mem.read16(reg.pc)),
-            Instruction::LD(_) => OperandData::op8(mem.read8(reg.pc)),
+            Instruction::RET(_) => OperandData::op16(mem.read16(reg.sp)),
             Instruction::XOR(ref r8)
             | Instruction::AND(ref r8)
             | Instruction::CP(ref r8)
@@ -1066,7 +1088,7 @@ impl RunInstr {
                 R16LD::HLp => OperandData::op16(reg.get_hl()),
                 R16LD::HLm => OperandData::op16(reg.get_hl()),
                 R16LD::A16 => OperandData::op16(mem.read16(reg.pc)),
-                R16LD::C => OperandData::op16(mem.read16(0xFF00 | reg.c as u16)),
+                R16LD::C => OperandData::op16(0xFF00 | reg.c as u16),
                 R16LD::A8 => OperandData::op16(0xFF00 | (mem.read8(reg.pc) as u16)),
             },
             Instruction::LDtoA(ref r16ld) => match r16ld {
@@ -1081,7 +1103,7 @@ impl RunInstr {
             Instruction::ADDSP() => OperandData::op8(mem.read8(reg.pc)),
             Instruction::JR(_) => {
                 let j = mem.read8(reg.pc) as i8;
-                OperandData::op16(((reg.pc as i32) + (j as i32)) as u16)
+                OperandData::op16((((reg.pc + 1) as i32) + (j as i32)) as u16)
             }
             _ => OperandData::none(),
         };

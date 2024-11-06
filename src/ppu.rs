@@ -61,6 +61,8 @@ pub struct PPU {
     pub ly: u8,
     /// LYC: LY compare.
     pub lyc: u8,
+    /// Update LY.
+    pub ly_update: bool,
 
     /// STAT: LCD status.
     pub stat: u8,
@@ -86,6 +88,13 @@ pub struct PPU {
     wy: u8,
     /// WX: Window X position plus 7.
     wx: u8,
+    /// BGP: Background palette register.
+    bgp: u8,
+    /// OBP0: Object palette 0.
+    obp0: u8,
+    /// OBP1: Object palette 1.
+    obp1: u8,
+
     /// LCD interrupt mask for registers IE and IF.
     pub i_mask: u8,
 }
@@ -110,6 +119,7 @@ impl PPU {
             lx: start_dot,
             ly: 0,
             lyc: 0,
+            ly_update: false,
             stat: 0,
             stat6: false,
             stat5: false,
@@ -121,6 +131,9 @@ impl PPU {
             scx: 0,
             wy: 0,
             wx: 7,
+            bgp: 0,
+            obp0: 0,
+            obp1: 0,
             i_mask: 0,
         }
     }
@@ -139,6 +152,9 @@ impl PPU {
         self.scy = 0;
         self.wx = 0;
         self.wy = 0;
+        self.bgp = 0;
+        self.obp0 = 0;
+        self.obp1 = 1;
         self.i_mask = 0;
     }
 
@@ -162,6 +178,12 @@ impl PPU {
             0xFF45 => self.lyc,
             // DMA.
             0xFF46 => 0,
+            // BGP.
+            0xFF47 => self.bgp,
+            // OBP0.
+            0xFF48 => self.obp0,
+            // OBP1.
+            0xFF49 => self.obp1,
 
             // WX.
             0xFF4A => self.wx,
@@ -207,6 +229,12 @@ impl PPU {
                 // Dest:   $FE00-FE9F
                 // This is implemented in `memory.rs`.
             }
+            // BGP.
+            0xFF47 => self.bgp = value,
+            // OBP0.
+            0xFF48 => self.obp0 = value,
+            // OBP1.
+            0xFF49 => self.obp1 = value,
 
             // WX.
             0xFF4A => self.wx = value,
@@ -229,9 +257,24 @@ impl PPU {
         self.dot += t_cycles;
         self.update_mode();
 
+        // LY.
+        if self.ly_update {
+            self.ly += 1;
+            if self.ly >= 154 {
+                self.ly = 0;
+            }
+            self.ly_update = false;
+            // Check LY==LYC condition.
+            self.check_interrupt_lyc();
+        }
+
+        // LX.
+        let last_lx = self.lx;
         self.lx = self.dot % 456;
-        self.ly = (self.dot / 456) as u8;
-        self.check_interrupt_lyc();
+        if self.lx < last_lx {
+            // New line.
+            self.ly_update = true;
+        }
     }
 
     fn update_mode(&mut self) {
@@ -245,6 +288,9 @@ impl PPU {
             144..=153 => 1,
             _ => 10,
         };
+        // Update STAT bits 01 with PPU mode.
+        self.stat = (self.stat & 0xF4) | new_mode;
+        self.stat01 = new_mode;
         // Interrupts.
         if new_mode != self.mode {
             match new_mode {
@@ -277,11 +323,15 @@ impl PPU {
     /// Update STAT bit 2 (LYC==LY).
     fn check_interrupt_lyc(&mut self) {
         if self.ly == self.lyc {
-            self.stat = self.stat | 0b0000_0100;
+            // Activate bit 2.
+            self.stat = (self.stat & 0xFB) | 0x04;
             self.stat2 = true;
             if self.stat6 {
                 self.i_mask |= 0b0000_0010;
             }
+        } else {
+            // Deactivate bit 2.
+            self.stat = self.stat & 0xFB;
         }
     }
 

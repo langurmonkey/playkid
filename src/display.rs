@@ -70,17 +70,17 @@ impl Display {
         // Window tile map area.
         let win_map_addr = ppu.get_win_tilemap_addr();
 
-        let st = 0x8010;
+        let base = 0x8000;
 
         let mut x = 0;
         let mut y = 0;
 
-        for sprite in 0..165 {
+        for sprite in 0..365 {
             let sx = x;
             let sy = y;
             // 8x8 sprites where each row of 8 pixels is 2 bytes.
             for row in 0..8 {
-                let address = st + sprite * 16 + row * 2;
+                let address = base + sprite * 16 + row * 2;
                 let b0 = ppu.read(address);
                 let b1 = ppu.read(address + 1);
                 let ba0 = self.get_bits_of_byte(b0);

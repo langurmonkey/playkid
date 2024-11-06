@@ -84,7 +84,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             let (t, m) = self.machine_cycle();
             self.m_cycles += m;
             self.t_cycles += t;
-            if self.t_cycles % 50 == 0 {
+            if self.t_cycles % 4560 == 0 {
                 // Render?.
                 self.display.clear();
                 self.display.render(m, &self.memory);
@@ -142,7 +142,7 @@ impl<'a, 'b> Machine<'a, 'b> {
 
             match mask {
                 // VBlank.
-                0x00 => {
+                0x01 => {
                     self.memory.iff &= 0b1111_1110;
                     let pc = self.registers.pc;
                     self.push_stack(pc);
@@ -177,7 +177,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                     self.registers.pc = 0x0060;
                 }
                 _ => {
-                    panic!("Invalid interrupt!");
+                    panic!("Invalid interrupt: {:#b}", mask);
                 }
             }
 
@@ -210,19 +210,23 @@ impl<'a, 'b> Machine<'a, 'b> {
             1
         };
 
-        // Memory cycle.
-        let t_cycles = m_cycles * 4;
-        self.memory.cycle(t_cycles);
+        if m_cycles > 0 {
+            // Memory cycle.
+            let t_cycles = m_cycles * 4;
+            self.memory.cycle(t_cycles);
 
-        // Compute the time we spent per t-cycle.
-        let t_cycle_t_ns = start.elapsed().expect("Error getting time.") / t_cycles;
-        let (resting_ns, of) = constants::CPU_CLOCK_NS.overflowing_sub(t_cycle_t_ns.as_nanos());
-        if !of {
-            // Wait to run at true speed.
-            thread::sleep(Duration::from_nanos(resting_ns as u64));
-        };
+            // Compute the time we spent per t-cycle.
+            let t_cycle_t_ns = start.elapsed().expect("Error getting time.") / t_cycles;
+            let (resting_ns, of) = constants::CPU_CLOCK_NS.overflowing_sub(t_cycle_t_ns.as_nanos());
+            if !of {
+                // Wait to run at true speed.
+                thread::sleep(Duration::from_nanos(resting_ns as u64));
+            };
 
-        (t_cycles, m_cycles)
+            (t_cycles, m_cycles)
+        } else {
+            (0, 0)
+        }
     }
 
     /// Main loop of the machine.
@@ -243,9 +247,11 @@ impl<'a, 'b> Machine<'a, 'b> {
             self.reset();
             self.display.clear();
             self.display.present();
+            0
+        } else {
+            // Execute the instruction.
+            self.execute(run_instr, opcode)
         }
-        // Execute the instruction.
-        self.execute(run_instr, opcode)
     }
 
     /// Execute a single instruction, and returns the number of cycles it takes.
@@ -2913,10 +2919,10 @@ impl<'a, 'b> Machine<'a, 'b> {
         let a = self.registers.a;
         // Actual subtraction.
         let result = a.wrapping_sub(value).wrapping_sub(carry);
-        //Update zero flag.
+        // Update zero flag.
         self.registers.z(result == 0);
         // Update subtraction flag.
-        self.registers.n(false);
+        self.registers.n(true);
         // Update carry flag if borrow (value+carry > a).
         self.registers
             .c((value as u16) + (carry as u16) > (a as u16));

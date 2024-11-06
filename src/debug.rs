@@ -60,7 +60,8 @@ impl DebugMonitor {
         // pc = reg.pc - 1, because we send in the pc before parsing the instruction.
         let next_byte = mem.read8(reg.pc);
         let next_word = mem.read16(reg.pc);
-        println!("Instr:     {}", run_instr);
+        let pc_str = format!("${:04x}", pc);
+        println!("{}:     {}", instr(pc_str), run_instr);
         println!("T-cycles:  {}", cycles);
         println!(
             "Reg:       {}: {:02x} {:02x}
@@ -104,13 +105,17 @@ impl DebugMonitor {
             }
         );
         println!("SP:        {:#06x}", reg.sp);
-        println!("PC:        {:#06x}", pc);
+        println!(
+            "(i)DIV:    {:#06x}/{:#04x}",
+            mem.timer.div16(),
+            mem.timer.div()
+        );
         println!("Next b/w:  {:#04x} / {:#06x}", next_byte, next_word);
         println!("LCDC:      {:#04x}", mem.ppu.lcdc);
         println!("STAT:      {:#04x}", mem.ppu.stat);
-        println!("LX:        {:#04x}", mem.ppu.lx);
-        println!("LY:        {:#04x}", mem.ppu.ly);
         println!("LYC:       {:#04x}", mem.ppu.lyc);
+        println!("LY:        {:#04x}", mem.ppu.ly);
+        println!("LX:        {:#04x}", mem.ppu.lx);
         println!("Opcode:    {:#04x}", opcode);
         println!(
             "Joypad:    {} {} {} {} {} {} {} {}",
@@ -179,7 +184,12 @@ impl DebugMonitor {
             "b".green(),
             "$ADDR".blue()
         );
-        println!("({})        list breakpoints", "b list".green());
+        println!(
+            "({} | {})    list breakpoints",
+            "b".green(),
+            "b list".green()
+        );
+        println!("({})   delete all breakpoints", "b del".green());
         println!(
             "({} {})   delete breakpoint",
             "b del".green(),
@@ -187,7 +197,8 @@ impl DebugMonitor {
         );
         println!("({})             reset emulator", "r".yellow());
         println!("({})             quit", "q".yellow());
-        stdout.write(b"$ ").unwrap();
+        let sh = "> ".bold().bright_green();
+        stdout.write(sh.as_bytes()).unwrap();
         stdout.flush().unwrap();
         match stdin().read_line(&mut buf) {
             Ok(bytes) => {
@@ -265,10 +276,12 @@ impl DebugMonitor {
                                                                 };
                                                             }
                                                             None => {
+                                                                // Delete all.
+                                                                let n = self.breakpoints.len();
+                                                                self.breakpoints.clear();
                                                                 println!(
-                                                                    "{}",
-                                                                    "You must give an address."
-                                                                        .red()
+                                                                    "{} breakpoints deleted",
+                                                                    n
                                                                 );
                                                             }
                                                         }
@@ -311,7 +324,8 @@ impl DebugMonitor {
                                                 }
                                             }
                                             None => {
-                                                println!("Error parsing breakpoint.");
+                                                // List.
+                                                self.breakpoint_list();
                                             }
                                         }
                                         return self.pause();
@@ -343,4 +357,8 @@ impl DebugMonitor {
 /// Formats the operand data.
 fn empty() -> ColoredString {
     "_".truecolor(110, 110, 110)
+}
+/// Formats the pc register.
+fn instr<S: AsRef<str>>(name: S) -> ColoredString {
+    name.as_ref().bold().truecolor(110, 110, 110)
 }
