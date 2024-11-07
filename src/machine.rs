@@ -84,11 +84,10 @@ impl<'a, 'b> Machine<'a, 'b> {
             let (t, m) = self.machine_cycle();
             self.m_cycles += m;
             self.t_cycles += t;
-            if self.t_cycles % 4560 == 0 {
-                // Render?.
-                self.display.clear();
-                self.display.render(m, &self.memory);
-            }
+
+            // Render if we have pixels.
+            self.display.clear();
+            self.display.render(&self.memory);
         }
     }
 

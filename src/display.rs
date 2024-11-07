@@ -58,53 +58,68 @@ impl Display {
     }
 
     // Renders the given buffer to the display.
-    pub fn render(&mut self, m_cycle: u32, mem: &Memory) {
+    pub fn render(&mut self, mem: &Memory) {
         // Fill with buffer
         let scl = self.scale as u32;
-        let ppu: &PPU = mem.ppu();
+        let ppu = mem.ppu();
 
-        // Get addresses of first and second tile blocks for Window and Background.
-        let addr = ppu.get_bgwin_tiledata_addr();
-        // BG tile map area.
-        let bg_map_addr = ppu.get_bg_tilemap_addr();
-        // Window tile map area.
-        let win_map_addr = ppu.get_win_tilemap_addr();
-
-        let base = 0x8000;
-
-        let mut x = 0;
-        let mut y = 0;
-
-        for sprite in 0..365 {
-            let sx = x;
-            let sy = y;
-            // 8x8 sprites where each row of 8 pixels is 2 bytes.
-            for row in 0..8 {
-                let address = base + sprite * 16 + row * 2;
-                let b0 = ppu.read(address);
-                let b1 = ppu.read(address + 1);
-                let ba0 = self.get_bits_of_byte(b0);
-                let ba1 = self.get_bits_of_byte(b1);
-                for col in 0..8 {
-                    let col_id = (ba0[col] | (ba1[col] << 1)) as u8;
-                    self.canvas.set_draw_color(self.palette[col_id as usize]);
-                    self.canvas
-                        .fill_rect(Rect::new(
-                            ((sx + col) as u32 * scl) as i32,
-                            ((sy + row) as u32 * scl) as i32,
-                            scl as u32,
-                            scl as u32,
-                        ))
-                        .unwrap();
-                }
-            }
-            // Update [x,y] for the next sprite.
-            x += 8;
-            if x >= 160 {
-                x = 0;
-                y += 8;
-            }
+        if ppu.has_pixels() {
+            let pixels = ppu.consume_pixels();
+            pixels.iter().for_each(|p| {
+                self.canvas.set_draw_color(self.palette[p.color as usize]);
+                self.canvas
+                    .fill_rect(Rect::new(
+                        (p.x as u32 * scl) as i32,
+                        (p.y as u32 * scl) as i32,
+                        scl as u32,
+                        scl as u32,
+                    ))
+                    .unwrap();
+            })
         }
+
+        // // Get addresses of first and second tile blocks for Window and Background.
+        // let addr = ppu.get_bgwin_tiledata_addr();
+        // // BG tile map area.
+        // let bg_map_addr = ppu.get_bg_tilemap_addr();
+        // // Window tile map area.
+        // let win_map_addr = ppu.get_win_tilemap_addr();
+
+        // let base = 0x8000;
+
+        // let mut x = 0;
+        // let mut y = 0;
+
+        // for sprite in 0..365 {
+        //     let sx = x;
+        //     let sy = y;
+        //     // 8x8 sprites where each row of 8 pixels is 2 bytes.
+        //     for row in 0..8 {
+        //         let address = base + sprite * 16 + row * 2;
+        //         let b0 = ppu.read(address);
+        //         let b1 = ppu.read(address + 1);
+        //         let ba0 = self.get_bits_of_byte(b0);
+        //         let ba1 = self.get_bits_of_byte(b1);
+        //         for col in 0..8 {
+        //             let col_id = (ba0[col] | (ba1[col] << 1)) as u8;
+        //             self.canvas.set_draw_color(self.palette[col_id as usize]);
+        //             self.canvas
+        //                 .fill_rect(Rect::new(
+        //                     ((sx + col) as u32 * scl) as i32,
+        //                     ((sy + row) as u32 * scl) as i32,
+        //                     scl as u32,
+        //                     scl as u32,
+        //                 ))
+        //                 .unwrap();
+        //         }
+        //     }
+        //     // Update [x,y] for the next sprite.
+        //     x += 8;
+        //     if x >= 160 {
+        //         x = 0;
+        //         y += 8;
+        //     }
+        // }
 
         // Background rendering.
         // self.canvas.clear();

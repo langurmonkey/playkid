@@ -1,4 +1,5 @@
 use crate::constants;
+use std::collections::VecDeque;
 
 /// # PPU
 /// The PPU is the picture processing unit of our machine.
@@ -33,8 +34,10 @@ pub struct PPU {
     mode: u8,
     /// Start dot of the PPU.
     start_dot: u32,
-    /// Current dot in a frame.
-    dot: u32,
+    /// Current dot within a frame, in [0,4560).
+    fdot: u32,
+    /// Current dot within the line, in [0,456).
+    ldot: u32,
 
     // The LCDC byte.
     pub lcdc: u8,
@@ -56,7 +59,7 @@ pub struct PPU {
     lcdc0: bool,
 
     /// LX: LCD X coordinate.
-    pub lx: u32,
+    pub lx: u8,
     /// LY: LCD Y coordinate.
     pub ly: u8,
     /// LYC: LY compare.
@@ -97,12 +100,36 @@ pub struct PPU {
 
     /// LCD interrupt mask for registers IE and IF.
     pub i_mask: u8,
+
+    /// Screen buffer with 8 bpp.
+    pub scr: Vec<u8>,
+    /// OAM sprite buffer.
+    sprite_buf: Vec<Sprite>,
+    /// Background pixel FIFO (for bg and window).
+    pub fifo_bg: VecDeque<Pixel>,
+    /// Sprite pixel FIFO.
+    pub fifo_sprite: VecDeque<Pixel>,
+    /// T-cycle accumulator, to trigger certain actions.
+    tcycle_accum: u32,
+    /// OAM pointer.
+    oam_ptr: usize,
+    /// Sprite fetcher step.
+    sprite_step: u8,
+    /// Background fetcher step.
+    /// When this is 0, the background fetcher is paused.
+    bg_step: u8,
+    /// Current sprite index.
+    curr_sprite_i: i16,
+    /// Tile data (low).
+    tile_low: u8,
+    /// Tile data (high).
+    tile_high: u8,
 }
 
 impl PPU {
     pub fn new(start_dot: u32) -> Self {
         PPU {
-            oam: [0; constants::OAM_SIZE],
+            oam: [0xFF; constants::OAM_SIZE],
             vram: [0; constants::VRAM_SIZE],
             mode: 0,
             lcdc: 0,
@@ -115,8 +142,9 @@ impl PPU {
             lcdc1: true,
             lcdc0: true,
             start_dot,
-            dot: start_dot,
-            lx: start_dot,
+            fdot: start_dot,
+            ldot: start_dot % 456,
+            lx: 0,
             ly: 0,
             lyc: 0,
             ly_update: false,
@@ -135,17 +163,30 @@ impl PPU {
             obp0: 0,
             obp1: 0,
             i_mask: 0,
+
+            scr: Vec::with_capacity(144 * 160),
+            sprite_buf: Vec::with_capacity(10),
+            fifo_bg: VecDeque::with_capacity(16),
+            fifo_sprite: VecDeque::with_capacity(16),
+            tcycle_accum: 0,
+            oam_ptr: 0,
+            sprite_step: 0,
+            bg_step: 0,
+            curr_sprite_i: -1,
+            tile_low: 0,
+            tile_high: 0,
         }
     }
 
     pub fn reset(&mut self) {
-        self.oam.fill(0);
+        self.oam.fill(0xFF);
         self.vram.fill(0);
         self.mode = 0;
         self.lcdc = 0;
-        self.dot = self.start_dot;
+        self.fdot = self.start_dot;
+        self.ldot = self.start_dot % 456;
         self.ly = 0;
-        self.lx = self.start_dot;
+        self.lx = 0;
         self.lyc = 0;
         self.stat = 0;
         self.scx = 0;
@@ -156,14 +197,36 @@ impl PPU {
         self.obp0 = 0;
         self.obp1 = 1;
         self.i_mask = 0;
+        self.scr.fill(0);
+        self.tcycle_accum = 0;
+        self.oam_ptr = 0;
+        self.sprite_step = 0;
+        self.bg_step = 0;
+        self.curr_sprite_i = -1;
+        self.tile_low = 0;
+        self.tile_high = 0;
     }
 
     pub fn read(&self, address: u16) -> u8 {
         match address {
             // VRAM.
-            0x8000..=0x9FFF => self.vram[(address - 0x8000) as usize],
+            0x8000..=0x9FFF => {
+                if self.mode != 3 {
+                    self.vram[(address - 0x8000) as usize]
+                } else {
+                    // During mode 3 VRAM is inaccessible.
+                    0xFF
+                }
+            }
             // OAM.
-            0xFE00..=0xFE9F => self.oam[(address - 0xFE00) as usize],
+            0xFE00..=0xFE9F => {
+                if self.mode & 0x02 == 0 {
+                    self.oam[(address - 0xfe00) as usize]
+                } else {
+                    // During modes 2 and 3 OAM is inaccessible.
+                    0xFF
+                }
+            }
             // LCDC.
             0xFF40 => self.lcdc,
             // STAT.
@@ -197,12 +260,16 @@ impl PPU {
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0x8000..=0x9FFF => {
-                // VRAM.
-                self.vram[(address - 0x8000) as usize] = value;
+                // VRAM only accessible when mode != 3
+                if self.mode != 3 {
+                    self.vram[(address - 0x8000) as usize] = value;
+                }
             }
             0xFE00..=0xFE9F => {
-                // OAM.
-                self.oam[(address - 0xFE00) as usize] = value;
+                // OAM inaccessible in modes 2 and 3.
+                if self.mode & 0x02 == 0 {
+                    self.oam[(address - 0xFE00) as usize] = value;
+                }
             }
             // LCDC.
             0xFF40 => {
@@ -254,40 +321,216 @@ impl PPU {
             return;
         }
 
-        self.dot += t_cycles;
+        // Update dot numbers.
+        let last_ldot = self.ldot;
+        self.fdot = (self.fdot + t_cycles) % 4560;
+        self.ldot = self.fdot % 456;
+        // Update mode if necessary.
         self.update_mode();
 
         // LY.
         if self.ly_update {
-            self.ly += 1;
-            if self.ly >= 154 {
-                self.ly = 0;
-            }
+            self.ly = (self.ly + 1) % 154;
             self.ly_update = false;
+            // Clear OAM object buffer.
+            self.sprite_buf.clear();
             // Check LY==LYC condition.
             self.check_interrupt_lyc();
         }
 
         // LX.
-        let last_lx = self.lx;
-        self.lx = self.dot % 456;
-        if self.lx < last_lx {
-            // New line.
+        if self.ldot < last_ldot {
+            // New line, update in next cycle.
             self.ly_update = true;
+        }
+
+        // Clear pixel FIFOs.
+        self.fifo_bg.clear();
+        self.fifo_sprite.clear();
+
+        // Update T-cycle accumulator.
+        self.tcycle_accum += t_cycles;
+        match self.mode {
+            0 => {
+                // MODE 0: H-Blank (until dot % 456 == 0).
+                // Only consume cycles.
+                self.tcycle_accum -= t_cycles;
+            }
+            1 => {
+                // MODE 1: V-Blank (10 lines * 456 T-cycles, 4560).
+                // Only consume cycles.
+                self.tcycle_accum -= t_cycles;
+            }
+            2 => {
+                // MODE 2: OAM (80 T-cycles; check new OAM entry every 2 T-cycles, 40 in total).
+                // Only 10 sprites per scanline are supported by the Game Boy.
+                while self.tcycle_accum >= 2
+                    && self.oam_ptr <= self.oam.len() - 4
+                    && self.sprite_buf.len() < 10
+                {
+                    // Fetch new OAM entry.
+                    let y = self.oam[self.oam_ptr].saturating_sub(15);
+                    let x = self.oam[self.oam_ptr + 1].saturating_sub(7);
+                    let tile = self.oam[self.oam_ptr + 2];
+                    let flags = self.oam[self.oam_ptr + 3];
+
+                    // Push to OAM buffer if sprite intersects with current scanline (LY).
+                    if self.ly >= y && self.ly < y + 8 {
+                        self.sprite_buf.push(Sprite::new(x, y, tile, flags));
+                    }
+
+                    // Advance pointer.
+                    self.oam_ptr += 4;
+                    // Consume cycles.
+                    self.tcycle_accum -= 2;
+                }
+            }
+            3 => {
+                // MODE 3: DRAWING (172-289 T-cycles).
+                // There are 4 steps, that take 2 cycles each to complete.
+                while self.tcycle_accum >= 2 {
+                    // Sprite fetcher check.
+                    if self.sprite_step == 0 && self.check_sprite_fetch() {
+                        // Reset background fetcher.
+                        self.bg_step = 0;
+                        self.sprite_step = 1;
+                    }
+
+                    // Sprite fetcher.
+                    if self.sprite_step > 0 {
+                        // Fetch indices of sprites that overlap pixel.
+                        let mut sprite_indices: Vec<usize> = self
+                            .sprite_buf
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, s)| self.lx >= s.x && self.lx < s.x + 8)
+                            .map(|(idx, _)| idx)
+                            .collect::<Vec<_>>();
+
+                        match self.sprite_step {
+                            1 => {
+                                // Read tile number from sprite buffer.
+                                self.curr_sprite_i = sprite_indices.pop().unwrap() as i16;
+                                self.sprite_step += 1;
+                            }
+                            2 => {
+                                // Fetch tile data (low).
+                                let s = self.sprite_buf[self.curr_sprite_i as usize];
+                                // We are at line LY-SY, so the offset is the line times 2, as
+                                // every line is 2 bytes.
+                                let offset = (self.ly - s.y) * 2;
+                                self.tile_low = self.read(0x8000 + (s.tile + offset) as u16);
+                                self.sprite_step += 1;
+                            }
+                            3 => {
+                                // Fetch tile data (high).
+                                let s = self.sprite_buf[self.curr_sprite_i as usize];
+                                // We are at line LY-SY, so the offset is the line times 2, as
+                                // every line is 2 bytes.
+                                let offset = (self.ly - s.y) * 2;
+                                self.tile_high = self.read(0x8000 + (s.tile + offset + 1) as u16);
+                                self.sprite_step += 1;
+                            }
+                            4 => {
+                                // Decode tile_low and tile_high into pixels.
+                                // Push pixels into sprite FIFO.
+                                let s = self.sprite_buf[self.curr_sprite_i as usize];
+                                let bits_low = self.get_bits_of_byte(self.tile_low);
+                                let bits_high = self.get_bits_of_byte(self.tile_high);
+                                for x_col in 0..8 {
+                                    let col_id = (bits_low[x_col] | (bits_high[x_col] << 1)) as u8;
+                                    let pix = Pixel::new(s.x + x_col as u8, self.ly, col_id, 0, 0);
+                                    self.fifo_sprite.push_front(pix);
+                                }
+                                // Next pixel.
+                                self.lx = (self.lx + 1) % 160;
+
+                                // Back to step 0.
+                                self.sprite_step = 0;
+                                // Restore background fetcher for next cycle.
+                                self.bg_step = 1;
+                            }
+
+                            _ => {}
+                        }
+                    } else if self.bg_step > 0 {
+                        // Background and Window tiles.
+                        if self.lcdc0 {
+                            // Background fetcher.
+                            {}
+
+                            // Window fetcher.
+                            if self.lcdc5 {}
+                        }
+                    }
+
+                    // Consume cycles.
+                    self.tcycle_accum -= 2;
+                }
+            }
+            _ => {}
         }
     }
 
+    /// Checks whether the PPU has pixels in the FIFOs.
+    pub fn has_pixels(&self) -> bool {
+        !self.fifo_sprite.is_empty()
+    }
+
+    pub fn consume_pixels(&self) -> Vec<Pixel> {
+        self.fifo_sprite.iter().map(|p| p.clone()).collect()
+    }
+
+    /// Checks if there are any sprites in the sprite buffer that need to be fetched.
+    /// The sprites X position is checked against the current LX position.
+    /// The condition is LX >= S.X AND LX < S.X + 8.
+    /// It also checks that LCDC1 is set (OBJ enable).
+    fn check_sprite_fetch(&self) -> bool {
+        self.lcdc1
+            && self
+                .sprite_buf
+                .iter()
+                .filter(|s| self.lx >= s.x && self.lx < s.x + 8)
+                .count()
+                != 0
+    }
+
+    /// Draws the sprite located at the given memory address at the given
+    /// screen position [sx,sy] in the screen buffer.
+    fn draw_sprite(&mut self, addr: u16, sx: usize, sy: usize) {
+        let base = addr;
+        // Sprites are 8x8 pixels, where each row of 8 pixels is 2 bytes.
+        for row in 0..8 {
+            let address = base + row * 2;
+            let low = self.read(address);
+            let high = self.read(address + 1);
+            let bits_low = self.get_bits_of_byte(low);
+            let bits_high = self.get_bits_of_byte(high);
+            for col in 0..8 {
+                let col_id = (bits_low[col] | (bits_high[col] << 1)) as u8;
+                self.scr[sy * constants::DISPLAY_WIDTH + sx] = col_id;
+            }
+        }
+    }
+
+    /// Updates the mode given the current frame dot.
     fn update_mode(&mut self) {
-        let new_mode = match self.ly {
-            0..=143 => match self.lx {
+        let new_mode = match self.ly % 154 {
+            0..=143 => match self.ldot {
+                // OAM search.
                 0..=79 => 2,
+                // Drawing.
                 80..=252 => 3,
-                253..=456 => 0,
+                // H-Blank.
+                253..=455 => 0,
+                // Not possible.
                 _ => 10,
             },
+            // V-Blank.
             144..=153 => 1,
             _ => 10,
         };
+
         // Update STAT bits 01 with PPU mode.
         self.stat = (self.stat & 0xF4) | new_mode;
         self.stat01 = new_mode;
@@ -295,24 +538,37 @@ impl PPU {
         if new_mode != self.mode {
             match new_mode {
                 0 => {
+                    // Reset sprite buffer.
+                    self.sprite_buf.clear();
+
                     if self.stat3 {
-                        // STAT mode 0.
+                        // Request LCD STAT interrupt.
+                        // H-Blank, raise LCD IF flag (bit 1).
                         self.i_mask |= 0b0000_0010;
+                        // Clear sprite buffer for next line.
                     }
                 }
                 1 => {
                     if self.stat4 {
-                        // STAT mode 1.
+                        // Request LCD STAT interrupt.
+                        // V-Blank, raise LCD IF flag (bit 1).
                         self.i_mask |= 0b0000_0010;
                     }
-                    // V-Blank.
+                    // Request V-Blank interrupt.
                     self.i_mask |= 0b0000_0001;
                 }
                 2 => {
+                    // Reset OAM pointer.
+                    self.oam_ptr = 0;
+
                     if self.stat5 {
-                        // STAT mode 2.
+                        // Request LCD STAT interrupt.
+                        // OAM scanning, raise LCD IF flag (bit 1).
                         self.i_mask |= 0b0000_0010;
                     }
+                }
+                3 => {
+                    // ??
                 }
                 _ => {}
             }
@@ -415,5 +671,95 @@ impl PPU {
     /// Are the LCD and the PPU enabled?
     pub fn is_ppu_enabled(&self) -> bool {
         self.lcdc7
+    }
+
+    /// Gets the bits of a byte as an array, with the most significant bit
+    /// at index 0 and the least significant bit at index 7.
+    /// For example, if the byte is 130, the array will be [1, 0, 0, 0, 0, 0, 1, 0]
+    fn get_bits_of_byte(&self, byte: u8) -> [u8; 8] {
+        let mut bits = [0u8; 8];
+        for i in 0..=7 {
+            let shifted_byte = byte >> i;
+            // Get the rightmost bit of the shifted byte (least significant bit)
+            let cur_bit = shifted_byte & 1;
+            // For the first iteration, the cur_bit is the
+            // least significant bit and therefore we place
+            // that bit at index 7 of the array (rightmost bit)
+            bits[7 - i] = cur_bit;
+        }
+        bits
+    }
+}
+
+/// A pixel in either of the pixel FIFOs.
+#[derive(Copy, Clone)]
+pub struct Pixel {
+    /// X LCD position.
+    pub x: u8,
+    /// Y LCD position.
+    pub y: u8,
+    /// Color ID.
+    pub color: u8,
+    /// Palette to use.
+    pub palette: u8,
+    // OBJ-to-BG priority.
+    pub bg_prio: u8,
+}
+
+impl Pixel {
+    /// Create a new pixel with the given data.
+    fn new(x: u8, y: u8, color: u8, palette: u8, bg_prio: u8) -> Self {
+        Pixel {
+            x,
+            y,
+            color,
+            palette,
+            bg_prio,
+        }
+    }
+}
+
+/// Representation of a Sprite.
+#[derive(Copy, Clone)]
+struct Sprite {
+    /// X position of the top-left pixel of this sprite in the LCD.
+    pub x: u8,
+    /// Y position of the top-left pixel of this sprite in the LCD.
+    pub y: u8,
+    /// Tile number. Sprites always use the $8000 addressing method.
+    pub tile: u8,
+    /// Flags.
+    /// - 0: OBJ-to-BG priority.
+    ///   - 0 (false): sprite rendered above bg.
+    ///   - 1 (true): BG colors 1-3 overlay sprite, but sprite renders over 0.
+    /// - 1: Y-flip.
+    /// - 2: X-flip.
+    /// - 3: Palette (false: OBP0, true: OBP1).
+    pub flags: u8,
+}
+
+impl Sprite {
+    fn new(x: u8, y: u8, tile: u8, flags: u8) -> Self {
+        Sprite { x, y, tile, flags }
+    }
+
+    /// OBJ-to-BG priority.
+    ///   - 0 (false): sprite rendered above bg.
+    ///   - 1 (true): BG colors 1-3 overlay sprite, but sprite renders over 0.
+    fn priority(&self) -> bool {
+        self.flags & 0x80 > 0
+    }
+
+    /// Y-flip.
+    fn x_flip(&self) -> bool {
+        self.flags & 0x40 > 0
+    }
+    /// X-flip.
+    fn y_flip(&self) -> bool {
+        self.flags & 0x20 > 0
+    }
+    /// Palette (false: OBP0, true: OBP1).
+    fn palette(&self) -> bool {
+        self.flags & 0x10 > 0
     }
 }
