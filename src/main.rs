@@ -12,6 +12,7 @@ mod timer;
 
 use cartridge::Cartridge;
 use clap::Parser;
+use crossterm::{execute, terminal::LeaveAlternateScreen};
 use machine::Machine;
 use std::io;
 use std::path::PathBuf;
@@ -27,9 +28,6 @@ struct Args {
     /// Activate debug mode.
     #[arg(short, long)]
     debug: bool,
-    /// If debug mode is active, this enables step-by-step execution.
-    #[arg(long)]
-    step: bool,
     /// Skip global checksum, header checksum, and logo sequence check.
     #[arg(short, long)]
     skipcheck: bool,
@@ -49,7 +47,7 @@ fn main() -> io::Result<()> {
 
     let sdl_context = sdl2::init().unwrap();
     // Create a game boy with the given cartridge.
-    let mut gameboy = Machine::new(&cart, &sdl_context, args.debug, args.step);
+    let mut gameboy = Machine::new(&cart, &sdl_context, args.debug);
     // Initialize the Game Boy state.
     gameboy.init();
     // Start the machine.

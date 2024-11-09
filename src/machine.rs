@@ -43,7 +43,7 @@ pub struct Machine<'a, 'b> {
 
 impl<'a, 'b> Machine<'a, 'b> {
     /// Create a new instance of the Game Boy.
-    pub fn new(cart: &'a Cartridge, sdl: &'b Sdl, debug: bool, step: bool) -> Self {
+    pub fn new(cart: &'a Cartridge, sdl: &'b Sdl, debug: bool) -> Self {
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
@@ -54,7 +54,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             running: false,
             t_cycles: 324,
             m_cycles: 0,
-            debug: DebugMonitor::new(debug, step),
+            debug: DebugMonitor::new(debug),
         }
     }
 

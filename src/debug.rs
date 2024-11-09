@@ -3,6 +3,14 @@ use crate::memory;
 use crate::registers;
 
 use colored::{ColoredString, Colorize};
+use crossterm::{
+    cursor::{MoveTo, MoveToNextLine},
+    execute,
+    style::{
+        Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
+    },
+    terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, SetTitle},
+};
 use instruction::RunInstr;
 use memory::Memory;
 use registers::Registers;
@@ -16,10 +24,15 @@ pub struct DebugMonitor {
 }
 
 impl DebugMonitor {
-    pub fn new(debug: bool, step: bool) -> Self {
+    pub fn new(debug: bool) -> Self {
+        ctrlc::set_handler(move || {
+            execute!(stdout(), LeaveAlternateScreen).expect("Error leaving alternate screen.");
+            process::exit(0);
+        })
+        .expect("Error setting Ctrl-C handler");
         DebugMonitor {
             debug,
-            step,
+            step: debug,
             breakpoints: Vec::new(),
         }
     }
@@ -57,6 +70,25 @@ impl DebugMonitor {
         opcode: u8,
         cycles: u32,
     ) {
+        // Clear, title.
+        match execute!(
+            stdout(),
+            EnterAlternateScreen,
+            SetTitle("PlayKid emulator (debug)"),
+            Clear(ClearType::All),
+            MoveTo(0, 0),
+            SetBackgroundColor(Color::Blue),
+            SetForegroundColor(Color::Black),
+            SetAttribute(Attribute::Bold),
+            Print("PlayKid Game Boy emulator\n\n"),
+            SetAttribute(Attribute::Reset),
+            MoveToNextLine(1),
+            ResetColor
+        ) {
+            Err(error) => println!("{:?}", error),
+            _ => {}
+        }
+
         // pc = reg.pc - 1, because we send in the pc before parsing the instruction.
         let next_byte = mem.read8(reg.pc);
         let next_word = mem.read16(reg.pc);
@@ -217,7 +249,12 @@ impl DebugMonitor {
                                 Some(command) => match command {
                                     "q" => {
                                         // Quit.
+                                        match execute!(stdout, LeaveAlternateScreen) {
+                                            Err(error) => println!("{:?}", error),
+                                            _ => {}
+                                        }
                                         println!("Bye bye!");
+
                                         process::exit(0);
                                     }
                                     "r" => {
@@ -232,7 +269,6 @@ impl DebugMonitor {
                                     "c" => {
                                         // Continue.
                                         self.step = false;
-                                        self.debug = false;
                                     }
                                     "b" => {
                                         // Breakpoint.
