@@ -62,19 +62,24 @@ impl Display {
         let ppu = mem.ppu();
 
         if ppu.data_available {
-            let (pixels, y) = ppu.get_screen_buffer();
+            let pixels: &Vec<u8> = &ppu.scr;
+            let y = ppu.ly % 144;
             let offset = y as usize * 160;
+
+            // Render last line.
             for x in 0..160 {
                 let color = pixels[offset + x];
-                self.canvas.set_draw_color(self.palette[color as usize]);
-                self.canvas
-                    .fill_rect(Rect::new(
-                        (x as u32 * scl) as i32,
-                        (y as u32 * scl) as i32,
-                        scl as u32,
-                        scl as u32,
-                    ))
-                    .unwrap();
+                if color < 4 {
+                    self.canvas.set_draw_color(self.palette[color as usize]);
+                    self.canvas
+                        .fill_rect(Rect::new(
+                            (x as u32 * scl) as i32,
+                            (y as u32 * scl) as i32,
+                            scl as u32,
+                            scl as u32,
+                        ))
+                        .unwrap();
+                }
             }
 
             // pixels.iter().for_each(|p| {

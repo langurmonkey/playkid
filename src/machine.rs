@@ -218,7 +218,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             let (resting_ns, of) = constants::CPU_CLOCK_NS.overflowing_sub(t_cycle_t_ns.as_nanos());
             if !of {
                 // Wait to run at true speed.
-                thread::sleep(Duration::from_nanos(resting_ns as u64));
+                //thread::sleep(Duration::from_nanos(resting_ns as u64));
             };
 
             (t_cycles, m_cycles)

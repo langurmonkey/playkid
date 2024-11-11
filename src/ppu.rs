@@ -185,7 +185,7 @@ impl PPU {
             updated: false,
             data_available: false,
 
-            scr: Vec::with_capacity(144 * 160),
+            scr: vec![0xff; 144 * 160],
             sprite_buf: Vec::with_capacity(10),
             fifo_bg: VecDeque::with_capacity(16),
             fifo_sprite: VecDeque::with_capacity(16),
@@ -204,7 +204,8 @@ impl PPU {
 
     pub fn reset(&mut self) {
         self.oam.fill(0xff);
-        self.vram.fill(0);
+        self.vram.fill(0x00);
+        self.scr.fill(0xff);
         self.mode = 0;
         self.lcdc = 0;
         self.fdot = self.start_dot;
@@ -224,7 +225,6 @@ impl PPU {
         self.obp1 = 1;
         self.i_mask = 0;
         self.hblank = false;
-        self.scr.fill(0);
         self.tcycle_accum = 0;
         self.oam_ptr = 0;
         self.sprite_step = 0;
@@ -237,7 +237,6 @@ impl PPU {
         self.tile_high = 0;
         self.updated = false;
         self.data_available = false;
-        self.scr.fill(0xff);
     }
 
     pub fn read(&self, address: u16) -> u8 {
@@ -353,10 +352,10 @@ impl PPU {
         if !self.is_ppu_enabled() {
             return;
         }
-
         self.hblank = false;
 
         let mut t_cycles_left = t_cycles;
+
         while t_cycles_left > 0 {
             let curr_cycles = if t_cycles_left >= 80 {
                 80
@@ -364,6 +363,8 @@ impl PPU {
                 t_cycles_left
             };
             self.fdot += curr_cycles;
+            t_cycles_left -= curr_cycles;
+
             // Full line takes 114 ticks
             if self.fdot >= 456 {
                 self.fdot -= 456;
@@ -403,6 +404,8 @@ impl PPU {
         if match self.mode {
             0 => {
                 self.render_scanline();
+                // Signal data available.
+                self.data_available = true;
                 self.hblank = true;
                 self.stat3
             }
@@ -415,10 +418,11 @@ impl PPU {
             }
             2 => self.stat5,
             3 => {
-                if self.lcdc5 && self.wy_trigger == false && self.ly == self.wy {
+                if self.lcdc5 && !self.wy_trigger && self.ly == self.wy {
                     self.wy_trigger = true;
                     self.wy_pos = -1;
                 }
+                // No data.
                 self.data_available = false;
                 false
             }
@@ -435,7 +439,6 @@ impl PPU {
         }
         self.draw_bg();
         self.draw_sprites();
-        self.data_available = true;
     }
     fn rbvram0(&self, a: u16) -> u8 {
         if a < 0x8000 || a >= 0xA000 {
@@ -451,46 +454,46 @@ impl PPU {
     }
 
     fn draw_bg(&mut self) {
-        let drawbg = self.lcdc0;
+        let draw_bg = self.lcdc0;
 
         let wx_trigger = self.wx <= 166;
-        let winy = if self.lcdc5 && self.wy_trigger && wx_trigger {
+        let win_y = if self.lcdc5 && self.wy_trigger && wx_trigger {
             self.wy_pos += 1;
             self.wy_pos
         } else {
             -1
         };
 
-        if winy < 0 && drawbg == false {
+        if win_y < 0 && !draw_bg {
             return;
         }
 
-        let wintiley = (winy as u16 >> 3) & 31;
+        let wtile_y = (win_y as u16 >> 3) & 31;
 
-        let bgy = self.scy.wrapping_add(self.ly);
-        let bgtiley = (bgy as u16 >> 3) & 31;
+        let bg_y = self.scy.wrapping_add(self.ly);
+        let bgtile_y = (bg_y as u16 >> 3) & 31;
 
         for x in 0..constants::DISPLAY_WIDTH {
-            let winx = -((self.wx as i32) - 7) + (x as i32);
-            let bgx = self.scx as u32 + x as u32;
+            let win_x = -((self.wx as i32) - 7) + (x as i32);
+            let bg_x = self.scx as u32 + x as u32;
 
-            let (tilemapbase, tile_y, tile_x, pixel_y, pixel_x) = if winy >= 0 && winx >= 0 {
+            let (tilemapbase, tile_y, tile_x, pixel_y, pixel_x) = if win_y >= 0 && win_x >= 0 {
                 (
                     // Window tilemap address.
                     self.lcdc6,
-                    wintiley,
-                    (winx as u16 >> 3),
-                    winy as u16 & 0x07,
-                    winx as u8 & 0x07,
+                    wtile_y,
+                    win_x as u16 >> 3,
+                    win_y as u16 & 0x07,
+                    win_x as u8 & 0x07,
                 )
-            } else if drawbg {
+            } else if draw_bg {
                 (
                     // BG tilemap address.
                     self.lcdc3,
-                    bgtiley,
-                    (bgx as u16 >> 3) & 31,
-                    bgy as u16 & 0x07,
-                    bgx as u8 & 0x07,
+                    bgtile_y,
+                    (bg_x as u16 >> 3) & 31,
+                    bg_y as u16 & 0x07,
+                    bg_x as u8 & 0x07,
                 )
             } else {
                 continue;
@@ -500,16 +503,18 @@ impl PPU {
 
             let (palnr, vram1, xflip, yflip, prio) = (0, false, false, false, false);
 
-            let tileaddress = self.lcdc4
+            let tile_addr = self.lcdc4
                 + (if self.lcdc4 == 0x8000 {
+                    // Unsigned.
                     tilenr as u16
                 } else {
+                    // Signed.
                     (tilenr as i8 as i16 + 128) as u16
                 }) * 16;
 
             let a0 = match yflip {
-                false => tileaddress + (pixel_y * 2),
-                true => tileaddress + (14 - (pixel_y * 2)),
+                false => tile_addr + (pixel_y * 2),
+                true => tile_addr + (14 - (pixel_y * 2)),
             };
 
             let (b1, b2) = match vram1 {
@@ -530,8 +535,7 @@ impl PPU {
     fn draw_sprites(&mut self) {}
 
     fn setcolor(&mut self, x: usize, color: u8) {
-        let width = constants::DISPLAY_WIDTH;
-        self.scr[self.ly as usize * width + x] = color;
+        self.scr[self.ly as usize * constants::DISPLAY_WIDTH + x] = color;
     }
     fn clear_screen(&mut self) {
         for v in self.scr.iter_mut() {
@@ -889,16 +893,8 @@ impl PPU {
 
     /// Update STAT bit 2 (LYC==LY).
     fn check_interrupt_lyc(&mut self) {
-        if self.ly == self.lyc {
-            // Activate bit 2.
-            self.stat = (self.stat & 0xFB) | 0x04;
-            self.stat2 = true;
-            if self.stat6 {
-                self.i_mask |= 0b0000_0010;
-            }
-        } else {
-            // Deactivate bit 2.
-            self.stat = self.stat & 0xFB;
+        if self.stat6 && self.ly == self.lyc {
+            self.i_mask |= 0b0000_0010;
         }
     }
 
