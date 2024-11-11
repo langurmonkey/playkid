@@ -13,3 +13,6 @@ colored = "2.*"
 hex = "0.4.*"
 crossterm = "0.27"
 ctrlc = "3.4.5"
+
+[profile.dev]
+debug = true

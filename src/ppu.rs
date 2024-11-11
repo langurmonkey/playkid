@@ -91,6 +91,10 @@ pub struct PPU {
     wy: u8,
     /// WX: Window X position plus 7.
     wx: u8,
+    /// Trigger for WY.
+    wy_trigger: bool,
+    /// Position WY.
+    wy_pos: i32,
     /// BGP: Background palette register.
     bgp: u8,
     /// OBP0: Object palette 0.
@@ -100,6 +104,12 @@ pub struct PPU {
 
     /// LCD interrupt mask for registers IE and IF.
     pub i_mask: u8,
+
+    /// Whether we are in H-Blank region.
+    pub hblank: bool,
+    /// Flag that goes up when the screen is updated.
+    pub updated: bool,
+    pub data_available: bool,
 
     /// Screen buffer with 8 bpp.
     pub scr: Vec<u8>,
@@ -118,8 +128,14 @@ pub struct PPU {
     /// Background fetcher step.
     /// When this is 0, the background fetcher is paused.
     bg_step: u8,
+    /// Current background or window tile ID.
+    curr_tile_num: u8,
     /// Current sprite index.
     curr_sprite_i: i16,
+    /// BG/Win data (low).
+    bgwin_low: u8,
+    /// BG/Win data (high).
+    bgwin_high: u8,
     /// Tile data (low).
     tile_low: u8,
     /// Tile data (high).
@@ -159,10 +175,15 @@ impl PPU {
             scx: 0,
             wy: 0,
             wx: 7,
+            wy_trigger: false,
+            wy_pos: -1,
             bgp: 0,
             obp0: 0,
             obp1: 0,
             i_mask: 0,
+            hblank: false,
+            updated: false,
+            data_available: false,
 
             scr: Vec::with_capacity(144 * 160),
             sprite_buf: Vec::with_capacity(10),
@@ -171,15 +192,18 @@ impl PPU {
             tcycle_accum: 0,
             oam_ptr: 0,
             sprite_step: 0,
-            bg_step: 0,
+            bg_step: 1,
+            curr_tile_num: 0,
             curr_sprite_i: -1,
+            bgwin_low: 0,
+            bgwin_high: 0,
             tile_low: 0,
             tile_high: 0,
         }
     }
 
     pub fn reset(&mut self) {
-        self.oam.fill(0xFF);
+        self.oam.fill(0xff);
         self.vram.fill(0);
         self.mode = 0;
         self.lcdc = 0;
@@ -193,18 +217,27 @@ impl PPU {
         self.scy = 0;
         self.wx = 0;
         self.wy = 0;
+        self.wy_trigger = false;
+        self.wy_pos = -1;
         self.bgp = 0;
         self.obp0 = 0;
         self.obp1 = 1;
         self.i_mask = 0;
+        self.hblank = false;
         self.scr.fill(0);
         self.tcycle_accum = 0;
         self.oam_ptr = 0;
         self.sprite_step = 0;
-        self.bg_step = 0;
+        self.bg_step = 1;
+        self.curr_tile_num = 0;
         self.curr_sprite_i = -1;
+        self.bgwin_low = 0;
+        self.bgwin_high = 0;
         self.tile_low = 0;
         self.tile_high = 0;
+        self.updated = false;
+        self.data_available = false;
+        self.scr.fill(0xff);
     }
 
     pub fn read(&self, address: u16) -> u8 {
@@ -321,6 +354,197 @@ impl PPU {
             return;
         }
 
+        self.hblank = false;
+
+        let mut t_cycles_left = t_cycles;
+        while t_cycles_left > 0 {
+            let curr_cycles = if t_cycles_left >= 80 {
+                80
+            } else {
+                t_cycles_left
+            };
+            self.fdot += curr_cycles;
+            // Full line takes 114 ticks
+            if self.fdot >= 456 {
+                self.fdot -= 456;
+                self.ly = (self.ly + 1) % 154;
+                self.check_interrupt_lyc();
+
+                // This is a VBlank line
+                if self.ly >= 144 && self.mode != 1 {
+                    self.change_mode(1);
+                }
+            }
+
+            // This is a normal line
+            if self.ly < 144 {
+                if self.fdot <= 80 {
+                    if self.mode != 2 {
+                        self.change_mode(2);
+                    }
+                } else if self.fdot <= (80 + 172) {
+                    // 252 cycles
+                    if self.mode != 3 {
+                        self.change_mode(3);
+                    }
+                } else {
+                    // the remaining 204
+                    if self.mode != 0 {
+                        self.change_mode(0);
+                    }
+                }
+            }
+        }
+    }
+
+    fn change_mode(&mut self, mode: u8) {
+        self.mode = mode;
+
+        if match self.mode {
+            0 => {
+                self.render_scanline();
+                self.hblank = true;
+                self.stat3
+            }
+            1 => {
+                // Vertical blank
+                self.wy_trigger = false;
+                self.i_mask |= 0x01;
+                self.updated = true;
+                self.stat4
+            }
+            2 => self.stat5,
+            3 => {
+                if self.lcdc5 && self.wy_trigger == false && self.ly == self.wy {
+                    self.wy_trigger = true;
+                    self.wy_pos = -1;
+                }
+                self.data_available = false;
+                false
+            }
+            _ => false,
+        } {
+            self.i_mask |= 0x02;
+        }
+    }
+
+    fn render_scanline(&mut self) {
+        // Set color to 255.
+        for x in 0..constants::DISPLAY_WIDTH {
+            self.setcolor(x, 255);
+        }
+        self.draw_bg();
+        self.draw_sprites();
+        self.data_available = true;
+    }
+    fn rbvram0(&self, a: u16) -> u8 {
+        if a < 0x8000 || a >= 0xA000 {
+            panic!("Shouldn't have used rbvram0");
+        }
+        self.vram[a as usize & 0x1FFF]
+    }
+    fn rbvram1(&self, a: u16) -> u8 {
+        if a < 0x8000 || a >= 0xA000 {
+            panic!("Shouldn't have used rbvram1");
+        }
+        self.vram[0x2000 + (a as usize & 0x1FFF)]
+    }
+
+    fn draw_bg(&mut self) {
+        let drawbg = self.lcdc0;
+
+        let wx_trigger = self.wx <= 166;
+        let winy = if self.lcdc5 && self.wy_trigger && wx_trigger {
+            self.wy_pos += 1;
+            self.wy_pos
+        } else {
+            -1
+        };
+
+        if winy < 0 && drawbg == false {
+            return;
+        }
+
+        let wintiley = (winy as u16 >> 3) & 31;
+
+        let bgy = self.scy.wrapping_add(self.ly);
+        let bgtiley = (bgy as u16 >> 3) & 31;
+
+        for x in 0..constants::DISPLAY_WIDTH {
+            let winx = -((self.wx as i32) - 7) + (x as i32);
+            let bgx = self.scx as u32 + x as u32;
+
+            let (tilemapbase, tile_y, tile_x, pixel_y, pixel_x) = if winy >= 0 && winx >= 0 {
+                (
+                    // Window tilemap address.
+                    self.lcdc6,
+                    wintiley,
+                    (winx as u16 >> 3),
+                    winy as u16 & 0x07,
+                    winx as u8 & 0x07,
+                )
+            } else if drawbg {
+                (
+                    // BG tilemap address.
+                    self.lcdc3,
+                    bgtiley,
+                    (bgx as u16 >> 3) & 31,
+                    bgy as u16 & 0x07,
+                    bgx as u8 & 0x07,
+                )
+            } else {
+                continue;
+            };
+
+            let tilenr: u8 = self.rbvram0(tilemapbase + tile_y * 32 + tile_x);
+
+            let (palnr, vram1, xflip, yflip, prio) = (0, false, false, false, false);
+
+            let tileaddress = self.lcdc4
+                + (if self.lcdc4 == 0x8000 {
+                    tilenr as u16
+                } else {
+                    (tilenr as i8 as i16 + 128) as u16
+                }) * 16;
+
+            let a0 = match yflip {
+                false => tileaddress + (pixel_y * 2),
+                true => tileaddress + (14 - (pixel_y * 2)),
+            };
+
+            let (b1, b2) = match vram1 {
+                false => (self.rbvram0(a0), self.rbvram0(a0 + 1)),
+                true => (self.rbvram1(a0), self.rbvram1(a0 + 1)),
+            };
+
+            let xbit = match xflip {
+                true => pixel_x,
+                false => 7 - pixel_x,
+            } as u32;
+            let colnr = if b1 & (1 << xbit) != 0 { 1 } else { 0 }
+                | if b2 & (1 << xbit) != 0 { 2 } else { 0 };
+
+            self.setcolor(x, colnr);
+        }
+    }
+    fn draw_sprites(&mut self) {}
+
+    fn setcolor(&mut self, x: usize, color: u8) {
+        let width = constants::DISPLAY_WIDTH;
+        self.scr[self.ly as usize * width + x] = color;
+    }
+    fn clear_screen(&mut self) {
+        for v in self.scr.iter_mut() {
+            *v = 255;
+        }
+        self.updated = true;
+    }
+
+    pub fn cycle_own(&mut self, t_cycles: u32) {
+        if !self.is_ppu_enabled() {
+            return;
+        }
+
         // Update dot numbers.
         let last_ldot = self.ldot;
         self.fdot = (self.fdot + t_cycles) % 4560;
@@ -355,6 +579,7 @@ impl PPU {
                 // MODE 0: H-Blank (until dot % 456 == 0).
                 // Only consume cycles.
                 self.tcycle_accum -= t_cycles;
+                self.lx = 0;
             }
             1 => {
                 // MODE 1: V-Blank (10 lines * 456 T-cycles, 4560).
@@ -392,8 +617,12 @@ impl PPU {
                     // Sprite fetcher check.
                     if self.sprite_step == 0 && self.check_sprite_fetch() {
                         // Reset background fetcher.
-                        self.bg_step = 0;
+                        //self.bg_step = 0;
+                        // Enable sprite fetcher.
                         self.sprite_step = 1;
+                    } else {
+                        // Disable sprite fetcher.
+                        self.sprite_step = 0;
                     }
 
                     // Sprite fetcher.
@@ -419,7 +648,7 @@ impl PPU {
                                 // We are at line LY-SY, so the offset is the line times 2, as
                                 // every line is 2 bytes.
                                 let offset = (self.ly - s.y) * 2;
-                                self.tile_low = self.read(0x8000 + (s.tile + offset) as u16);
+                                self.tile_low = self.read(0x8000 + ((s.tile + offset) * 16) as u16);
                                 self.sprite_step += 1;
                             }
                             3 => {
@@ -428,7 +657,8 @@ impl PPU {
                                 // We are at line LY-SY, so the offset is the line times 2, as
                                 // every line is 2 bytes.
                                 let offset = (self.ly - s.y) * 2;
-                                self.tile_high = self.read(0x8000 + (s.tile + offset + 1) as u16);
+                                self.tile_high =
+                                    self.read(0x8000 + ((s.tile + offset + 1) * 16) as u16);
                                 self.sprite_step += 1;
                             }
                             4 => {
@@ -443,7 +673,7 @@ impl PPU {
                                     self.fifo_sprite.push_front(pix);
                                 }
                                 // Next pixel.
-                                self.lx = (self.lx + 1) % 160;
+                                self.lx = self.lx + 1;
 
                                 // Back to step 0.
                                 self.sprite_step = 0;
@@ -457,7 +687,50 @@ impl PPU {
                         // Background and Window tiles.
                         if self.lcdc0 {
                             // Background fetcher.
-                            {}
+                            match self.bg_step {
+                                1 => {
+                                    // Fetch tile ID.
+                                    self.curr_tile_num = self.fetch_tile_num(false);
+                                    // Next.
+                                    self.bg_step += 1;
+                                }
+                                2 => {
+                                    // Fetch data (low).
+                                    self.bgwin_low =
+                                        self.get_tile_pixel_low(self.curr_tile_num, self.lcdc4);
+                                    // Next.
+                                    self.bg_step += 1;
+                                }
+                                3 => {
+                                    // Fetch data (high).
+                                    self.bgwin_high =
+                                        self.get_tile_pixel_high(self.curr_tile_num, self.lcdc4);
+                                    // Next.
+                                    self.bg_step += 1;
+                                }
+                                4 => {
+                                    // Produce 8 pixels.
+                                    let bits_low = self.get_bits_of_byte(self.bgwin_low);
+                                    let bits_high = self.get_bits_of_byte(self.bgwin_high);
+                                    for x_col in 0..8 {
+                                        let col_id =
+                                            (bits_low[x_col] | (bits_high[x_col] << 1)) as u8;
+                                        let pix = Pixel::new(
+                                            self.lx + x_col as u8,
+                                            self.ly,
+                                            col_id,
+                                            0,
+                                            0,
+                                        );
+                                        self.fifo_bg.push_front(pix);
+                                    }
+                                    self.lx += 8;
+
+                                    // Back to start.
+                                    self.bg_step = 1;
+                                }
+                                _ => {}
+                            }
 
                             // Window fetcher.
                             if self.lcdc5 {}
@@ -472,13 +745,51 @@ impl PPU {
         }
     }
 
+    /// Fetches the current tile ID with the current LX, LY, SCX, SCY, and WX, WY.
+    fn fetch_tile_num(&self, use_window: bool) -> u8 {
+        let base;
+        let tile_x;
+        let tile_y;
+        if use_window {
+            base = self.lcdc6;
+            tile_y = (self.wy as u16 >> 3) & 31;
+            tile_x = self.wx as u16 >> 3;
+        } else {
+            base = self.lcdc3;
+            tile_y = (self.scy.wrapping_add(self.ly) as u16 >> 3) & 31;
+            tile_x = ((self.scx as u32 + self.wx as u32) as u16 >> 3) & 31;
+        }
+        // Each row in the tile map is 32 tiles (32 bytes).
+        self.read(base + tile_y * 32 + tile_x)
+    }
+
+    fn get_tile_pixel_low(&self, tile_num: u8, base: u16) -> u8 {
+        self.get_tile_pixel_data(tile_num, base, 0)
+    }
+    fn get_tile_pixel_high(&self, tile_num: u8, base: u16) -> u8 {
+        self.get_tile_pixel_data(tile_num, base, 1)
+    }
+    fn get_tile_pixel_data(&self, tile_num: u8, base: u16, plus: u16) -> u8 {
+        let pix_y = self.scy.wrapping_add(self.ly) as u16 & 0x07;
+        let tile_addr = base
+            + (if base != 0x8000 {
+                // Signed access.
+                (tile_num as i8 as i16 + 128) as u16
+            } else {
+                // Unsigned access.
+                tile_num as u16
+            }) * 16
+            + (pix_y * 2);
+        self.read(tile_addr + plus)
+    }
+
     /// Checks whether the PPU has pixels in the FIFOs.
     pub fn has_pixels(&self) -> bool {
-        !self.fifo_sprite.is_empty()
+        !self.fifo_bg.is_empty()
     }
 
     pub fn consume_pixels(&self) -> Vec<Pixel> {
-        self.fifo_sprite.iter().map(|p| p.clone()).collect()
+        self.fifo_bg.iter().map(|p| p.clone()).collect()
     }
 
     /// Checks if there are any sprites in the sprite buffer that need to be fetched.
@@ -594,6 +905,7 @@ impl PPU {
     /// This method updates the LCDC flags from the current value
     /// in the byte `self.lcdc`.
     fn update_lcdc_flags(&mut self) {
+        let prev_lcd_status = self.lcdc7;
         self.lcdc7 = self.lcdc & 0b1000_0000 != 0;
         self.lcdc6 = if self.lcdc & 0b0100_0000 != 0 {
             0x9800
@@ -603,7 +915,7 @@ impl PPU {
         self.lcdc5 = self.lcdc & 0b0010_0000 != 0;
         self.lcdc4 = if self.lcdc & 0b0001_0000 != 0 {
             // Signed access.
-            0x9000
+            0x8800
         } else {
             // Unsigned access.
             0x8000
@@ -620,6 +932,15 @@ impl PPU {
         };
         self.lcdc1 = self.lcdc & 0b0000_0010 != 0;
         self.lcdc0 = self.lcdc & 0b0000_0001 != 0;
+
+        if prev_lcd_status && !self.lcdc7 {
+            // Screen went off.
+            self.fdot = 0;
+            self.ly = 0;
+            self.mode = 0;
+            self.wy_trigger = false;
+            self.clear_screen();
+        }
     }
 
     /// This method updates the STAT flags from the current value
@@ -639,38 +960,13 @@ impl PPU {
         //self.stat01 = self.stat & 0b0000_0011;
     }
 
-    /// Gets the starting index of the tile data region. May be 0 (lcdc4 == 1, 0x8000-0x8FFF),
-    /// or -128 (lcdc4 == 0, 0x8800-0x97FF, with 0 at 0x9000).
-    pub fn get_bgwin_index(&self) -> i32 {
-        if self.lcdc4 == 0x8000 {
-            0
-        } else if self.lcdc4 == 0x9000 {
-            -128
-        } else {
-            panic!(
-                "LCDC(4) does not contain a valid tile data address: {:#06X}",
-                self.lcdc4
-            );
-        }
-    }
-
-    /// Gets the address in bit 4 of LCDC register.
-    /// This is the background and window tile data address.
-    pub fn get_bgwin_tiledata_addr(&self) -> u16 {
-        self.lcdc4
-    }
-    /// Gets the address of the background tile map.
-    pub fn get_bg_tilemap_addr(&self) -> u16 {
-        self.lcdc3
-    }
-    /// Gets the address of the window tile map.
-    pub fn get_win_tilemap_addr(&self) -> u16 {
-        self.lcdc6
-    }
-
     /// Are the LCD and the PPU enabled?
     pub fn is_ppu_enabled(&self) -> bool {
         self.lcdc7
+    }
+
+    pub fn get_screen_buffer(&self) -> (Vec<u8>, u8) {
+        (self.scr.clone(), self.ly)
     }
 
     /// Gets the bits of a byte as an array, with the most significant bit

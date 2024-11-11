@@ -1,9 +1,7 @@
 use crate::constants;
 use crate::memory;
-use crate::ppu;
 
 use memory::Memory;
-use ppu::PPU;
 use sdl2;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -63,19 +61,33 @@ impl Display {
         let scl = self.scale as u32;
         let ppu = mem.ppu();
 
-        if ppu.has_pixels() {
-            let pixels = ppu.consume_pixels();
-            pixels.iter().for_each(|p| {
-                self.canvas.set_draw_color(self.palette[p.color as usize]);
+        if ppu.data_available {
+            let (pixels, y) = ppu.get_screen_buffer();
+            let offset = y as usize * 160;
+            for x in 0..160 {
+                let color = pixels[offset + x];
+                self.canvas.set_draw_color(self.palette[color as usize]);
                 self.canvas
                     .fill_rect(Rect::new(
-                        (p.x as u32 * scl) as i32,
-                        (p.y as u32 * scl) as i32,
+                        (x as u32 * scl) as i32,
+                        (y as u32 * scl) as i32,
                         scl as u32,
                         scl as u32,
                     ))
                     .unwrap();
-            })
+            }
+
+            // pixels.iter().for_each(|p| {
+            //     self.canvas.set_draw_color(self.palette[p.color as usize]);
+            //     self.canvas
+            //         .fill_rect(Rect::new(
+            //             (p.x as u32 * scl) as i32,
+            //             (p.y as u32 * scl) as i32,
+            //             scl as u32,
+            //             scl as u32,
+            //         ))
+            //         .unwrap();
+            // })
         }
 
         // // Get addresses of first and second tile blocks for Window and Background.

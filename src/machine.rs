@@ -86,7 +86,6 @@ impl<'a, 'b> Machine<'a, 'b> {
             self.t_cycles += t;
 
             // Render if we have pixels.
-            self.display.clear();
             self.display.render(&self.memory);
         }
     }
