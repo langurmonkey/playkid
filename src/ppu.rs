@@ -268,8 +268,8 @@ impl PPU {
             0xFF42 => self.scy = value,
             // SCX.
             0xFF43 => self.scx = value,
-            // LY.
-            0xFF44 => self.ly = value,
+            // LY (read-only).
+            0xFF44 => {}
             // LCY.
             0xFF45 => self.lyc = value,
             // DMA.
@@ -466,24 +466,6 @@ impl PPU {
         self.updated = true;
     }
 
-    /// Draws the sprite located at the given memory address at the given
-    /// screen position [sx,sy] in the screen buffer.
-    fn draw_sprite(&mut self, addr: u16, sx: usize, sy: usize) {
-        let base = addr;
-        // Sprites are 8x8 pixels, where each row of 8 pixels is 2 bytes.
-        for row in 0..8 {
-            let address = base + row * 2;
-            let low = self.read(address);
-            let high = self.read(address + 1);
-            let bits_low = self.get_bits_of_byte(low);
-            let bits_high = self.get_bits_of_byte(high);
-            for col in 0..8 {
-                let col_id = (bits_low[col] | (bits_high[col] << 1)) as u8;
-                self.scr[sy * constants::DISPLAY_WIDTH + sx] = col_id;
-            }
-        }
-    }
-
     /// Update STAT bit 2 (LYC==LY).
     fn check_interrupt_lyc(&mut self) {
         if self.stat6 && self.ly == self.lyc {
@@ -552,27 +534,6 @@ impl PPU {
     /// Are the LCD and the PPU enabled?
     pub fn is_ppu_enabled(&self) -> bool {
         self.lcdc7
-    }
-
-    pub fn get_screen_buffer(&self) -> (Vec<u8>, u8) {
-        (self.scr.clone(), self.ly)
-    }
-
-    /// Gets the bits of a byte as an array, with the most significant bit
-    /// at index 0 and the least significant bit at index 7.
-    /// For example, if the byte is 130, the array will be [1, 0, 0, 0, 0, 0, 1, 0]
-    fn get_bits_of_byte(&self, byte: u8) -> [u8; 8] {
-        let mut bits = [0u8; 8];
-        for i in 0..=7 {
-            let shifted_byte = byte >> i;
-            // Get the rightmost bit of the shifted byte (least significant bit)
-            let cur_bit = shifted_byte & 1;
-            // For the first iteration, the cur_bit is the
-            // least significant bit and therefore we place
-            // that bit at index 7 of the array (rightmost bit)
-            bits[7 - i] = cur_bit;
-        }
-        bits
     }
 }
 

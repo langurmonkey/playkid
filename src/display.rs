@@ -69,10 +69,10 @@ impl Display {
 
         let y = ppu.ly % 144;
         if ppu.data_available && self.last_ly != y {
-            let pixels: &Vec<u8> = &ppu.scr;
+            let pixels: Vec<u8> = ppu.scr.clone();
             let offset = y as usize * 160;
 
-            // Render last line.
+            // Render line.
             for x in 0..160 {
                 let color = pixels[offset + x];
                 if color < 4 {
