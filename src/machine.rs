@@ -13,8 +13,7 @@ use instruction::{Instruction, RunInstr, CC, R16, R16EXT, R16LD, R8, TGT3};
 use memory::Memory;
 use registers::Registers;
 use sdl2::Sdl;
-use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 /// This is our machine, which contains the registers and the memory, and
 /// executes the operations.
@@ -47,7 +46,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
-            display: Display::new("PlayKid emulator", 4, sdl),
+            display: Display::new("PlayKid emulator", 4, sdl, debug),
             ime: false,
             ei: 0,
             di: 0,
@@ -2698,7 +2697,7 @@ impl<'a, 'b> Machine<'a, 'b> {
 
     /// Halt the machine by setting the running flag.
     fn halt(&mut self) {
-        self.running = false;
+        //self.running = false;
     }
 
     /// TODO: implement this.

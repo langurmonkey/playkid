@@ -18,10 +18,12 @@ pub struct Display {
     pub palette: [Color; 4],
     /// Holds the last rendered LY.
     last_ly: u8,
+    /// Run in debug mode (present after every line).
+    debug: bool,
 }
 
 impl Display {
-    pub fn new(window_title: &str, scale: u32, sdl: &Sdl) -> Self {
+    pub fn new(window_title: &str, scale: u32, sdl: &Sdl, debug: bool) -> Self {
         let video_subsystem = sdl.video().unwrap();
         let window = video_subsystem
             .window(
@@ -47,6 +49,7 @@ impl Display {
             canvas,
             scale,
             palette,
+            debug,
             last_ly: 255,
         }
     }
@@ -88,7 +91,10 @@ impl Display {
                 }
             }
             self.last_ly = y;
-            self.canvas.present();
+            // Only present when all screen lines are in the buffer (or debugging).
+            if y == 143 || self.debug {
+                self.canvas.present();
+            }
         }
     }
 

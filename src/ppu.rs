@@ -457,7 +457,104 @@ impl PPU {
             self.scr[self.ly as usize * constants::DISPLAY_WIDTH + x] = bg_pixel;
         }
     }
-    fn render_sprites(&mut self) {}
+    /// Fetches the sprite attributes from OAM.
+    fn get_sprites_on_scanline(&self, sprite_height: u8) -> Vec<Sprite> {
+        let mut sprites = Vec::new();
+
+        for i in 0..40 {
+            let base = i * 4;
+            let sprite_y = self.oam[base];
+            let sprite_x = self.oam[base + 1];
+            let tile_id = self.oam[base + 2];
+            let attributes = self.oam[base + 3];
+
+            // Check if the sprite overlaps with the current scanline
+            if self.ly + 16 >= sprite_y && self.ly + 16 < sprite_y + sprite_height {
+                sprites.push(Sprite {
+                    y: sprite_y,
+                    x: sprite_x,
+                    tile_id,
+                    attributes,
+                });
+                if sprites.len() >= constants::MAX_SPRITES_PER_LINE {
+                    break; // Limit to 10 sprites per line as per Game Boy hardware
+                }
+            }
+        }
+
+        sprites
+    }
+
+    /// Fetches the 8 pixels of a row within a sprite tile.
+    fn get_sprite_tile_pixels(
+        &self,
+        tile_id: u8,
+        line: u8,
+        attributes: u8,
+        sprite_height: u8,
+    ) -> [u8; 8] {
+        let tile_addr = if sprite_height == 16 {
+            // For 8x16 sprites, ignore lowest bit of tile_id
+            0x8000 + ((tile_id & 0xFE) as usize * 16)
+        } else {
+            0x8000 + (tile_id as usize * 16)
+        };
+
+        // Vertical flip
+        let actual_line = if attributes & 0x40 != 0 {
+            // Flip vertically
+            if sprite_height == 16 {
+                15 - line
+            } else {
+                7 - line
+            }
+        } else {
+            line
+        };
+
+        let low_byte = self.read((tile_addr + actual_line as usize * 2) as u16);
+        let high_byte = self.read((tile_addr + actual_line as usize * 2 + 1) as u16);
+        let mut pixels = [0u8; 8];
+
+        // Horizontal flip
+        for i in 0..8 {
+            let color_id = ((high_byte >> (7 - i)) & 0x1) << 1 | ((low_byte >> (7 - i)) & 0x1);
+            let pixel_index = if attributes & 0x20 != 0 { 7 - i } else { i }; // Flip horizontally if needed
+            pixels[pixel_index] = color_id;
+        }
+
+        pixels
+    }
+
+    /// Renders sprites onto a scanline in the framebuffer.
+    fn render_sprites(&mut self) {
+        let sprite_size = 8;
+        let sprites = self.get_sprites_on_scanline(sprite_size);
+
+        for sprite in sprites.iter().rev() {
+            let tile_line = (self.ly + 16 - sprite.y) % sprite_size;
+            let pixels = self.get_sprite_tile_pixels(
+                sprite.tile_id,
+                tile_line,
+                sprite.attributes,
+                sprite_size,
+            );
+
+            for i in 0..8 {
+                let x_pos = sprite.x.wrapping_sub(8) as usize + i;
+                if x_pos >= constants::DISPLAY_WIDTH {
+                    continue; // Ignore pixels outside screen bounds
+                }
+
+                let color_id = pixels[i];
+                if color_id == 0 {
+                    continue; // Skip transparent pixels
+                }
+                // Store the pixel color in the framebuffer
+                self.scr[self.ly as usize * constants::DISPLAY_WIDTH + x_pos] = color_id;
+            }
+        }
+    }
 
     fn clear_screen(&mut self) {
         for v in self.scr.iter_mut() {
@@ -537,75 +634,10 @@ impl PPU {
     }
 }
 
-/// A pixel in either of the pixel FIFOs.
-#[derive(Copy, Clone)]
-pub struct Pixel {
-    /// X LCD position.
-    pub x: u8,
-    /// Y LCD position.
-    pub y: u8,
-    /// Color ID.
-    pub color: u8,
-    /// Palette to use.
-    pub palette: u8,
-    // OBJ-to-BG priority.
-    pub bg_prio: u8,
-}
-
-impl Pixel {
-    /// Create a new pixel with the given data.
-    fn new(x: u8, y: u8, color: u8, palette: u8, bg_prio: u8) -> Self {
-        Pixel {
-            x,
-            y,
-            color,
-            palette,
-            bg_prio,
-        }
-    }
-}
-
-/// Representation of a Sprite.
-#[derive(Copy, Clone)]
+#[derive(Debug, Clone, Copy)]
 struct Sprite {
-    /// X position of the top-left pixel of this sprite in the LCD.
-    pub x: u8,
-    /// Y position of the top-left pixel of this sprite in the LCD.
-    pub y: u8,
-    /// Tile number. Sprites always use the $8000 addressing method.
-    pub tile: u8,
-    /// Flags.
-    /// - 0: OBJ-to-BG priority.
-    ///   - 0 (false): sprite rendered above bg.
-    ///   - 1 (true): BG colors 1-3 overlay sprite, but sprite renders over 0.
-    /// - 1: Y-flip.
-    /// - 2: X-flip.
-    /// - 3: Palette (false: OBP0, true: OBP1).
-    pub flags: u8,
-}
-
-impl Sprite {
-    fn new(x: u8, y: u8, tile: u8, flags: u8) -> Self {
-        Sprite { x, y, tile, flags }
-    }
-
-    /// OBJ-to-BG priority.
-    ///   - 0 (false): sprite rendered above bg.
-    ///   - 1 (true): BG colors 1-3 overlay sprite, but sprite renders over 0.
-    fn priority(&self) -> bool {
-        self.flags & 0x80 > 0
-    }
-
-    /// Y-flip.
-    fn x_flip(&self) -> bool {
-        self.flags & 0x40 > 0
-    }
-    /// X-flip.
-    fn y_flip(&self) -> bool {
-        self.flags & 0x20 > 0
-    }
-    /// Palette (false: OBP0, true: OBP1).
-    fn palette(&self) -> bool {
-        self.flags & 0x10 > 0
-    }
+    y: u8,
+    x: u8,
+    tile_id: u8,
+    attributes: u8,
 }
