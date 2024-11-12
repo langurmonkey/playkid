@@ -10,9 +10,14 @@ use sdl2::{render::Canvas, video::Window};
 
 /// Holds the display data, and renders the image.
 pub struct Display {
+    /// The canvas itself.
     pub canvas: Canvas<Window>,
+    /// The scale factor for the display.
     pub scale: u32,
+    /// The palette.
     pub palette: [Color; 4],
+    /// Holds the last rendered LY.
+    last_ly: u8,
 }
 
 impl Display {
@@ -42,6 +47,7 @@ impl Display {
             canvas,
             scale,
             palette,
+            last_ly: 255,
         }
     }
 
@@ -61,9 +67,9 @@ impl Display {
         let scl = self.scale as u32;
         let ppu = mem.ppu();
 
-        if ppu.data_available {
+        let y = ppu.ly % 144;
+        if ppu.data_available && self.last_ly != y {
             let pixels: &Vec<u8> = &ppu.scr;
-            let y = ppu.ly % 144;
             let offset = y as usize * 160;
 
             // Render last line.
@@ -81,84 +87,9 @@ impl Display {
                         .unwrap();
                 }
             }
-
-            // pixels.iter().for_each(|p| {
-            //     self.canvas.set_draw_color(self.palette[p.color as usize]);
-            //     self.canvas
-            //         .fill_rect(Rect::new(
-            //             (p.x as u32 * scl) as i32,
-            //             (p.y as u32 * scl) as i32,
-            //             scl as u32,
-            //             scl as u32,
-            //         ))
-            //         .unwrap();
-            // })
+            self.last_ly = y;
+            self.canvas.present();
         }
-
-        // // Get addresses of first and second tile blocks for Window and Background.
-        // let addr = ppu.get_bgwin_tiledata_addr();
-        // // BG tile map area.
-        // let bg_map_addr = ppu.get_bg_tilemap_addr();
-        // // Window tile map area.
-        // let win_map_addr = ppu.get_win_tilemap_addr();
-
-        // let base = 0x8000;
-
-        // let mut x = 0;
-        // let mut y = 0;
-
-        // for sprite in 0..365 {
-        //     let sx = x;
-        //     let sy = y;
-        //     // 8x8 sprites where each row of 8 pixels is 2 bytes.
-        //     for row in 0..8 {
-        //         let address = base + sprite * 16 + row * 2;
-        //         let b0 = ppu.read(address);
-        //         let b1 = ppu.read(address + 1);
-        //         let ba0 = self.get_bits_of_byte(b0);
-        //         let ba1 = self.get_bits_of_byte(b1);
-        //         for col in 0..8 {
-        //             let col_id = (ba0[col] | (ba1[col] << 1)) as u8;
-        //             self.canvas.set_draw_color(self.palette[col_id as usize]);
-        //             self.canvas
-        //                 .fill_rect(Rect::new(
-        //                     ((sx + col) as u32 * scl) as i32,
-        //                     ((sy + row) as u32 * scl) as i32,
-        //                     scl as u32,
-        //                     scl as u32,
-        //                 ))
-        //                 .unwrap();
-        //         }
-        //     }
-        //     // Update [x,y] for the next sprite.
-        //     x += 8;
-        //     if x >= 160 {
-        //         x = 0;
-        //         y += 8;
-        //     }
-        // }
-
-        // Background rendering.
-        // self.canvas.clear();
-        // let mut col_idx = (m_cycle as usize) % self.palette.len();
-        // for x in 0..constants::DISPLAY_WIDTH {
-        //     for y in 0..constants::DISPLAY_HEIGHT {
-        //         let color = self.palette[col_idx];
-        //         self.canvas.set_draw_color(color);
-        //         self.canvas
-        //             .fill_rect(Rect::new(
-        //                 (x * scl) as i32,
-        //                 (y * scl) as i32,
-        //                 scl as u32,
-        //                 scl as u32,
-        //             ))
-        //             .unwrap();
-        //         col_idx = (col_idx + 1) % self.palette.len();
-        //     }
-        //     col_idx = (col_idx + 1) % self.palette.len();
-        // }
-
-        self.canvas.present();
     }
 
     /// Gets the bits of a byte as an array, with the most significant bit
