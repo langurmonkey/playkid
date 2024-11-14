@@ -1,6 +1,8 @@
+use crossterm::{execute, terminal::LeaveAlternateScreen};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::Sdl;
+use std::io;
 use std::process;
 
 /// Describes the current state of the Game Boy joypad.
@@ -27,6 +29,9 @@ pub struct Joypad<'b> {
     pub left: bool,
     /// D-pad right.
     pub right: bool,
+    /// Debug flag. If this is on, a debug pause is requested.
+    pub debug_flag: bool,
+    /// Reference to the main SDL object.
     sdl: &'b Sdl,
 }
 
@@ -44,6 +49,7 @@ impl<'b> Joypad<'b> {
             up: false,
             left: false,
             right: false,
+            debug_flag: false,
             sdl,
         }
     }
@@ -53,6 +59,7 @@ impl<'b> Joypad<'b> {
         self.joyp = 0xFF;
         self.select_buttons = false;
         self.select_dpad = false;
+        self.debug_flag = false;
         self.update_buttons();
     }
 
@@ -80,6 +87,7 @@ impl<'b> Joypad<'b> {
         // Event loop
         for event in event_pump.poll_iter() {
             match event {
+                // Quit.
                 Event::Quit { .. }
                 | Event::KeyDown {
                     keycode: Some(Keycode::Escape),
@@ -89,8 +97,27 @@ impl<'b> Joypad<'b> {
                     keycode: Some(Keycode::CapsLock),
                     ..
                 } => {
+                    match execute!(io::stdout(), LeaveAlternateScreen) {
+                        Err(error) => println!("{:?}", error),
+                        _ => {}
+                    }
                     println!("Bye bye!");
                     process::exit(0);
+                }
+                // Debug pause ('s' for stop).
+                Event::KeyDown {
+                    keycode: Some(Keycode::S),
+                    ..
+                } => {
+                    // Raise deubg flag.
+                    self.debug_flag = true;
+                }
+                Event::KeyUp {
+                    keycode: Some(Keycode::S),
+                    ..
+                } => {
+                    // Lower debug flag..
+                    self.debug_flag = false;
                 }
 
                 // DOWN
@@ -269,14 +296,16 @@ impl<'b> Joypad<'b> {
 
     /// Updates the state of the joypad buttons from the JOYP register.
     /// WARN: A button is pressed when the corresponding bit is 0!
+    /// If both bits 4 and 5 of P1/JOYP are zero, we decide to give preference
+    /// to bit 5 (buttons SsAB) in our implementation. This is, however,
+    /// and invalid state with undefined results.
     fn update_buttons(&mut self) {
         if self.select_buttons {
             self.start = (self.joyp & 0x08) == 0;
             self.select = (self.joyp & 0x04) == 0;
             self.b = (self.joyp & 0x02) == 0;
             self.a = (self.joyp & 0x01) == 0;
-        }
-        if self.select_dpad {
+        } else if self.select_dpad {
             self.down = (self.joyp & 0x08) == 0;
             self.up = (self.joyp & 0x04) == 0;
             self.left = (self.joyp & 0x02) == 0;

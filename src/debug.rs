@@ -5,6 +5,7 @@ use crate::registers;
 use colored::{ColoredString, Colorize};
 use crossterm::{
     cursor::{MoveTo, MoveToNextLine},
+    event::{read, Event, KeyCode, KeyEvent, KeyModifiers},
     execute,
     style::{
         Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
@@ -49,7 +50,7 @@ impl DebugMonitor {
         reg: &Registers,
     ) -> bool {
         // Debug if needed.
-        let stop = self.breakpoints.contains(&pc);
+        let stop = self.breakpoints.contains(&pc) || mem.joypad.debug_flag;
         if self.debug || stop {
             if self.step || stop {
                 return self.debug_step(pc, reg, mem, run_instr, opcode, cycles);

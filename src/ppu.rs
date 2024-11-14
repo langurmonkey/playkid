@@ -111,12 +111,17 @@ pub struct PPU {
     pub updated: bool,
     pub data_available: bool,
 
-    /// Screen buffer with 8 bpp.
-    pub scr: Vec<u8>,
+    /// The palette.
+    palette: [u8; 4 * 3],
+    /// Screen buffer in RGBA8888.
+    pub fb: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
 }
 
 impl PPU {
     pub fn new(start_dot: u32) -> Self {
+        // The 4 GB shades in RGB888.
+        let palette = [224, 248, 208, 136, 192, 112, 52, 104, 86, 8, 24, 32];
+
         PPU {
             oam: [0xFF; constants::OAM_SIZE],
             vram: [0; constants::VRAM_SIZE],
@@ -158,14 +163,15 @@ impl PPU {
             updated: false,
             data_available: false,
 
-            scr: vec![0xff; 144 * 160],
+            palette,
+            fb: [0xff; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
         }
     }
 
     pub fn reset(&mut self) {
         self.oam.fill(0xff);
         self.vram.fill(0x00);
-        self.scr.fill(0xff);
+        self.fb.fill(0xff);
         self.mode = 0;
         self.lcdc = 0;
         self.fdot = self.start_dot;
@@ -451,10 +457,10 @@ impl PPU {
             let tile_pixels = self.get_tile_pixel_dat(tile_id, tile_line, use_unsigned);
 
             // Get the background pixel and apply palette color
-            let bg_pixel = tile_pixels[bg_x % 8];
+            let color_id = tile_pixels[bg_x % 8];
 
-            // Store the pixel color in the framebuffer
-            self.scr[self.ly as usize * constants::DISPLAY_WIDTH + x] = bg_pixel;
+            // Store the pixel color in the framebuffer.
+            self.color(x, self.ly, color_id);
         }
     }
     /// Fetches the sprite attributes from OAM.
@@ -551,13 +557,28 @@ impl PPU {
                     continue; // Skip transparent pixels
                 }
                 // Store the pixel color in the framebuffer
-                self.scr[self.ly as usize * constants::DISPLAY_WIDTH + x_pos] = color_id;
+                self.color(x_pos, self.ly, color_id);
             }
         }
     }
 
+    /// Sets the pixel at the given position to the given color id.
+    fn color(&mut self, x: usize, y: u8, color_id: u8) {
+        // R.
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4] =
+            self.palette[color_id as usize * 3];
+        // G.
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 1] =
+            self.palette[color_id as usize * 3 + 1];
+        // B.
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 2] =
+            self.palette[color_id as usize * 3 + 2];
+        // A.
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 3] = 0xff;
+    }
+
     fn clear_screen(&mut self) {
-        for v in self.scr.iter_mut() {
+        for v in self.fb.iter_mut() {
             *v = 255;
         }
         self.updated = true;

@@ -1,3 +1,4 @@
+mod canvas;
 mod cartridge;
 mod constants;
 mod debug;
