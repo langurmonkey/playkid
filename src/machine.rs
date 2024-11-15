@@ -23,7 +23,7 @@ pub struct Machine<'a, 'b> {
     /// The main memory.
     pub memory: Memory<'a, 'b>,
     /// The display.
-    display: Display,
+    display: Display<'b>,
     /// Interrupt master enable flag.
     ime: bool,
     /// EI operation is delayed by one instruction, so we use this counter.

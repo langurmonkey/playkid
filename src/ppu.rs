@@ -120,8 +120,8 @@ pub struct PPU {
 impl PPU {
     pub fn new(start_dot: u32) -> Self {
         // The 4 GB shades in RGB888.
-        // let palette = [224, 248, 208, 136, 192, 112, 52, 104, 86, 8, 24, 32];
-        let palette = [24, 48, 08, 136, 192, 112, 52, 104, 86, 8, 24, 32];
+        let palette = [224, 248, 208, 136, 192, 112, 52, 104, 86, 8, 24, 32];
+        // let palette = [24, 48, 08, 136, 192, 112, 52, 104, 86, 8, 24, 32];
 
         PPU {
             oam: [0xFF; constants::OAM_SIZE],
@@ -566,16 +566,16 @@ impl PPU {
     /// Sets the pixel at the given position to the given color id.
     fn color(&mut self, x: usize, y: u8, color_id: u8) {
         // R.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4] =
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 3] =
             self.palette[color_id as usize * 3];
         // G.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 1] =
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 2] =
             self.palette[color_id as usize * 3 + 1];
         // B.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 2] =
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 1] =
             self.palette[color_id as usize * 3 + 2];
         // A.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 3] = 0xff;
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 0] = 0xff;
     }
 
     fn clear_screen(&mut self) {

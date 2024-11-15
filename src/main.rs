@@ -13,7 +13,6 @@ mod timer;
 
 use cartridge::Cartridge;
 use clap::Parser;
-use crossterm::{execute, terminal::LeaveAlternateScreen};
 use machine::Machine;
 use std::io;
 use std::path::PathBuf;

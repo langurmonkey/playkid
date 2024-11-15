@@ -5,7 +5,6 @@ use crate::registers;
 use colored::{ColoredString, Colorize};
 use crossterm::{
     cursor::{MoveTo, MoveToNextLine},
-    event::{read, Event, KeyCode, KeyEvent, KeyModifiers},
     execute,
     style::{
         Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,

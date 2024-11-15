@@ -8,27 +8,24 @@ use sdl2;
 use sdl2::Sdl;
 
 /// Holds the display objects and renders the image from the PPU data.
-pub struct Display {
+pub struct Display<'a> {
     /// The canvas itself.
-    pub canvas: Canvas,
-    /// The scale factor for the display.
-    scale: usize,
+    pub canvas: Canvas<'a>,
     /// Holds the last rendered LY.
     last_ly: u8,
     /// Run in debug mode (present after every line).
     debug: bool,
 }
 
-impl Display {
-    pub fn new(window_title: &str, scale: usize, sdl: &Sdl, debug: bool) -> Self {
+impl<'a> Display<'a> {
+    pub fn new(window_title: &str, scale: usize, sdl: &'a Sdl, debug: bool) -> Self {
         let w = constants::DISPLAY_WIDTH;
         let h = constants::DISPLAY_HEIGHT;
 
-        let canvas = Canvas::new(window_title, w, h, scale).unwrap();
+        let canvas = Canvas::new(sdl, window_title, w, h, scale).unwrap();
 
         Display {
             canvas,
-            scale,
             debug,
             last_ly: 255,
         }
@@ -40,7 +37,7 @@ impl Display {
     }
 
     pub fn clear(&mut self) {
-        // TODO implement this.
+        self.canvas.clear();
     }
 
     // Renders the given buffer to the display.
@@ -52,17 +49,11 @@ impl Display {
             let pixels: &[u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4] = &ppu.fb;
 
             // Render line.
-            for y in 0..constants::DISPLAY_HEIGHT {
-                for x in 0..constants::DISPLAY_WIDTH {
-                    self.canvas.draw_pixel_rgba(
-                        x,
-                        y,
-                        pixels[(y * constants::DISPLAY_WIDTH + x) * 4],
-                        pixels[(y * constants::DISPLAY_WIDTH + x) * 4 + 1],
-                        pixels[(y * constants::DISPLAY_WIDTH + x) * 4 + 2],
-                        pixels[(y * constants::DISPLAY_WIDTH + x) * 4 + 3],
-                    );
-                }
+            {
+                let y = y as usize;
+                let slice = &pixels[(y * constants::DISPLAY_WIDTH) * 4
+                    ..(y * constants::DISPLAY_WIDTH + 159) * 4 + 3];
+                self.canvas.draw_line_rgba(y, slice);
             }
             self.last_ly = y;
             // Only present when all screen lines are in the buffer (or debugging).
