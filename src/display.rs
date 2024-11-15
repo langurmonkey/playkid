@@ -45,13 +45,11 @@ impl Display {
 
     // Renders the given buffer to the display.
     pub fn render(&mut self, mem: &Memory) {
-        // Fill with buffer
         let ppu = mem.ppu();
 
         let y = ppu.ly % constants::DISPLAY_HEIGHT as u8;
         if ppu.data_available && self.last_ly != y {
-            let pixels: &mut [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4] =
-                &mut ppu.fb.clone();
+            let pixels: &[u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4] = &ppu.fb;
 
             // Render line.
             for y in 0..constants::DISPLAY_HEIGHT {

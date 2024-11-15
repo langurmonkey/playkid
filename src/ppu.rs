@@ -120,7 +120,8 @@ pub struct PPU {
 impl PPU {
     pub fn new(start_dot: u32) -> Self {
         // The 4 GB shades in RGB888.
-        let palette = [224, 248, 208, 136, 192, 112, 52, 104, 86, 8, 24, 32];
+        // let palette = [224, 248, 208, 136, 192, 112, 52, 104, 86, 8, 24, 32];
+        let palette = [24, 48, 08, 136, 192, 112, 52, 104, 86, 8, 24, 32];
 
         PPU {
             oam: [0xFF; constants::OAM_SIZE],

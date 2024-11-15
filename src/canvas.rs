@@ -39,7 +39,7 @@ impl Canvas {
         Ok(Canvas {
             width,
             height,
-            data: vec![0; (width * height) as usize],
+            data: vec![0xff; (width * height) as usize],
             sdl_canvas,
             sdl_context,
             creator,
