@@ -46,18 +46,18 @@ impl<'a> Display<'a> {
 
         let y = ppu.ly % constants::DISPLAY_HEIGHT as u8;
         if ppu.data_available && self.last_ly != y {
-            let pixels: &[u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4] = &ppu.fb;
+            let pixels = &ppu.fb;
 
             // Render line.
             {
                 let y = y as usize;
-                let slice = &pixels[(y * constants::DISPLAY_WIDTH) * 4
-                    ..(y * constants::DISPLAY_WIDTH + 159) * 4 + 3];
+                let offset = y * constants::DISPLAY_WIDTH * 4;
+                let slice = &pixels[offset..offset + 160 * 4 - 1];
                 self.canvas.draw_line_rgba(y, slice);
             }
             self.last_ly = y;
             // Only present when all screen lines are in the buffer (or debugging).
-            if y == 143 || self.debug {
+            if y == 143 || self.debug || true {
                 self.canvas.flush();
             }
         }

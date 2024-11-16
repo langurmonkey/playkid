@@ -52,7 +52,7 @@ pub struct PPU {
     /// BG tile map.
     lcdc3: u16,
     /// OBJ size.
-    lcdc2: u32,
+    lcdc2: u8,
     /// OBJ enable.
     lcdc1: bool,
     /// BG & Window enable/priority.
@@ -115,6 +115,8 @@ pub struct PPU {
     palette: [u8; 4 * 3],
     /// Screen buffer in RGBA8888.
     pub fb: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
+    /// Color buffer.
+    pub fb_col: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH],
 }
 
 impl PPU {
@@ -166,6 +168,7 @@ impl PPU {
 
             palette,
             fb: [0xff; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
+            fb_col: [0x00; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH],
         }
     }
 
@@ -173,6 +176,7 @@ impl PPU {
         self.oam.fill(0xff);
         self.vram.fill(0x00);
         self.fb.fill(0xff);
+        self.fb_col.fill(0x00);
         self.mode = 0;
         self.lcdc = 0;
         self.fdot = self.start_dot;
@@ -403,12 +407,12 @@ impl PPU {
 
     /// Renders a single scanline.
     fn render_scanline(&mut self) {
-        self.render_background_scanline();
+        self.render_bgwin_scanline();
         self.render_sprites();
     }
 
-    /// Fetches the 8 pixels of a specific row within a tile.
-    fn get_tile_pixel_dat(&mut self, tile_id: u8, line: u8, use_unsigned: bool) -> [u8; 8] {
+    /// Fetches the 8 pixels of a row within a background or window tile.
+    fn get_bgwin_tile_pixels(&mut self, tile_id: u8, line: u8, use_unsigned: bool) -> [u8; 8] {
         let tile_data_start = self.lcdc4;
 
         let tile_addr = if use_unsigned {
@@ -432,36 +436,90 @@ impl PPU {
         pixels
     }
 
-    /// Renders a single scanline of the background.
-    fn render_background_scanline(&mut self) {
-        let lcdc = self.lcdc;
+    /// Fetches the 8 pixels of a row within a sprite tile.
+    fn get_sprite_tile_pixels(
+        &self,
+        tile_id: u8,
+        line: u8,
+        attributes: u8,
+        sprite_height: u8,
+    ) -> [u8; 8] {
+        let tile_addr = if sprite_height == 16 {
+            // For 8x16 sprites, ignore lowest bit of tile_id.
+            0x8000 + ((tile_id & 0xFE) as usize * 16) as u16
+        } else {
+            0x8000 + (tile_id as usize * 16) as u16
+        };
+
+        // Vertical flip.
+        let line = if attributes & 0x40 != 0 {
+            if sprite_height == 16 {
+                15 - line
+            } else {
+                7 - line
+            }
+        } else {
+            line
+        };
+
+        let low_byte = self.read(tile_addr + line as u16 * 2);
+        let high_byte = self.read(tile_addr + line as u16 * 2 + 1);
+        let mut pixels = [0u8; 8];
+
+        // Horizontal flip.
+        for i in 0..8 {
+            let color_id = ((high_byte >> (7 - i)) & 0x1) << 1 | ((low_byte >> (7 - i)) & 0x1);
+            let pixel_index = if attributes & 0x20 != 0 { 7 - i } else { i };
+            pixels[pixel_index] = color_id;
+        }
+
+        pixels
+    }
+
+    /// Renders a single scanline of the background and window.
+    fn render_bgwin_scanline(&mut self) {
+        // Determine if the background and window are enabled.
+        let bg_enabled = self.lcdc0;
+        let win_enabled = self.lcdc5 && self.ly >= self.wy;
+
         // Determine if we’re using unsigned or signed tile IDs
-        let use_unsigned = (lcdc & 0x10) != 0;
+        let use_unsigned = (self.lcdc & 0x10) != 0;
 
-        // Determine the tile map base address
-        let tile_map_start = self.lcdc3;
-
-        let bg_y = self.ly.wrapping_add(self.scy);
-        let tile_y = bg_y / 8;
-        // Render each pixel of the scanline
         for x in 0..constants::DISPLAY_WIDTH {
-            // Calculate the tile coordinates and pixel position within the tile
-            let bg_x = x.wrapping_add(self.scx as usize);
-            let tile_x = bg_x / 8;
+            // Calculate the tile coordinates and pixel position within the tile.
+            let (tile_map, comp_x, comp_y, tile_x, tile_y) =
+                if win_enabled && (x as u8) >= self.wx.wrapping_sub(7) {
+                    let win_y = self.ly.wrapping_add(self.wy);
+                    let tile_y = win_y / 8;
+                    let win_x = x - self.wx.wrapping_sub(7) as usize;
+                    let tile_x = win_x / 8;
+                    (self.lcdc6, win_x, win_y, tile_x, tile_y)
+                } else if bg_enabled {
+                    let bg_y = self.ly.wrapping_add(self.scy);
+                    let tile_y = bg_y / 8;
+                    let bg_x = x.wrapping_add(self.scx as usize);
+                    let tile_x = bg_x / 8;
+                    (self.lcdc3, bg_x, bg_y, tile_x, tile_y)
+                } else {
+                    // Disable.
+                    self.color(x, self.ly, 0);
+                    continue;
+                };
 
-            // Calculate tile map address and fetch tile ID
-            let tile_map_addr = tile_map_start + (tile_y as u16 * 32) + tile_x as u16;
+            // Calculate tile map address and fetch tile ID.
+            let tile_map_addr = tile_map + (tile_y as u16 * 32) + tile_x as u16;
             let tile_id = self.read(tile_map_addr);
 
-            // Get the specific row of pixels from the tile
-            let tile_line = (bg_y % 8) as u8;
-            let tile_pixels = self.get_tile_pixel_dat(tile_id, tile_line, use_unsigned);
+            // Get the specific row of pixels from the tile.
+            let tile_line = (comp_y % 8) as u8;
+            let tile_pixels = self.get_bgwin_tile_pixels(tile_id, tile_line, use_unsigned);
 
-            // Get the background pixel and apply palette color
-            let color_id = tile_pixels[bg_x % 8];
+            // Get the background pixel and apply palette color.
+            let color_idx = tile_pixels[comp_x % 8];
+            let color = (self.bgp >> (color_idx * 2)) & 0x03;
 
             // Store the pixel color in the framebuffer.
-            self.color(x, self.ly, color_id);
+            self.color(x, self.ly, color);
         }
     }
     /// Fetches the sprite attributes from OAM.
@@ -492,50 +550,12 @@ impl PPU {
         sprites
     }
 
-    /// Fetches the 8 pixels of a row within a sprite tile.
-    fn get_sprite_tile_pixels(
-        &self,
-        tile_id: u8,
-        line: u8,
-        attributes: u8,
-        sprite_height: u8,
-    ) -> [u8; 8] {
-        let tile_addr = if sprite_height == 16 {
-            // For 8x16 sprites, ignore lowest bit of tile_id
-            0x8000 + ((tile_id & 0xFE) as usize * 16)
-        } else {
-            0x8000 + (tile_id as usize * 16)
-        };
-
-        // Vertical flip
-        let actual_line = if attributes & 0x40 != 0 {
-            // Flip vertically
-            if sprite_height == 16 {
-                15 - line
-            } else {
-                7 - line
-            }
-        } else {
-            line
-        };
-
-        let low_byte = self.read((tile_addr + actual_line as usize * 2) as u16);
-        let high_byte = self.read((tile_addr + actual_line as usize * 2 + 1) as u16);
-        let mut pixels = [0u8; 8];
-
-        // Horizontal flip
-        for i in 0..8 {
-            let color_id = ((high_byte >> (7 - i)) & 0x1) << 1 | ((low_byte >> (7 - i)) & 0x1);
-            let pixel_index = if attributes & 0x20 != 0 { 7 - i } else { i }; // Flip horizontally if needed
-            pixels[pixel_index] = color_id;
-        }
-
-        pixels
-    }
-
-    /// Renders sprites onto a scanline in the framebuffer.
+    /// Renders a single scanline of sprites.
     fn render_sprites(&mut self) {
-        let sprite_size = 8;
+        if !self.lcdc1 {
+            return;
+        }
+        let sprite_size = self.lcdc2;
         let sprites = self.get_sprites_on_scanline(sprite_size);
 
         for sprite in sprites.iter().rev() {
@@ -553,34 +573,53 @@ impl PPU {
                     continue; // Ignore pixels outside screen bounds
                 }
 
-                let color_id = pixels[i];
-                if color_id == 0 {
+                let color_idx = pixels[i];
+                if color_idx == 0 {
                     continue; // Skip transparent pixels
                 }
-                // Store the pixel color in the framebuffer
-                self.color(x_pos, self.ly, color_id);
+
+                let palette = if sprite.attributes & 0x10 != 0 {
+                    self.obp1
+                } else {
+                    self.obp0
+                };
+                let color = (palette >> (color_idx * 2)) & 0x03;
+
+                // Priority handling: if bg/sprite priority bit is 0, sprite has priority over background
+                let has_priority = sprite.attributes & 0x80 == 0;
+                if has_priority
+                    || self.fb_col[self.ly as usize * constants::DISPLAY_WIDTH + x_pos] == 0
+                {
+                    // Store the pixel color in the framebuffer
+                    self.color(x_pos, self.ly, color);
+                }
             }
         }
     }
 
     /// Sets the pixel at the given position to the given color id.
     fn color(&mut self, x: usize, y: u8, color_id: u8) {
+        // Color frame buffer.
+        self.fb_col[y as usize * constants::DISPLAY_WIDTH + x] = color_id;
         // R.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 3] =
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 0] =
             self.palette[color_id as usize * 3];
         // G.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 2] =
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 1] =
             self.palette[color_id as usize * 3 + 1];
         // B.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 1] =
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 2] =
             self.palette[color_id as usize * 3 + 2];
         // A.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 0] = 0xff;
+        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 3] = 0xff;
     }
 
     fn clear_screen(&mut self) {
         for v in self.fb.iter_mut() {
             *v = 255;
+        }
+        for v in self.fb_col.iter_mut() {
+            *v = 0;
         }
         self.updated = true;
     }
@@ -615,11 +654,7 @@ impl PPU {
         } else {
             0x9C00
         };
-        self.lcdc2 = if self.lcdc & 0b0000_0100 == 0 {
-            64
-        } else {
-            128
-        };
+        self.lcdc2 = if self.lcdc & 0b0000_0100 == 0 { 8 } else { 16 };
         self.lcdc1 = self.lcdc & 0b0000_0010 != 0;
         self.lcdc0 = self.lcdc & 0b0000_0001 != 0;
 

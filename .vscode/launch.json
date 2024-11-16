@@ -7,19 +7,6 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debuggy",
-            "program": "${workspaceRoot}/target/debug/${workspaceRootFolderName}",
-            "args": [
-                "/home/tsagrista/Documents/roms/Tetris.gb"
-            ],
-            "cwd": "${workspaceRoot}/target/debug/",
-            "sourceLanguages": [
-                "rust"
-            ]
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
             "name": "Debug PlayKid",
             "cargo": {
                 "args": [

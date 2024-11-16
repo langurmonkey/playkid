@@ -31,7 +31,7 @@ impl<'a> Canvas<'a> {
         let sdl_canvas = window.into_canvas().build()?;
         let creator = sdl_canvas.texture_creator();
         let texture = creator.create_texture_target(
-            PixelFormatEnum::RGBA8888,
+            PixelFormatEnum::ABGR8888,
             width as u32,
             height as u32,
         )?;
@@ -71,7 +71,8 @@ impl<'a> Canvas<'a> {
 
     /// Draws a full line.
     pub fn draw_line_rgba(&mut self, y: usize, dat: &[u8]) {
-        self.data[(y * self.width) * 4..(y * self.width + 159) * 4 + 3].clone_from_slice(dat);
+        let offset = y * self.width * 4;
+        self.data[offset..offset + self.width * 4 - 1].clone_from_slice(dat);
     }
 
     /// Draws an RGBA pixel at the given [x,y] location.
