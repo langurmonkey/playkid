@@ -64,8 +64,6 @@ pub struct PPU {
     pub ly: u8,
     /// LYC: LY compare.
     pub lyc: u8,
-    /// Update LY.
-    pub ly_update: bool,
 
     /// STAT: LCD status.
     pub stat: u8,
@@ -93,8 +91,6 @@ pub struct PPU {
     wx: u8,
     /// Trigger for WY.
     wy_trigger: bool,
-    /// Position WY.
-    wy_pos: i32,
     /// BGP: Background palette register.
     bgp: u8,
     /// OBP0: Object palette 0.
@@ -144,7 +140,6 @@ impl PPU {
             lx: 0,
             ly: 0,
             lyc: 0,
-            ly_update: false,
             stat: 0,
             stat6: false,
             stat5: false,
@@ -157,7 +152,6 @@ impl PPU {
             wy: 0,
             wx: 7,
             wy_trigger: false,
-            wy_pos: -1,
             bgp: 0,
             obp0: 0,
             obp1: 0,
@@ -190,7 +184,6 @@ impl PPU {
         self.wx = 0;
         self.wy = 0;
         self.wy_trigger = false;
-        self.wy_pos = -1;
         self.bgp = 0;
         self.obp0 = 0;
         self.obp1 = 1;
@@ -394,7 +387,6 @@ impl PPU {
             3 => {
                 if self.lcdc5 && !self.wy_trigger && self.ly == self.wy {
                     self.wy_trigger = true;
-                    self.wy_pos = -1;
                 }
                 // No data.
                 false
