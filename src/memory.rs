@@ -355,10 +355,13 @@ impl<'a, 'b> Memory<'a, 'b> {
     }
 
     pub fn cycle(&mut self, t_cycles: u32) -> u32 {
-        self.joypad.update();
-
         let vram_cycles = 0;
         let ppu_cycles = t_cycles + vram_cycles;
+
+        // Joypad.
+        self.joypad.cycle();
+        self.iff |= self.joypad.i_mask;
+        self.joypad.i_mask = 0;
 
         // Time.
         self.timer.cycle(t_cycles);

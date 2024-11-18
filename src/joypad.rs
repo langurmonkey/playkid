@@ -8,11 +8,11 @@ use std::process;
 /// Describes the current state of the Game Boy joypad.
 pub struct Joypad<'b> {
     /// The P1/JOYP register.
-    pub joyp: u8,
+    joyp: u8,
     /// Bits 0-4 contain the state of SsAB.
-    pub select_buttons: bool,
+    select_buttons: bool,
     /// Bits 0-4 contain the state of the D-Pad.
-    pub select_dpad: bool,
+    select_dpad: bool,
     /// Start button.
     pub start: bool,
     /// Select button.
@@ -29,6 +29,10 @@ pub struct Joypad<'b> {
     pub left: bool,
     /// D-pad right.
     pub right: bool,
+    /// JOY interrupt requested.
+    request_interrupt: bool,
+    /// Interrupt mask.
+    pub i_mask: u8,
     /// Debug flag. If this is on, a debug pause is requested.
     pub debug_flag: bool,
     /// Reference to the main SDL object.
@@ -49,6 +53,8 @@ impl<'b> Joypad<'b> {
             up: false,
             left: false,
             right: false,
+            request_interrupt: false,
+            i_mask: 0,
             debug_flag: false,
             sdl,
         }
@@ -80,7 +86,7 @@ impl<'b> Joypad<'b> {
         }
     }
 
-    pub fn update(&mut self) {
+    pub fn cycle(&mut self) {
         let mut event_pump = self.sdl.event_pump().unwrap();
         // Event loop
         for event in event_pump.poll_iter() {
@@ -249,6 +255,12 @@ impl<'b> Joypad<'b> {
                 _ => {}
             }
         }
+
+        // Raise interrupt if necessary.
+        if self.request_interrupt {
+            self.i_mask = 0b0001_0000;
+            self.request_interrupt = false;
+        }
     }
 
     /// Updates the flags in bits 5 and 4 (select buttons, select D-pad) of JOYP.
@@ -261,42 +273,50 @@ impl<'b> Joypad<'b> {
         if self.select_buttons {
             if self.a {
                 self.joyp = self.joyp & 0xfe;
+                self.request_interrupt = true;
             } else {
                 self.joyp = self.joyp | 0x01;
             }
             if self.b {
                 self.joyp = self.joyp & 0xfd;
+                self.request_interrupt = true;
             } else {
                 self.joyp = self.joyp | 0x02;
             }
             if self.select {
                 self.joyp = self.joyp & 0xfb;
+                self.request_interrupt = true;
             } else {
                 self.joyp = self.joyp | 0x04;
             }
             if self.start {
                 self.joyp = self.joyp & 0xf7;
+                self.request_interrupt = true;
             } else {
                 self.joyp = self.joyp | 0x08;
             }
         } else if self.select_buttons {
             if self.right {
                 self.joyp = self.joyp & 0xfe;
+                self.request_interrupt = true;
             } else {
                 self.joyp = self.joyp | 0x01;
             }
             if self.left {
                 self.joyp = self.joyp & 0xfd;
+                self.request_interrupt = true;
             } else {
                 self.joyp = self.joyp | 0x02;
             }
             if self.up {
                 self.joyp = self.joyp & 0xfb;
+                self.request_interrupt = true;
             } else {
                 self.joyp = self.joyp | 0x04;
             }
             if self.down {
                 self.joyp = self.joyp & 0xf7;
+                self.request_interrupt = true;
             } else {
                 self.joyp = self.joyp | 0x08;
             }
