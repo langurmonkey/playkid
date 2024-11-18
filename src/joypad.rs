@@ -60,7 +60,6 @@ impl<'b> Joypad<'b> {
         self.select_buttons = false;
         self.select_dpad = false;
         self.debug_flag = false;
-        self.update_buttons();
     }
 
     pub fn read(&self, address: u16) -> u8 {
@@ -75,14 +74,13 @@ impl<'b> Joypad<'b> {
             0xFF00 => {
                 // Only write top nibble!
                 self.joyp = (self.joyp & 0x0F) | (value & 0xF0);
-                self.update_flags();
+                self.update_state();
             }
             _ => panic!("Invalid Joypad address."),
         }
     }
 
     pub fn update(&mut self) {
-        self.update_flags();
         let mut event_pump = self.sdl.event_pump().unwrap();
         // Event loop
         for event in event_pump.poll_iter() {
@@ -126,18 +124,14 @@ impl<'b> Joypad<'b> {
                     ..
                 } => {
                     // Set down.
-                    if self.select_dpad {
-                        self.joyp = self.joyp & 0xF7;
-                    }
+                    self.down = true;
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::Down),
                     ..
                 } => {
                     // Unset down.
-                    if self.select_dpad {
-                        self.joyp = self.joyp | 0x08;
-                    }
+                    self.down = false;
                 }
 
                 // UP
@@ -146,18 +140,14 @@ impl<'b> Joypad<'b> {
                     ..
                 } => {
                     // Set Up.
-                    if self.select_dpad {
-                        self.joyp = self.joyp & 0xFB;
-                    }
+                    self.up = true;
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::Up),
                     ..
                 } => {
                     // Unset Up.
-                    if self.select_dpad {
-                        self.joyp = self.joyp | 0x04;
-                    }
+                    self.up = false;
                 }
 
                 // LEFT
@@ -166,18 +156,14 @@ impl<'b> Joypad<'b> {
                     ..
                 } => {
                     // Set left.
-                    if self.select_dpad {
-                        self.joyp = self.joyp & 0xFD;
-                    }
+                    self.left = true;
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::Left),
                     ..
                 } => {
                     // Unset left.
-                    if self.select_dpad {
-                        self.joyp = self.joyp | 0x02;
-                    }
+                    self.left = false;
                 }
 
                 // RIGHT
@@ -186,18 +172,14 @@ impl<'b> Joypad<'b> {
                     ..
                 } => {
                     // Set right.
-                    if self.select_dpad {
-                        self.joyp = self.joyp & 0xFE;
-                    }
+                    self.right = true;
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::Right),
                     ..
                 } => {
                     // Unset right.
-                    if self.select_dpad {
-                        self.joyp = self.joyp | 0x01;
-                    }
+                    self.right = false;
                 }
 
                 // START (enter)
@@ -206,18 +188,14 @@ impl<'b> Joypad<'b> {
                     ..
                 } => {
                     // Set Start.
-                    if self.select_buttons {
-                        self.joyp = self.joyp & 0xF7;
-                    }
+                    self.start = true;
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::Return),
                     ..
                 } => {
                     // Unset Start.
-                    if self.select_buttons {
-                        self.joyp = self.joyp | 0x08;
-                    }
+                    self.start = false;
                 }
 
                 // SELECT (space)
@@ -226,18 +204,14 @@ impl<'b> Joypad<'b> {
                     ..
                 } => {
                     // Set Select.
-                    if self.select_buttons {
-                        self.joyp = self.joyp & 0xFB;
-                    }
+                    self.select = true;
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::Space),
                     ..
                 } => {
                     // Unset Select.
-                    if self.select_buttons {
-                        self.joyp = self.joyp | 0x04;
-                    }
+                    self.select = false;
                 }
 
                 // B
@@ -246,18 +220,14 @@ impl<'b> Joypad<'b> {
                     ..
                 } => {
                     // Set B.
-                    if self.select_buttons {
-                        self.joyp = self.joyp & 0xFD;
-                    }
+                    self.b = true;
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::B),
                     ..
                 } => {
                     // Unset B.
-                    if self.select_buttons {
-                        self.joyp = self.joyp | 0x02;
-                    }
+                    self.b = false;
                 }
 
                 // A
@@ -266,50 +236,73 @@ impl<'b> Joypad<'b> {
                     ..
                 } => {
                     // Set A.
-                    if self.select_buttons {
-                        self.joyp = self.joyp & 0xFE;
-                    }
+                    self.a = true;
                 }
                 Event::KeyUp {
                     keycode: Some(Keycode::A),
                     ..
                 } => {
                     // Unset A.
-                    if self.select_buttons {
-                        self.joyp = self.joyp | 0x01;
-                    }
+                    self.a = false;
                 }
 
                 _ => {}
             }
         }
-        self.update_buttons();
     }
 
     /// Updates the flags in bits 5 and 4 (select buttons, select D-pad) of JOYP.
-    fn update_flags(&mut self) {
+    fn update_state(&mut self) {
         // If bit 5 is zero, SsBA are in the lower nibble.
         self.select_buttons = (self.joyp & 0x20) == 0;
         // If bit 4 is zero, d-pad buttons are in the lower nibble.
         self.select_dpad = (self.joyp & 0x10) == 0;
-    }
 
-    /// Updates the state of the joypad buttons from the JOYP register.
-    /// WARN: A button is pressed when the corresponding bit is 0!
-    /// If both bits 4 and 5 of P1/JOYP are zero, we decide to give preference
-    /// to bit 5 (buttons SsAB) in our implementation. This is, however,
-    /// and invalid state with undefined results.
-    fn update_buttons(&mut self) {
         if self.select_buttons {
-            self.start = (self.joyp & 0x08) == 0;
-            self.select = (self.joyp & 0x04) == 0;
-            self.b = (self.joyp & 0x02) == 0;
-            self.a = (self.joyp & 0x01) == 0;
-        } else if self.select_dpad {
-            self.down = (self.joyp & 0x08) == 0;
-            self.up = (self.joyp & 0x04) == 0;
-            self.left = (self.joyp & 0x02) == 0;
-            self.right = (self.joyp & 0x01) == 0;
+            if self.a {
+                self.joyp = self.joyp & 0xfe;
+            } else {
+                self.joyp = self.joyp | 0x01;
+            }
+            if self.b {
+                self.joyp = self.joyp & 0xfd;
+            } else {
+                self.joyp = self.joyp | 0x02;
+            }
+            if self.select {
+                self.joyp = self.joyp & 0xfb;
+            } else {
+                self.joyp = self.joyp | 0x04;
+            }
+            if self.start {
+                self.joyp = self.joyp & 0xf7;
+            } else {
+                self.joyp = self.joyp | 0x08;
+            }
+        } else if self.select_buttons {
+            if self.right {
+                self.joyp = self.joyp & 0xfe;
+            } else {
+                self.joyp = self.joyp | 0x01;
+            }
+            if self.left {
+                self.joyp = self.joyp & 0xfd;
+            } else {
+                self.joyp = self.joyp | 0x02;
+            }
+            if self.up {
+                self.joyp = self.joyp & 0xfb;
+            } else {
+                self.joyp = self.joyp | 0x04;
+            }
+            if self.down {
+                self.joyp = self.joyp & 0xf7;
+            } else {
+                self.joyp = self.joyp | 0x08;
+            }
+        } else {
+            // All off.
+            self.joyp = self.joyp | 0xff;
         }
     }
 }

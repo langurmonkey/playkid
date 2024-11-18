@@ -18,11 +18,11 @@ pub struct Display<'a> {
 }
 
 impl<'a> Display<'a> {
-    pub fn new(window_title: &str, scale: usize, sdl: &'a Sdl, debug: bool) -> Self {
+    pub fn new(window_title: &str, scale: u8, sdl: &'a Sdl, debug: bool) -> Self {
         let w = constants::DISPLAY_WIDTH;
         let h = constants::DISPLAY_HEIGHT;
 
-        let canvas = Canvas::new(sdl, window_title, w, h, scale).unwrap();
+        let canvas = Canvas::new(sdl, window_title, w, h, scale as usize).unwrap();
 
         Display {
             canvas,

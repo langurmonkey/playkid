@@ -25,11 +25,14 @@ use std::path::PathBuf;
 struct Args {
     /// Path to the input rom file to load.
     input: PathBuf,
+    #[arg(short, long, default_value_t = 3, value_parser = clap::value_parser!(u8).range(1..12))]
+    /// Display scale.
+    scale: u8,
     /// Activate debug mode.
     #[arg(short, long)]
     debug: bool,
     /// Skip global checksum, header checksum, and logo sequence check.
-    #[arg(short, long)]
+    #[arg(long)]
     skipcheck: bool,
 }
 
@@ -47,7 +50,7 @@ fn main() -> io::Result<()> {
 
     let sdl_context = sdl2::init().unwrap();
     // Create a game boy with the given cartridge.
-    let mut gameboy = Machine::new(&cart, &sdl_context, args.debug);
+    let mut gameboy = Machine::new(&cart, &sdl_context, args.scale, args.debug);
     // Initialize the Game Boy state.
     gameboy.init();
     // Start the machine.

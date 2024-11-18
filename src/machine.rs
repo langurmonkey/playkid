@@ -42,11 +42,11 @@ pub struct Machine<'a, 'b> {
 
 impl<'a, 'b> Machine<'a, 'b> {
     /// Create a new instance of the Game Boy.
-    pub fn new(cart: &'a Cartridge, sdl: &'b Sdl, debug: bool) -> Self {
+    pub fn new(cart: &'a Cartridge, sdl: &'b Sdl, scale: u8, debug: bool) -> Self {
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
-            display: Display::new("PlayKid emulator", 4, sdl, debug),
+            display: Display::new("PlayKid emulator", scale, sdl, debug),
             ime: false,
             ei: 0,
             di: 0,

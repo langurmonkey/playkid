@@ -103,7 +103,6 @@ pub struct PPU {
     /// Whether we are in H-Blank region.
     pub hblank: bool,
     /// Flag that goes up when the screen is updated.
-    pub updated: bool,
     pub data_available: bool,
 
     /// The palette.
@@ -156,7 +155,6 @@ impl PPU {
             obp1: 0,
             i_mask: 0,
             hblank: false,
-            updated: false,
             data_available: false,
 
             palette,
@@ -189,7 +187,6 @@ impl PPU {
         self.obp1 = 1;
         self.i_mask = 0;
         self.hblank = false;
-        self.updated = false;
         self.data_available = false;
     }
 
@@ -373,7 +370,6 @@ impl PPU {
             1 => {
                 self.wly_flag = false;
                 self.i_mask |= 0x01;
-                self.updated = true;
                 self.stat4
             }
 
@@ -521,11 +517,6 @@ impl PPU {
                     bg_tile_x,
                     bg_tile_y,
                 )
-                // let bg_x = (self.scx as u32 + x as u32) as u8 & 0x07;
-                // let bg_y = self.scy.wrapping_add(self.ly) as u16 & 0x07;
-                // let tile_x = (bg_x as u16 >> 3) & 0x1f;
-                // let tile_y = (bg_y as u16 >> 3) & 0x1f;
-                // (self.lcdc3, bg_x, bg_y, tile_x, tile_y)
             } else {
                 // Next pixel.
                 continue;
@@ -641,9 +632,8 @@ impl PPU {
             *v = 255;
         }
         for v in self.priorities.iter_mut() {
-            *v = 0;
+            *v = 255;
         }
-        self.updated = true;
     }
 
     /// Update STAT bit 2 (LYC==LY).
