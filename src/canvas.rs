@@ -75,14 +75,6 @@ impl<'a> Canvas<'a> {
         self.data[offset..offset + self.width * 4 - 1].clone_from_slice(dat);
     }
 
-    /// Draws an RGBA pixel at the given [x,y] location.
-    pub fn draw_pixel_rgba(&mut self, x: usize, y: usize, r: u8, g: u8, b: u8, a: u8) {
-        self.data[(y * self.width + x) * 4] = a;
-        self.data[(y * self.width + x) * 4 + 1] = b;
-        self.data[(y * self.width + x) * 4 + 2] = g;
-        self.data[(y * self.width + x) * 4 + 3] = r;
-    }
-
     /// Converts the internal data vector to a `u8` array.
     fn data_raw(&self) -> &[u8] {
         unsafe { std::slice::from_raw_parts(self.data.as_ptr(), self.data.len()) }

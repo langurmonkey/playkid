@@ -612,19 +612,17 @@ impl PPU {
 
     /// Sets the pixel at the given position to the given color id.
     fn color(&mut self, x: usize, y: u8, color_id: u8) {
+        let pos = y as usize * constants::DISPLAY_WIDTH + x;
         // Priority frame buffer.
-        self.priorities[y as usize * constants::DISPLAY_WIDTH + x] = color_id;
+        self.priorities[pos] = color_id;
         // R.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 0] =
-            self.palette[color_id as usize * 3];
+        self.fb[pos * 4 + 0] = self.palette[color_id as usize * 3];
         // G.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 1] =
-            self.palette[color_id as usize * 3 + 1];
+        self.fb[pos * 4 + 1] = self.palette[color_id as usize * 3 + 1];
         // B.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 2] =
-            self.palette[color_id as usize * 3 + 2];
+        self.fb[pos * 4 + 2] = self.palette[color_id as usize * 3 + 2];
         // A.
-        self.fb[(y as usize * constants::DISPLAY_WIDTH + x) * 4 + 3] = 0xff;
+        self.fb[pos * 4 + 3] = 0xff;
     }
 
     fn clear_screen(&mut self) {

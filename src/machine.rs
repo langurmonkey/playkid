@@ -187,7 +187,7 @@ impl<'a, 'b> Machine<'a, 'b> {
 
     /// Runs
     fn machine_cycle(&mut self) -> (u32, u32) {
-        let start = SystemTime::now();
+        // let start = SystemTime::now();
 
         // Update IME.
         self.ime_update();
@@ -213,12 +213,12 @@ impl<'a, 'b> Machine<'a, 'b> {
             self.memory.cycle(t_cycles);
 
             // Compute the time we spent per t-cycle.
-            let t_cycle_t_ns = start.elapsed().expect("Error getting time.") / t_cycles;
-            let (resting_ns, of) = constants::CPU_CLOCK_NS.overflowing_sub(t_cycle_t_ns.as_nanos());
-            if !of {
-                // Wait to run at true speed.
-                //thread::sleep(Duration::from_nanos(resting_ns as u64));
-            };
+            // let t_cycle_t_ns = start.elapsed().expect("Error getting time.") / t_cycles;
+            // let (resting_ns, of) = constants::CPU_CLOCK_NS.overflowing_sub(t_cycle_t_ns.as_nanos());
+            // if !of {
+            // Wait to run at true speed.
+            //thread::sleep(Duration::from_nanos(resting_ns as u64));
+            // };
 
             (t_cycles, m_cycles)
         } else {
