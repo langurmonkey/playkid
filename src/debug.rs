@@ -221,7 +221,7 @@ impl DebugMonitor {
             "b".green(),
             "b list".green()
         );
-        println!("({})   delete all breakpoints", "b del".green());
+        println!("({})         delete all breakpoints", "b del".green());
         println!(
             "({} {})   delete breakpoint",
             "b del".green(),
