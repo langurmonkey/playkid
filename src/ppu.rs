@@ -307,46 +307,32 @@ impl PPU {
         }
         self.hblank = false;
 
-        let mut t_cycles_left = t_cycles;
+        self.fdot += t_cycles;
 
-        while t_cycles_left > 0 {
-            let curr_cycles = if t_cycles_left >= 80 {
-                80
-            } else {
-                t_cycles_left
-            };
-            self.fdot += curr_cycles;
-            t_cycles_left -= curr_cycles;
+        while self.fdot >= 456 {
+            self.fdot -= 456;
+            self.ly = (self.ly + 1) % 154;
+            self.check_interrupt_lyc();
 
-            // Full line takes 114 ticks
-            if self.fdot >= 456 {
-                self.fdot -= 456;
-                self.ly = (self.ly + 1) % 154;
-                self.check_interrupt_lyc();
-
-                // This is a VBlank line
-                if self.ly >= 144 && self.mode != 1 {
-                    self.update_mode(1);
-                }
+            if self.ly == 144 {
+                self.update_mode(1); // VBlank start
+            } else if self.ly == 0 {
+                self.update_mode(2); // OAM scan start of new frame
             }
+        }
 
-            // This is a normal line
-            if self.ly < 144 {
-                if self.fdot <= 80 {
-                    if self.mode != 2 {
-                        self.update_mode(2);
-                    }
-                } else if self.fdot <= (80 + 172) {
-                    // 252 cycles
-                    if self.mode != 3 {
-                        self.update_mode(3);
-                    }
-                } else {
-                    // the remaining 204
-                    if self.mode != 0 {
-                        self.update_mode(0);
-                    }
-                }
+        if self.ly < 144 {
+            // Determine mode by fdot range
+            let mode = match self.fdot {
+                // OAM scan
+                0..=80 => 2,
+                // DRAW
+                81..=252 => 3,
+                // H-blank
+                _ => 0,
+            };
+            if mode != self.mode {
+                self.update_mode(mode);
             }
         }
     }
@@ -489,6 +475,8 @@ impl PPU {
             return;
         }
 
+        let mut tile_row_cache = [[0u8; 8]; 32]; // Per scanline
+
         // Every pixel in the scanline.
         for x in 0..constants::DISPLAY_WIDTH {
             let win_y = self.wly;
@@ -522,12 +510,19 @@ impl PPU {
                 continue;
             };
 
+            let tile_index = tile_y * 32 + tile_x;
+            // Only get tile row data if not already cached
+            if tile_row_cache[tile_x as usize] == [0; 8] {
+                let tile_id = self.read(tile_map + tile_index);
+                tile_row_cache[tile_x as usize] =
+                    self.get_bgwin_tile_data(tile_id, px_y, use_unsigned);
+            }
+
             // Read tile ID and then data bytes.
-            let tile_id: u8 = self.read(tile_map + tile_y * 32 + tile_x);
-            let tile_pixels = self.get_bgwin_tile_data(tile_id, px_y, use_unsigned);
+            let tile_pixels = tile_row_cache[tile_x as usize];
 
             // Get the background pixel and apply palette color.
-            let color_idx = tile_pixels[px_x as usize % 8];
+            let color_idx = tile_pixels[px_x as usize];
             let color = (self.bgp >> (color_idx * 2)) & 0x03;
 
             // Store the pixel color in the framebuffer.
@@ -615,12 +610,14 @@ impl PPU {
         let pos = y as usize * constants::DISPLAY_WIDTH + x;
         // Priority frame buffer.
         self.priorities[pos] = color_id;
+
+        let cid = color_id as usize * 3;
         // R.
-        self.fb[pos * 4 + 0] = self.palette[color_id as usize * 3];
+        self.fb[pos * 4 + 0] = self.palette[cid];
         // G.
-        self.fb[pos * 4 + 1] = self.palette[color_id as usize * 3 + 1];
+        self.fb[pos * 4 + 1] = self.palette[cid + 1];
         // B.
-        self.fb[pos * 4 + 2] = self.palette[color_id as usize * 3 + 2];
+        self.fb[pos * 4 + 2] = self.palette[cid + 2];
         // A.
         self.fb[pos * 4 + 3] = 0xff;
     }

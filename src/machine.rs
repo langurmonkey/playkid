@@ -81,36 +81,37 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.display.clear();
         self.display.present();
 
+        let mut start = Instant::now();
+        let mut cycles = 0;
+
         'mainloop: while self.running {
             let frame_start_time = std::time::Instant::now();
-            let mut cycles_this_frame: u128 = 0;
+            let mut cycles_this_frame: usize = 0;
 
-            let mut start = Instant::now();
-
-            let mut cycles = 0;
             // Execute cycles for one full frame
             while cycles_this_frame < constants::CYCLES_PER_FRAME {
                 let (t, m) = self.machine_cycle();
                 self.m_cycles += m;
                 self.t_cycles += t;
                 cycles += 1;
-                cycles_this_frame += t as u128;
-
-                let el = start.elapsed().as_secs_f64();
-                if el >= 1.0 {
-                    println!("Cycles per second: {}", cycles);
-                    cycles = 0;
-                    start = Instant::now();
-                }
+                cycles_this_frame += t as usize;
 
                 // Render if we have pixels.
                 self.display.render(&self.memory);
             }
 
+            // Print cycles per second every 1 second, outside inner loop
+            let el = start.elapsed().as_secs_f64();
+            if el >= 1.0 {
+                println!("Cycles per second: {}", cycles);
+                cycles = 0;
+                start = Instant::now();
+            }
+
             // Now, sleep for the remaining time in the frame
             let elapsed = frame_start_time.elapsed();
             if elapsed < constants::TARGET_FRAME_DURATION {
-                thread::sleep(constants::TARGET_FRAME_DURATION - elapsed);
+                // thread::sleep(constants::TARGET_FRAME_DURATION - elapsed);
             }
         }
     }

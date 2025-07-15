@@ -1,3 +1,5 @@
+use crate::constants;
+
 use crossterm::{execute, terminal::LeaveAlternateScreen};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -35,6 +37,8 @@ pub struct Joypad<'b> {
     pub i_mask: u8,
     /// Debug flag. If this is on, a debug pause is requested.
     pub debug_flag: bool,
+    /// Cycle counter,
+    cycles: usize,
     /// The event pum.
     event_pump: EventPump,
     /// Reference to the main SDL object.
@@ -58,6 +62,7 @@ impl<'b> Joypad<'b> {
             request_interrupt: false,
             i_mask: 0,
             debug_flag: false,
+            cycles: 0,
             event_pump: sdl.event_pump().unwrap(),
             sdl,
         }
@@ -69,6 +74,7 @@ impl<'b> Joypad<'b> {
         self.select_buttons = false;
         self.select_dpad = false;
         self.debug_flag = false;
+        self.cycles = 0;
     }
 
     pub fn read(&self, address: u16) -> u8 {
@@ -91,6 +97,17 @@ impl<'b> Joypad<'b> {
 
     pub fn cycle(&mut self) {
         // Event loop
+        // Only poll events once every frame.
+        //
+        self.cycles += 1;
+        if self.cycles < constants::CYCLES_PER_FRAME {
+            return;
+        }
+
+        // Reset cycles.
+        self.cycles = 0;
+
+        // Poll.
         for event in self.event_pump.poll_iter() {
             match event {
                 // Quit.
