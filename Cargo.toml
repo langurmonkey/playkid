@@ -16,3 +16,6 @@ ctrlc = "3.4.5"
 
 [profile.dev]
 debug = true
+
+[profile.release]
+debug = true

@@ -1,7 +1,7 @@
 use crossterm::{execute, terminal::LeaveAlternateScreen};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::Sdl;
+use sdl2::{EventPump, Sdl};
 use std::io;
 use std::process;
 
@@ -35,6 +35,8 @@ pub struct Joypad<'b> {
     pub i_mask: u8,
     /// Debug flag. If this is on, a debug pause is requested.
     pub debug_flag: bool,
+    /// The event pum.
+    event_pump: EventPump,
     /// Reference to the main SDL object.
     sdl: &'b Sdl,
 }
@@ -56,6 +58,7 @@ impl<'b> Joypad<'b> {
             request_interrupt: false,
             i_mask: 0,
             debug_flag: false,
+            event_pump: sdl.event_pump().unwrap(),
             sdl,
         }
     }
@@ -87,9 +90,8 @@ impl<'b> Joypad<'b> {
     }
 
     pub fn cycle(&mut self) {
-        let mut event_pump = self.sdl.event_pump().unwrap();
         // Event loop
-        for event in event_pump.poll_iter() {
+        for event in self.event_pump.poll_iter() {
             match event {
                 // Quit.
                 Event::Quit { .. }

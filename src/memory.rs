@@ -20,13 +20,13 @@ use timer::Timer;
 /// 0x8000-0x9FFF: 8 KiB video RAM                (VRAM)
 /// 0xA000-0xBFFF: 8 KiB switchable RAM bank      (cartridge)
 /// 0xC000-0xDFFF: 8 KiB work RAM                 (WRAM)
-/// 0xE000-0xFDFF: Echo RAM                     (mirror of 0xC000-0xDFFF)
-/// 0xFE00-0xFE9F: Object attribute memory      (OAM)
+/// 0xE000-0xFDFF: Echo RAM                       (mirror of 0xC000-0xDFFF)
+/// 0xFE00-0xFE9F: Object attribute memory        (OAM)
 /// 0xFEA0-0xFEFF: Empty, not usable
-/// 0xFF00-0xFF4B: I/O registers                (I/O)
+/// 0xFF00-0xFF4B: I/O registers                  (I/O)
 /// 0xFF4C-0xFF7F: Empty (?)
-/// 0xFF80-0xFFFE: High RAM                     (HRAM)
-/// 0xFF80-0xFFFF: Interrupt Enable Register    (IER)
+/// 0xFF80-0xFFFE: High RAM                       (HRAM)
+/// 0xFF80-0xFFFF: Interrupt Enable Register      (IER)
 
 pub struct Memory<'a, 'b> {
     /// Work RAM.

@@ -52,12 +52,12 @@ impl<'a> Display<'a> {
             {
                 let y = y as usize;
                 let offset = y * constants::DISPLAY_WIDTH * 4;
-                let slice = &pixels[offset..offset + 160 * 4 - 1];
+                let slice = &pixels[offset..offset + constants::DISPLAY_WIDTH * 4];
                 self.canvas.draw_line_rgba(y, slice);
             }
             self.last_ly = y;
             // Only present when all screen lines are in the buffer (or debugging).
-            if y == 143 || self.debug || true {
+            if y == 143 || self.debug {
                 self.canvas.flush();
             }
         }

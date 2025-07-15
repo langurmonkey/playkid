@@ -72,7 +72,7 @@ impl<'a> Canvas<'a> {
     /// Draws a full line.
     pub fn draw_line_rgba(&mut self, y: usize, dat: &[u8]) {
         let offset = y * self.width * 4;
-        self.data[offset..offset + self.width * 4 - 1].clone_from_slice(dat);
+        self.data[offset..offset + self.width * 4].clone_from_slice(dat);
     }
 
     /// Converts the internal data vector to a `u8` array.

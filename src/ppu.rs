@@ -603,7 +603,7 @@ impl PPU {
                 if has_priority
                     || self.priorities[self.ly as usize * constants::DISPLAY_WIDTH + x_pos] == 0
                 {
-                    // Store the pixel color in the framebuffer
+                    // Store the pixel color in the frame buffer
                     self.color(x_pos, self.ly, color);
                 }
             }

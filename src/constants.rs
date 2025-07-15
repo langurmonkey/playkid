@@ -12,9 +12,16 @@ pub const IO_SIZE: usize = 128;
 pub const DISPLAY_WIDTH: usize = 160;
 /// Display height.
 pub const DISPLAY_HEIGHT: usize = 144;
+/// Target frame rate.
+pub const TARGET_FPS: u64 = 60;
+/// Target frame duration.
+pub const TARGET_FRAME_DURATION: std::time::Duration =
+    std::time::Duration::from_millis(1000 / TARGET_FPS);
 /// CPU frequency [Hz].
 pub const CPU_FREQ_HZ: usize = 4194304;
 /// CPU period [ns].
 pub const CPU_CLOCK_NS: u128 = (1000_000_000.0 / CPU_FREQ_HZ as f64) as u128;
+/// CPU cycles per frame.
+pub const CYCLES_PER_FRAME: u128 = (CPU_FREQ_HZ as f64 / 59.7) as u128;
 /// Maximum number of sprites per line.
 pub const MAX_SPRITES_PER_LINE: usize = 10;

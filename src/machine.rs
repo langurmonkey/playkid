@@ -13,7 +13,8 @@ use instruction::{Instruction, RunInstr, CC, R16, R16EXT, R16LD, R8, TGT3};
 use memory::Memory;
 use registers::Registers;
 use sdl2::Sdl;
-use std::time::SystemTime;
+use std::thread;
+use std::time::Instant;
 
 /// This is our machine, which contains the registers and the memory, and
 /// executes the operations.
@@ -79,13 +80,38 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.running = true;
         self.display.clear();
         self.display.present();
-        'mainloop: while self.running {
-            let (t, m) = self.machine_cycle();
-            self.m_cycles += m;
-            self.t_cycles += t;
 
-            // Render if we have pixels.
-            self.display.render(&self.memory);
+        'mainloop: while self.running {
+            let frame_start_time = std::time::Instant::now();
+            let mut cycles_this_frame: u128 = 0;
+
+            let mut start = Instant::now();
+
+            let mut cycles = 0;
+            // Execute cycles for one full frame
+            while cycles_this_frame < constants::CYCLES_PER_FRAME {
+                let (t, m) = self.machine_cycle();
+                self.m_cycles += m;
+                self.t_cycles += t;
+                cycles += 1;
+                cycles_this_frame += t as u128;
+
+                let el = start.elapsed().as_secs_f64();
+                if el >= 1.0 {
+                    println!("Cycles per second: {}", cycles);
+                    cycles = 0;
+                    start = Instant::now();
+                }
+
+                // Render if we have pixels.
+                self.display.render(&self.memory);
+            }
+
+            // Now, sleep for the remaining time in the frame
+            let elapsed = frame_start_time.elapsed();
+            if elapsed < constants::TARGET_FRAME_DURATION {
+                thread::sleep(constants::TARGET_FRAME_DURATION - elapsed);
+            }
         }
     }
 
@@ -187,8 +213,6 @@ impl<'a, 'b> Machine<'a, 'b> {
 
     /// Runs
     fn machine_cycle(&mut self) -> (u32, u32) {
-        // let start = SystemTime::now();
-
         // Update IME.
         self.ime_update();
 
@@ -211,15 +235,6 @@ impl<'a, 'b> Machine<'a, 'b> {
             // Memory cycle.
             let t_cycles = m_cycles * 4;
             self.memory.cycle(t_cycles);
-
-            // Compute the time we spent per t-cycle.
-            // let t_cycle_t_ns = start.elapsed().expect("Error getting time.") / t_cycles;
-            // let (resting_ns, of) = constants::CPU_CLOCK_NS.overflowing_sub(t_cycle_t_ns.as_nanos());
-            // if !of {
-            // Wait to run at true speed.
-            //thread::sleep(Duration::from_nanos(resting_ns as u64));
-            // };
-
             (t_cycles, m_cycles)
         } else {
             (0, 0)
