@@ -557,8 +557,14 @@ impl Instruction {
             // EXPAND to 16-bit OPCODES
             0xCB => Some(Instruction::OPCODE16()),
 
-            // Not found!
-            _ => panic!("Instruction is not implemented: {:#04x}", byte),
+            // Undocumented OPCODE
+            _ => {
+                println!(
+                    "Warn: Unimplemented instruction {:02X}, treating as NOP",
+                    byte
+                );
+                Some(Instruction::NOP())
+            }
         }
     }
 
@@ -1021,8 +1027,7 @@ pub struct RunInstr {
 impl RunInstr {
     pub fn new(opcode: u8, mem: &Memory, reg: &Registers) -> RunInstr {
         let instruction = Instruction::from_byte(opcode);
-        let msg = format!("Incorrect opcode: {:#04x}", opcode);
-        let instr = instruction.expect(&msg);
+        let instr = instruction.unwrap();
         let data = match instr {
             Instruction::ADDimm()
             | Instruction::ADCimm()
@@ -1115,12 +1120,10 @@ impl fmt::Display for RunInstr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.data {
             OperandData::op8(u8) => {
-                let d = format!("{:#04x}", u8);
-                write!(f, "{}   {}", self.instr, dat(d))
+                write!(f, "{}   {:#04x}", self.instr, u8)
             }
             OperandData::op16(u16) => {
-                let d = format!("{:#06x}", u16);
-                write!(f, "{}   {}", self.instr, dat(d))
+                write!(f, "{}   {:#06x}", self.instr, u16)
             }
             _ => write!(f, "{}", self.instr),
         }

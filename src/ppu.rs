@@ -1,5 +1,10 @@
 use crate::constants;
 
+use std::collections::HashMap;
+
+/// Key for sprite tile row cache
+type SpriteTileKey = (u8, u8, bool, bool);
+
 /// # PPU
 /// The PPU is the picture processing unit of our machine.
 ///
@@ -107,7 +112,7 @@ pub struct PPU {
 
     /// The palette.
     palette: [u8; 4 * 3],
-    /// Screen buffer in RGBA8888.
+    /// Full screen buffer in RGBA format.
     pub fb: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
     /// Color ID buffer for priorities.
     pub priorities: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH],
@@ -413,46 +418,6 @@ impl PPU {
         pixels
     }
 
-    /// Fetches and combines the tow bytes of pixel data (low/high) of a row within a sprite tile.
-    fn get_sprite_tile_pixels(
-        &self,
-        tile_id: u8,
-        line: u8,
-        attributes: u8,
-        sprite_height: u8,
-    ) -> [u8; 8] {
-        let tile_addr = if sprite_height == 16 {
-            // For 8x16 sprites, ignore lowest bit of tile_id.
-            0x8000 + ((tile_id & 0xFE) as usize * 16) as u16
-        } else {
-            0x8000 + (tile_id as usize * 16) as u16
-        };
-
-        // Vertical flip.
-        let line = if attributes & 0x40 != 0 {
-            if sprite_height == 16 {
-                15 - line
-            } else {
-                7 - line
-            }
-        } else {
-            line
-        };
-
-        let low_byte = self.read(tile_addr + line as u16 * 2);
-        let high_byte = self.read(tile_addr + line as u16 * 2 + 1);
-        let mut pixels = [0u8; 8];
-
-        // Horizontal flip.
-        for i in 0..8 {
-            let color_id = ((high_byte >> (7 - i)) & 0x1) << 1 | ((low_byte >> (7 - i)) & 0x1);
-            let pixel_index = if attributes & 0x20 != 0 { 7 - i } else { i };
-            pixels[pixel_index] = color_id;
-        }
-
-        pixels
-    }
-
     /// Renders the background and window for the current scanline.
     fn render_bgwin_scanline(&mut self) {
         // Determine if we’re using unsigned or signed tile IDs
@@ -558,6 +523,42 @@ impl PPU {
         sprites
     }
 
+    /// Fetches and combines the tow bytes of pixel data (low/high) of a row within a sprite tile.
+    fn get_sprite_tile_pixels(
+        &self,
+        tile_id: u8,
+        line: u8,
+        attributes: u8,
+        cache: &mut HashMap<SpriteTileKey, [u8; 8]>,
+    ) -> [u8; 8] {
+        let vflip = attributes & 0x40 != 0;
+        let hflip = attributes & 0x20 != 0;
+
+        let effective_line = if vflip { 7 - line } else { line };
+        let key = (tile_id, effective_line, hflip, vflip);
+
+        if let Some(cached) = cache.get(&key) {
+            return *cached;
+        }
+
+        let tile_addr = 0x8000 + (tile_id as u16) * 16;
+        let low_byte = self.read(tile_addr + (effective_line as u16) * 2);
+        let high_byte = self.read(tile_addr + (effective_line as u16) * 2 + 1);
+
+        let mut pixels = [0u8; 8];
+        // Horizontal flip.
+        for i in 0..8 {
+            let color_id = ((high_byte >> (7 - i)) & 0x1) << 1 | ((low_byte >> (7 - i)) & 0x1);
+            let pixel_index = if attributes & 0x20 != 0 { 7 - i } else { i };
+            pixels[pixel_index] = color_id;
+        }
+
+        // Insert into cache
+        cache.insert(key, pixels);
+
+        pixels
+    }
+
     /// Renders a single scanline of sprites.
     fn render_sprites(&mut self) {
         if !self.lcdc1 {
@@ -566,41 +567,58 @@ impl PPU {
         let sprite_size = self.lcdc2;
         let sprites = self.get_sprites_on_scanline(sprite_size);
 
+        // Cache for decoded sprite rows
+        // Key: (tile_id, line, hflip, vflip)
+        // Value: [u8; 8] for the 8 pixels
+        let mut tile_row_cache = HashMap::new();
+
         for sprite in sprites.iter().rev() {
-            let tile_line = (self.ly + 16 - sprite.y) % sprite_size;
-            let pixels = self.get_sprite_tile_pixels(
-                sprite.tile_id,
-                tile_line,
-                sprite.attributes,
-                sprite_size,
-            );
+            self.render_sprite(sprite, &mut tile_row_cache);
+        }
+    }
 
-            for i in 0..8 {
-                let x_pos = sprite.x.wrapping_sub(8) as usize + i;
-                if x_pos >= constants::DISPLAY_WIDTH {
-                    continue; // Ignore pixels outside screen bounds
-                }
+    fn render_sprite(&mut self, sprite: &Sprite, cache: &mut HashMap<SpriteTileKey, [u8; 8]>) {
+        let sprite_size = self.lcdc2;
+        let tile_line = (self.ly + 16 - sprite.y) % sprite_size;
+        // Handle 8×16 mode tile addressing
+        let tile_id = if sprite_size == 16 {
+            let base_tile = sprite.tile_id & 0xFE;
+            if tile_line < 8 {
+                base_tile
+            } else {
+                base_tile.wrapping_add(1)
+            }
+        } else {
+            sprite.tile_id
+        };
+        let sub_tile_line = tile_line % 8;
+        let pixels = self.get_sprite_tile_pixels(tile_id, sub_tile_line, sprite.attributes, cache);
 
-                let color_idx = pixels[i];
-                if color_idx == 0 {
-                    continue; // Skip transparent pixels
-                }
+        for i in 0..8 {
+            let x_pos = sprite.x.wrapping_sub(8) as usize + i;
+            if x_pos >= constants::DISPLAY_WIDTH {
+                continue; // Ignore pixels outside screen bounds
+            }
 
-                let palette = if sprite.attributes & 0x10 != 0 {
-                    self.obp1
-                } else {
-                    self.obp0
-                };
-                let color = (palette >> (color_idx * 2)) & 0x03;
+            let color_idx = pixels[i];
+            if color_idx == 0 {
+                continue; // Skip transparent pixels
+            }
 
-                // Priority handling: if bg/sprite priority bit is 0, sprite has priority over background
-                let has_priority = sprite.attributes & 0x80 == 0;
-                if has_priority
-                    || self.priorities[self.ly as usize * constants::DISPLAY_WIDTH + x_pos] == 0
-                {
-                    // Store the pixel color in the frame buffer
-                    self.color(x_pos, self.ly, color);
-                }
+            let palette = if sprite.attributes & 0x10 != 0 {
+                self.obp1
+            } else {
+                self.obp0
+            };
+            let color = (palette >> (color_idx * 2)) & 0x03;
+
+            // Priority handling: if bg/sprite priority bit is 0, sprite has priority over background
+            let has_priority = sprite.attributes & 0x80 == 0;
+            if has_priority
+                || self.priorities[self.ly as usize * constants::DISPLAY_WIDTH + x_pos] == 0
+            {
+                // Store the pixel color in the frame buffer
+                self.color(x_pos, self.ly, color);
             }
         }
     }
@@ -608,16 +626,14 @@ impl PPU {
     /// Sets the pixel at the given position to the given color id.
     fn color(&mut self, x: usize, y: u8, color_id: u8) {
         let pos = y as usize * constants::DISPLAY_WIDTH + x;
-        // Priority frame buffer.
         self.priorities[pos] = color_id;
-
-        let cid = color_id as usize * 3;
+        let base = color_id as usize * 3;
         // R.
-        self.fb[pos * 4 + 0] = self.palette[cid];
+        self.fb[pos * 4 + 0] = self.palette[base];
         // G.
-        self.fb[pos * 4 + 1] = self.palette[cid + 1];
+        self.fb[pos * 4 + 1] = self.palette[base + 1];
         // B.
-        self.fb[pos * 4 + 2] = self.palette[cid + 2];
+        self.fb[pos * 4 + 2] = self.palette[base + 2];
         // A.
         self.fb[pos * 4 + 3] = 0xff;
     }

@@ -81,8 +81,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.display.clear();
         self.display.present();
 
-        let mut start = Instant::now();
-        let mut cycles = 0;
+        const SPIN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(2);
 
         'mainloop: while self.running {
             let frame_start_time = std::time::Instant::now();
@@ -93,25 +92,21 @@ impl<'a, 'b> Machine<'a, 'b> {
                 let (t, m) = self.machine_cycle();
                 self.m_cycles += m;
                 self.t_cycles += t;
-                cycles += 1;
                 cycles_this_frame += t as usize;
 
                 // Render if we have pixels.
                 self.display.render(&self.memory);
             }
 
-            // Print cycles per second every 1 second, outside inner loop
-            let el = start.elapsed().as_secs_f64();
-            if el >= 1.0 {
-                println!("Cycles per second: {}", cycles);
-                cycles = 0;
-                start = Instant::now();
-            }
-
             // Now, sleep for the remaining time in the frame
             let elapsed = frame_start_time.elapsed();
             if elapsed < constants::TARGET_FRAME_DURATION {
-                // thread::sleep(constants::TARGET_FRAME_DURATION - elapsed);
+                let remaining = constants::TARGET_FRAME_DURATION - elapsed;
+                if remaining > SPIN_THRESHOLD {
+                    thread::sleep(remaining - SPIN_THRESHOLD);
+                }
+                // Busy spin for remaining small amount
+                while frame_start_time.elapsed() < constants::TARGET_FRAME_DURATION {}
             }
         }
     }
