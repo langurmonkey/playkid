@@ -14,7 +14,6 @@ use memory::Memory;
 use registers::Registers;
 use sdl2::Sdl;
 use std::thread;
-use std::time::Instant;
 
 /// This is our machine, which contains the registers and the memory, and
 /// executes the operations.
@@ -80,6 +79,11 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.running = true;
         self.display.clear();
         self.display.present();
+
+        for i in 0..16 {
+            let addr = 0x0050 + i;
+            println!("{:#06X}: {:#04X}", addr, self.memory.read8(addr));
+        }
 
         const SPIN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(2);
 
@@ -158,45 +162,21 @@ impl<'a, 'b> Machine<'a, 'b> {
             // | 7  6  5 |    4   |    3   |   2   |   1  |    0   |
             // |    1    | Joypad | Serial | Timer |  LCD | VBlank |
             //
-
-            match mask {
-                // VBlank.
-                0x01 => {
-                    self.memory.iff &= 0b1111_1110;
+            for i in 0..5 {
+                let bit = 1 << i;
+                if mask & bit != 0 {
+                    self.memory.iff &= !bit;
                     let pc = self.registers.pc;
                     self.push_stack(pc);
-                    self.registers.pc = 0x0040;
-                }
-                // STAT (LCD).
-                0x02 => {
-                    self.memory.iff &= 0b1111_1101;
-                    let pc = self.registers.pc;
-                    self.push_stack(pc);
-                    self.registers.pc = 0x0048;
-                }
-                // Timer.
-                0x04 => {
-                    self.memory.iff &= 0b1111_1011;
-                    let pc = self.registers.pc;
-                    self.push_stack(pc);
-                    self.registers.pc = 0x0050;
-                }
-                // Serial.
-                0x08 => {
-                    self.memory.iff &= 0b1111_0111;
-                    let pc = self.registers.pc;
-                    self.push_stack(pc);
-                    self.registers.pc = 0x0058;
-                }
-                // Joypad.
-                0x10 => {
-                    self.memory.iff &= 0b1110_1111;
-                    let pc = self.registers.pc;
-                    self.push_stack(pc);
-                    self.registers.pc = 0x0060;
-                }
-                _ => {
-                    panic!("Invalid interrupt: {:#b}", mask);
+                    self.registers.pc = match bit {
+                        0x01 => 0x0040,
+                        0x02 => 0x0048,
+                        0x04 => 0x0050,
+                        0x08 => 0x0058,
+                        0x10 => 0x0060,
+                        _ => panic!("Unknown interrupt bit {}", bit),
+                    };
+                    break;
                 }
             }
 
@@ -242,6 +222,10 @@ impl<'a, 'b> Machine<'a, 'b> {
         // Fetch next instruction, and parse it.
         let pc = self.registers.pc;
         let opcode = self.read8();
+
+        if pc == 0x0050 {
+            println!(">>> Timer ISR entered");
+        }
 
         let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
         if self.debug.cycle(

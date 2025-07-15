@@ -291,7 +291,7 @@ impl<'a, 'b> Memory<'a, 'b> {
         match address {
             0x0000..=0x7FFF => {
                 // Cartridge (ROM + switchable banks).
-                println!("Attempted to write to cartridge ROM: ${:04x}", address);
+                // println!("Attempted to write to cartridge ROM: ${:04x}", address);
             }
             0x8000..=0x9FFF => {
                 // VRAM.
@@ -299,7 +299,7 @@ impl<'a, 'b> Memory<'a, 'b> {
             }
             0xA000..=0xBFFF => {
                 // 8kB switchable RAM bank (cartridge).
-                println!("Write to cartridge RAM: ${:04x}", address);
+                // println!("Write to cartridge RAM: ${:04x}", address);
             }
             0xC000..=0xDFFF => {
                 // 8kB WRAM.
@@ -315,7 +315,7 @@ impl<'a, 'b> Memory<'a, 'b> {
             }
             0xFEA0..=0xFEFF => {
                 // Empty, unusable.
-                println!("Forbidden write ($FEA0-$FEFE): ${:04x}", address)
+                // println!("Forbidden write ($FEA0-$FEFE): ${:04x}", address)
             }
             // Joypad.
             0xFF00 => self.joypad.write(address, value),

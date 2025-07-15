@@ -12,16 +12,11 @@ pub struct Timer {
     tma: u8,
     /// Enabled.
     enabled: bool,
-    /// Step.
-    step: u32,
+    /// Timer bit.
+    timer_bit: u8,
     /// Timer interrupt mask for registers IE and IF.
     pub i_mask: u8,
 }
-
-const T4: u32 = 4 * 4;
-const T16: u32 = 16 * 4;
-const T64: u32 = 64 * 4;
-const T256: u32 = 256 * 4;
 
 impl Timer {
     pub fn new() -> Timer {
@@ -31,7 +26,7 @@ impl Timer {
             tima: 0,
             tma: 0,
             enabled: false,
-            step: 1024,
+            timer_bit: 9, // 4096 Hz -> bits 1-0 = 0b00
             i_mask: 0,
         }
     }
@@ -43,7 +38,7 @@ impl Timer {
         self.tima = 0;
         self.tma = 0;
         self.enabled = false;
-        self.step = 1024;
+        self.timer_bit = 9;
         self.i_mask = 0;
     }
 
@@ -54,14 +49,14 @@ impl Timer {
             0xFF05 => self.tima,
             0xFF06 => self.tma,
             0xFF07 => {
-                0xF8 | (if self.enabled { 0x4 } else { 0 })
-                    | (match self.step {
-                        T4 => 1,
-                        T16 => 2,
-                        T64 => 3,
-                        T256 => 0,
-                        _ => 0,
-                    })
+                let freq_bits = match self.timer_bit {
+                    9 => 0b00, // 4096 Hz
+                    3 => 0b01, // 262144 Hz
+                    5 => 0b10, // 65536 Hz
+                    7 => 0b11, // 16384 Hz
+                    _ => 0b00, // default/fallback
+                };
+                0xF8 | (if self.enabled { 0x4 } else { 0 }) | freq_bits
             }
             _ => panic!("Timer does not know address: {:#04X}", address),
         }
@@ -71,6 +66,7 @@ impl Timer {
         match address {
             0xFF04 => {
                 self.div_counter = 0;
+                self.last_div_bit = ((self.div_counter >> self.timer_bit) & 1) != 0;
             }
             0xFF05 => {
                 self.tima = value;
@@ -79,14 +75,32 @@ impl Timer {
                 self.tma = value;
             }
             0xFF07 => {
+                let old_bit = (self.div_counter >> self.timer_bit) & 1 != 0;
+
                 self.enabled = value & 0x4 != 0;
-                self.step = match value & 0x3 {
-                    1 => T4,
-                    2 => T16,
-                    3 => T64,
-                    0 => T256,
-                    _ => T256,
+                self.timer_bit = match value & 0x3 {
+                    0b00 => 9, // 4096 Hz
+                    0b01 => 3, // 262144 Hz
+                    0b10 => 5, // 65536 Hz
+                    0b11 => 7, // 16384 Hz
+                    _ => 9,
                 };
+                let new_bit = (self.div_counter >> self.timer_bit) & 1 != 0;
+                // Check for a falling edge across the change
+                if self.enabled && old_bit && !new_bit {
+                    self.tima = self.tima.wrapping_add(1);
+                    if self.tima == 0 {
+                        self.tima = self.tma;
+                        println!("TIMA overflow -> requesting interrupt (on TAC write)");
+                        self.i_mask |= 0b0000_0100;
+                    }
+                }
+
+                self.last_div_bit = new_bit;
+                println!(
+                    "TAC write: enabled={}, bit={}",
+                    self.enabled, self.timer_bit
+                );
             }
             _ => panic!("Timer does not know address: {:#04X}", address),
         };
@@ -97,27 +111,25 @@ impl Timer {
         // DIV increments every M-cycle (4 T-cycles)
         for _ in 0..(t_cycles / 4) {
             self.div_counter = self.div_counter.wrapping_add(1);
+            let new_bit = (self.div_counter >> self.timer_bit) & 1 != 0;
 
             // Update TIMA on falling edge of selected bit
             if self.enabled {
-                let bit = match self.step {
-                    T256 => 9, // 4096 Hz
-                    T4 => 3,   // 262144 Hz
-                    T16 => 5,  // 65536 Hz
-                    T64 => 7,  // 16384 Hz
-                    _ => 9,
-                };
-                let new_bit = (self.div_counter >> bit) & 1 != 0;
                 if self.last_div_bit && !new_bit {
-                    // falling edge
-                    self.tima = self.tima.wrapping_add(1);
-                    if self.tima == 0 {
-                        self.tima = self.tma;
-                        self.i_mask |= 0b0000_0100;
-                    }
+                    self.increment_tima();
                 }
-                self.last_div_bit = new_bit;
             }
+            self.last_div_bit = new_bit;
+        }
+    }
+
+    fn increment_tima(&mut self) {
+        // Falling edge
+        self.tima = self.tima.wrapping_add(1);
+        if self.tima == 0 {
+            self.tima = self.tma;
+            println!("TIMA overflow -> requesting interrupt");
+            self.i_mask |= 0b0000_0100;
         }
     }
 
