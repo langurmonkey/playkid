@@ -363,7 +363,7 @@ impl<'a, 'b> Memory<'a, 'b> {
         self.iff |= self.joypad.i_mask;
         self.joypad.i_mask = 0;
 
-        // Time.
+        // Timer.
         self.timer.cycle(t_cycles);
         self.iff |= self.timer.i_mask;
         self.timer.i_mask = 0;

@@ -80,11 +80,6 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.display.clear();
         self.display.present();
 
-        for i in 0..16 {
-            let addr = 0x0050 + i;
-            println!("{:#06X}: {:#04X}", addr, self.memory.read8(addr));
-        }
-
         const SPIN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(2);
 
         'mainloop: while self.running {
@@ -142,18 +137,13 @@ impl<'a, 'b> Machine<'a, 'b> {
     /// In this case, the corresponding interrupt handler is called by pushing the PC
     /// to the stack, and then setting it to the address of the interrupt handler.
     fn interrupt_handling(&mut self) -> u32 {
-        if !self.ime && self.running {
-            // Do nothing.
+        let pending = self.memory.ie & self.memory.iff;
+        // Wake from HALT if any interrupt is pending.
+        if pending == 0 {
             return 0;
         }
 
-        let mask = self.memory.ie & self.memory.iff;
-        if mask == 0 {
-            return 0;
-        }
-
-        self.running = true;
-        if self.ime {
+        if self.ime && pending != 0 {
             // Reset IME.
             self.ime = false;
 
@@ -164,7 +154,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             //
             for i in 0..5 {
                 let bit = 1 << i;
-                if mask & bit != 0 {
+                if pending & bit != 0 {
                     self.memory.iff &= !bit;
                     let pc = self.registers.pc;
                     self.push_stack(pc);
@@ -180,26 +170,21 @@ impl<'a, 'b> Machine<'a, 'b> {
                 }
             }
 
-            5
+            5 // 5 M-cycles = 20 T-cycles
         } else {
             // IME is not enabled.
             0
         }
     }
 
-    /// Runs
+    /// Run a machine cycle.
     fn machine_cycle(&mut self) -> (u32, u32) {
         // Update IME.
         self.ime_update();
 
-        // Handle interrupts if necessary.
-        let interrupt_m_cycles = self.interrupt_handling();
-        if interrupt_m_cycles > 0 {
-            return (interrupt_m_cycles * 4, interrupt_m_cycles);
-        }
-
+        // CPU instruction.
         // One machine cycle (M-cycle) is 4 clock cycles.
-        let m_cycles = if self.running {
+        let mut m_cycles = if self.running {
             // Run next CPU instruction.
             self.cycle() as u32
         } else {
@@ -207,13 +192,24 @@ impl<'a, 'b> Machine<'a, 'b> {
             1
         };
 
+        // Memory cycle.
+        let mut t_cycles = m_cycles * 4;
         if m_cycles > 0 {
             // Memory cycle.
-            let t_cycles = m_cycles * 4;
             self.memory.cycle(t_cycles);
-            (t_cycles, m_cycles)
         } else {
-            (0, 0)
+            t_cycles = 0;
+            m_cycles = 0;
+        }
+
+        // Handle interrupts if necessary.
+        let interrupt_m_cycles = self.interrupt_handling();
+
+        // Return.
+        if interrupt_m_cycles > 0 {
+            (interrupt_m_cycles * 4, interrupt_m_cycles)
+        } else {
+            (t_cycles, m_cycles)
         }
     }
 
@@ -222,10 +218,6 @@ impl<'a, 'b> Machine<'a, 'b> {
         // Fetch next instruction, and parse it.
         let pc = self.registers.pc;
         let opcode = self.read8();
-
-        if pc == 0x0050 {
-            println!(">>> Timer ISR entered");
-        }
 
         let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
         if self.debug.cycle(

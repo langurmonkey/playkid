@@ -77,10 +77,6 @@ pub struct PPU {
     stat4: bool,
     /// STAT3: Mode0 int select.
     stat3: bool,
-    /// STAT2: LYC == LY flag.
-    stat2: bool,
-    /// STAT10: PPU mode.
-    stat01: u8,
 
     /// SCY: Scroll Y position. Top coordinate of the visible 160x144 area within the BG map.
     scy: u8,
@@ -109,6 +105,8 @@ pub struct PPU {
     pub hblank: bool,
     /// Flag that goes up when the screen is updated.
     pub data_available: bool,
+    /// Did LY==LYC previously?
+    last_ly_eq_lyc: bool,
 
     /// The palette.
     palette: [u8; 4 * 3],
@@ -147,8 +145,6 @@ impl PPU {
             stat5: false,
             stat4: false,
             stat3: false,
-            stat2: false,
-            stat01: 0,
             scy: 0,
             scx: 0,
             wy: 0,
@@ -161,6 +157,7 @@ impl PPU {
             i_mask: 0,
             hblank: false,
             data_available: false,
+            last_ly_eq_lyc: false,
 
             palette,
             fb: [0xff; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
@@ -193,6 +190,7 @@ impl PPU {
         self.i_mask = 0;
         self.hblank = false;
         self.data_available = false;
+        self.last_ly_eq_lyc = false;
     }
 
     /// Read a byte from a PPU.
@@ -267,7 +265,7 @@ impl PPU {
                 self.update_lcdc_flags();
             }
             0xFF41 => {
-                self.stat = value;
+                self.stat = (self.stat & 0x07) | (value & 0x78);
                 self.update_stat_flags();
             }
             // SCY.
@@ -277,7 +275,10 @@ impl PPU {
             // LY (read-only).
             0xFF44 => {}
             // LCY.
-            0xFF45 => self.lyc = value,
+            0xFF45 => {
+                self.lyc = value;
+                self.check_interrupt_lyc();
+            }
             // DMA.
             0xFF46 => {
                 // Writing to this register starts a DMA transfer from ROM/RAM to OAM.
@@ -342,10 +343,23 @@ impl PPU {
         }
     }
 
+    fn update_stat_ly_lyc(&mut self) {
+        // Update mode bits in STAT (bits 0–1).
+        self.stat = (self.stat & 0b1111_1100) | (self.mode & 0b0000_0011);
+
+        // Update bit 2 (LYC == LY flag).
+        if self.ly == self.lyc {
+            self.stat |= 0x04;
+        } else {
+            self.stat &= !0x04;
+        }
+    }
+
     /// Updates the PPU mode and triggers the necessary actions.
     /// Rendering happens when entering mode 0 (H-Blank).
     fn update_mode(&mut self, mode: u8) {
         self.mode = mode;
+        self.update_stat_ly_lyc();
 
         if match self.mode {
             // H-blank.
@@ -373,7 +387,7 @@ impl PPU {
             // Draw.
             3 => {
                 if self.lcdc5 && !self.wly_flag && self.ly == self.wy {
-                    self.wly = -1;
+                    self.wly = 0;
                     self.wly_flag = true;
                 }
                 // No data.
@@ -418,80 +432,69 @@ impl PPU {
         pixels
     }
 
-    /// Renders the background and window for the current scanline.
+    /// Renders the background and window for the current scan line.
     fn render_bgwin_scanline(&mut self) {
-        // Determine if we’re using unsigned or signed tile IDs
         let use_unsigned = (self.lcdc & 0x10) != 0;
+        let win_enabled = self.lcdc5;
+        let win_started = win_enabled && self.ly >= self.wy;
+        // WX gating is only for deciding whether to render the window pixels this scan line.
+        let win_this_line = win_started && self.wx <= 166;
 
-        // Is the background enabled?
-        let bg_enabled = self.lcdc0;
-
-        // Is the window enabled?
-        let wx_flag = self.wx <= 166;
-        let win_enabled = if self.lcdc5 && self.wly_flag && wx_flag {
-            self.wly += 1;
-            true
-        } else {
-            false
-        };
-
-        // We proceed only if we have the window or the background enabled.
-        if !win_enabled && !bg_enabled {
+        // Skip rendering entirely if both bg and window are off.
+        if !self.lcdc0 && !win_this_line {
             return;
         }
 
-        let mut tile_row_cache = [[0u8; 8]; 32]; // Per scanline
+        let mut tile_row_cache = [[0u8; 8]; 32];
 
-        // Every pixel in the scanline.
         for x in 0..constants::DISPLAY_WIDTH {
-            let win_y = self.wly;
-            let win_x = -((self.wx as i32) - 7) + (x as i32);
-
-            // compute tile map address, plus the pixel and the tile coordinates.
-            let (tile_map, px_x, px_y, tile_x, tile_y) = if win_y >= 0 && win_x >= 0 {
-                let win_tile_x = win_x as u16 / 8;
-                let win_tile_y = (win_y as u16 >> 3) & 31;
-                (
-                    self.lcdc6,
-                    win_x as u8 & 0x07,
-                    win_y as u16 & 0x07,
-                    win_tile_x,
-                    win_tile_y,
-                )
-            } else if bg_enabled {
-                let bg_x = self.scx as u32 + x as u32;
-                let bg_y = self.scy.wrapping_add(self.ly);
-                let bg_tile_x = (bg_x as u16 / 8) & 0x1f;
-                let bg_tile_y = (bg_y as u16 / 8) & 0x1f;
-                (
-                    self.lcdc3,
-                    bg_x as u8 & 0x07,
-                    bg_y as u16 & 0x07,
-                    bg_tile_x,
-                    bg_tile_y,
-                )
-            } else {
-                // Next pixel.
-                continue;
-            };
+            let (tile_map, px_x, px_y, tile_x, tile_y) =
+                if win_this_line && x as u8 >= self.wx.wrapping_sub(7) {
+                    // Window pixel.
+                    let win_x = x.wrapping_sub(self.wx.wrapping_sub(7) as usize);
+                    let win_tile_x = win_x as u16 / 8;
+                    let win_tile_y = (self.wly as u16 >> 3) & 31;
+                    (
+                        self.lcdc6,
+                        (win_x & 0x07) as u8,
+                        self.wly as u16 & 0x07,
+                        win_tile_x,
+                        win_tile_y,
+                    )
+                } else if self.lcdc0 {
+                    // Background pixel.
+                    let bg_x = self.scx as u32 + x as u32;
+                    let bg_y = self.scy.wrapping_add(self.ly);
+                    let bg_tile_x = (bg_x as u16 / 8) & 0x1f;
+                    let bg_tile_y = (bg_y as u16 / 8) & 0x1f;
+                    (
+                        self.lcdc3,
+                        bg_x as u8 & 0x07,
+                        bg_y as u16 & 0x07,
+                        bg_tile_x,
+                        bg_tile_y,
+                    )
+                } else {
+                    continue;
+                };
 
             let tile_index = tile_y * 32 + tile_x;
-            // Only get tile row data if not already cached
+
             if tile_row_cache[tile_x as usize] == [0; 8] {
                 let tile_id = self.read(tile_map + tile_index);
                 tile_row_cache[tile_x as usize] =
                     self.get_bgwin_tile_data(tile_id, px_y, use_unsigned);
             }
 
-            // Read tile ID and then data bytes.
             let tile_pixels = tile_row_cache[tile_x as usize];
-
-            // Get the background pixel and apply palette color.
             let color_idx = tile_pixels[px_x as usize];
             let color = (self.bgp >> (color_idx * 2)) & 0x03;
 
-            // Store the pixel color in the framebuffer.
             self.color(x, self.ly, color);
+        }
+        // Always increment WLY once the window has *started*, regardless of WX.
+        if win_started {
+            self.wly += 1;
         }
     }
 
@@ -529,12 +532,39 @@ impl PPU {
         tile_id: u8,
         line: u8,
         attributes: u8,
+        sprite_size_8x16: bool,
         cache: &mut HashMap<SpriteTileKey, [u8; 8]>,
     ) -> [u8; 8] {
         let vflip = attributes & 0x40 != 0;
         let hflip = attributes & 0x20 != 0;
 
-        let effective_line = if vflip { 7 - line } else { line };
+        // For 8x16 sprites, line can be 0..15.
+        let (tile_id, effective_line) = if sprite_size_8x16 {
+            // Determine top or bottom tile based on line.
+            // Note: tile_id's LSB is ignored for 8x16 sprites, so tile_id & 0xFE is top tile.
+            let top_tile = tile_id & 0xFE;
+            let (tile, line_in_tile) = if vflip {
+                // Flip vertical line within the 16 lines.
+                let flipped_line = 15 - line;
+                if flipped_line < 8 {
+                    (top_tile, flipped_line) // Bottom tile flipped -> top tile index + 1.
+                } else {
+                    (top_tile | 1, flipped_line - 8)
+                }
+            } else {
+                if line < 8 {
+                    (top_tile, line)
+                } else {
+                    (top_tile | 1, line - 8)
+                }
+            };
+            (tile, line_in_tile)
+        } else {
+            // 8x8 sprites
+            let effective_line = if vflip { 7 - line } else { line };
+            (tile_id, effective_line)
+        };
+
         let key = (tile_id, effective_line, hflip, vflip);
 
         if let Some(cached) = cache.get(&key) {
@@ -559,7 +589,7 @@ impl PPU {
         pixels
     }
 
-    /// Renders a single scanline of sprites.
+    /// Renders a single scan line of sprites.
     fn render_sprites(&mut self) {
         if !self.lcdc1 {
             return;
@@ -580,19 +610,13 @@ impl PPU {
     fn render_sprite(&mut self, sprite: &Sprite, cache: &mut HashMap<SpriteTileKey, [u8; 8]>) {
         let sprite_size = self.lcdc2;
         let tile_line = (self.ly + 16 - sprite.y) % sprite_size;
-        // Handle 8×16 mode tile addressing
-        let tile_id = if sprite_size == 16 {
-            let base_tile = sprite.tile_id & 0xFE;
-            if tile_line < 8 {
-                base_tile
-            } else {
-                base_tile.wrapping_add(1)
-            }
-        } else {
-            sprite.tile_id
-        };
-        let sub_tile_line = tile_line % 8;
-        let pixels = self.get_sprite_tile_pixels(tile_id, sub_tile_line, sprite.attributes, cache);
+        let pixels = self.get_sprite_tile_pixels(
+            sprite.tile_id,
+            tile_line,
+            sprite.attributes,
+            sprite_size == 16,
+            cache,
+        );
 
         for i in 0..8 {
             let x_pos = sprite.x.wrapping_sub(8) as usize + i;
@@ -647,11 +671,29 @@ impl PPU {
         }
     }
 
-    /// Update STAT bit 2 (LYC==LY).
-    fn check_interrupt_lyc(&mut self) {
+    fn check_interrupt_lyc_old(&mut self) {
         if self.stat6 && self.ly == self.lyc {
             self.i_mask |= 0b0000_0010;
         }
+    }
+    /// Update STAT bit 2 (LYC==LY).
+    fn check_interrupt_lyc(&mut self) {
+        self.update_stat_ly_lyc();
+        let coincidence = self.ly == self.lyc;
+
+        // Update bit 2 of STAT
+        if coincidence {
+            self.stat |= 0x04; // Set coincidence flag
+        } else {
+            self.stat &= !0x04;
+        }
+
+        // Trigger interrupt only on rising edge
+        if self.stat6 && coincidence && !self.last_ly_eq_lyc {
+            self.i_mask |= 0x02; // STAT interrupt
+        }
+
+        self.last_ly_eq_lyc = coincidence;
     }
 
     /// This method updates the LCDC flags from the current value
@@ -702,10 +744,6 @@ impl PPU {
         self.stat4 = self.stat & 0b0001_0000 != 0;
         // Mode 0 int select (rw).
         self.stat3 = self.stat & 0b0000_1000 != 0;
-        // LYC == LY flag (read only).
-        //self.stat2 = self.stat & 0b0000_0100 == 0;
-        // PPU Mode (read only).
-        //self.stat01 = self.stat & 0b0000_0011;
     }
 
     /// Are the LCD and the PPU enabled?

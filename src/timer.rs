@@ -77,30 +77,25 @@ impl Timer {
             0xFF07 => {
                 let old_bit = (self.div_counter >> self.timer_bit) & 1 != 0;
 
-                self.enabled = value & 0x4 != 0;
-                self.timer_bit = match value & 0x3 {
+                // Update TAC values.
+                let new_enabled = value & 0x4 != 0;
+                let new_timer_bit = match value & 0x3 {
                     0b00 => 9, // 4096 Hz
                     0b01 => 3, // 262144 Hz
                     0b10 => 5, // 65536 Hz
                     0b11 => 7, // 16384 Hz
                     _ => 9,
                 };
-                let new_bit = (self.div_counter >> self.timer_bit) & 1 != 0;
-                // Check for a falling edge across the change
-                if self.enabled && old_bit && !new_bit {
-                    self.tima = self.tima.wrapping_add(1);
-                    if self.tima == 0 {
-                        self.tima = self.tma;
-                        println!("TIMA overflow -> requesting interrupt (on TAC write)");
-                        self.i_mask |= 0b0000_0100;
-                    }
+                let new_bit = (self.div_counter >> new_timer_bit) & 1 != 0;
+                // Check for a falling edge across the change - even if timer is disabled.
+                if old_bit && !new_bit {
+                    self.increment_tima();
                 }
 
+                // Apply new config.
+                self.enabled = new_enabled;
+                self.timer_bit = new_timer_bit;
                 self.last_div_bit = new_bit;
-                println!(
-                    "TAC write: enabled={}, bit={}",
-                    self.enabled, self.timer_bit
-                );
             }
             _ => panic!("Timer does not know address: {:#04X}", address),
         };
@@ -128,8 +123,7 @@ impl Timer {
         self.tima = self.tima.wrapping_add(1);
         if self.tima == 0 {
             self.tima = self.tma;
-            println!("TIMA overflow -> requesting interrupt");
-            self.i_mask |= 0b0000_0100;
+            self.i_mask |= 0x04;
         }
     }
 
