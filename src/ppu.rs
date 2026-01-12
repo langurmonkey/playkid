@@ -89,7 +89,7 @@ pub struct PPU {
     wx: u8,
     /// Window line counter.
     wly: i16,
-    /// WLY flag.
+    /// WLY flag; internal window latch.
     wly_flag: bool,
     /// BGP: Background palette register.
     bgp: u8,
@@ -149,7 +149,7 @@ impl PPU {
             scx: 0,
             wy: 0,
             wx: 7,
-            wly: -1,
+            wly: 0,
             wly_flag: false,
             bgp: 0,
             obp0: 0,
@@ -182,7 +182,7 @@ impl PPU {
         self.scy = 0;
         self.wx = 0;
         self.wy = 0;
-        self.wly = -1;
+        self.wly = 0;
         self.wly_flag = false;
         self.bgp = 0;
         self.obp0 = 0;
@@ -373,6 +373,7 @@ impl PPU {
 
             // V-blank.
             1 => {
+                self.wly = 0;
                 self.wly_flag = false;
                 self.i_mask |= 0x01;
                 self.stat4
@@ -386,8 +387,8 @@ impl PPU {
 
             // Draw.
             3 => {
-                if self.lcdc5 && !self.wly_flag && self.ly == self.wy {
-                    self.wly = 0;
+                // Check if window should start on this line
+                if self.lcdc5 && self.ly == self.wy {
                     self.wly_flag = true;
                 }
                 // No data.
@@ -441,34 +442,28 @@ impl PPU {
         let win_enabled = self.lcdc5;
 
         // Is the window enabled and should it be drawn on this line?
-        let win_started = win_enabled && self.ly >= self.wy;
-        let mut win_used_this_line = false;
+        let win_y_condition = win_enabled && self.wly_flag;
 
         let mut bg_cache = [[0u8; 8]; 32];
         let mut win_cache = [[0u8; 8]; 32];
 
-        // Track the first window pixel on this line to handle WLY increment
-        if win_started && !self.wly_flag && self.ly == self.wy {
-            self.wly = 0;
-            self.wly_flag = true;
-        }
-
         for x in 0..constants::DISPLAY_WIDTH {
-            let use_window = win_started && (x as u16) >= (self.wx.saturating_sub(7) as u16);
+            // Window is active if WLY has been activated and WX is in range
+            let use_window = win_y_condition && (x as u16) >= (self.wx.saturating_sub(7) as u16);
 
             let (tile_map, px_x, px_y, tile_x, tile_y, cache) = if use_window {
                 // Window pixel.
-                win_used_this_line = true;
+
                 // Window's internal X coordinate: current screen X minus window start position
                 // Window starts at (WX - 7), so internal window X is: x - (WX - 7)
                 let win_x = x.wrapping_sub(self.wx.saturating_sub(7) as usize) as u16;
                 let win_tile_x = (win_x / 8) & 31;
-                let win_tile_y = (self.wly as u16 >> 3) & 31;
+                let win_tile_y = (self.wly as u16 / 8) & 31;
 
                 (
                     self.lcdc6,
-                    (win_x & 0x07) as u8,   // Pixel X in tile
-                    self.wly as u16 & 0x07, // Pixel Y in tile
+                    (win_x & 0x07) as u8,     // Pixel X in tile
+                    (self.wly as u16) & 0x07, // Pixel Y in tile
                     win_tile_x,
                     win_tile_y,
                     &mut win_cache,
@@ -506,12 +501,15 @@ impl PPU {
             let color_idx = tile_pixels[px_x as usize];
             let color = (self.bgp >> (color_idx * 2)) & 0x03;
 
+            // Store the raw ID for sprite priority checks
+            self.priorities[self.ly as usize * constants::DISPLAY_WIDTH + x] = color_idx;
             // Render the pixel
             self.color(x, self.ly, color);
         }
 
-        // Increment WLY once the window pixels for this line are rendered
-        if win_used_this_line {
+        // Increment WLY only if the window is enabled, triggered, AND visible on screen.
+        // WX >= 167 effectively hides the window and "freezes" the internal counter.
+        if win_y_condition && self.wx < (constants::DISPLAY_WIDTH + 7) as u8 {
             self.wly += 1;
         }
     }
@@ -648,63 +646,66 @@ impl PPU {
         );
 
         for i in 0..8 {
-            let x_pos = sprite.x.wrapping_sub(8) as usize + i;
-            if x_pos >= constants::DISPLAY_WIDTH {
+            let x_pos = (sprite.x as i16) - 8 + (i as i16);
+            if x_pos < 0 || x_pos >= constants::DISPLAY_WIDTH as i16 {
                 continue; // Ignore pixels outside screen bounds
             }
+            let x_pos = x_pos as usize;
 
             let color_idx = pixels[i];
             if color_idx == 0 {
                 continue; // Skip transparent pixels
             }
 
-            let palette = if sprite.attributes & 0x10 != 0 {
-                self.obp1
-            } else {
-                self.obp0
-            };
-            let color = (palette >> (color_idx * 2)) & 0x03;
+            // Fetch BG color ID from priorities cache.
+            let bg_color_id = self.priorities[self.ly as usize * constants::DISPLAY_WIDTH + x_pos];
 
-            // Priority handling: if bg/sprite priority bit is 0, sprite has priority over background
-            let has_priority = sprite.attributes & 0x80 == 0;
-            if has_priority
-                || self.priorities[self.ly as usize * constants::DISPLAY_WIDTH + x_pos] == 0
-            {
-                // Store the pixel color in the frame buffer
+            // Priority logic:
+            // Bit 7 == 0: Sprite always over BG (except when BG is transparent/ID 0? No, always over)
+            // Bit 7 == 1: Sprite only over BG Color ID 0
+            let sprite_has_priority = (sprite.attributes & 0x80 == 0) || (bg_color_id == 0);
+            if sprite_has_priority {
+                let palette = if sprite.attributes & 0x10 != 0 {
+                    self.obp1
+                } else {
+                    self.obp0
+                };
+                let color = (palette >> (color_idx * 2)) & 0x03;
+
+                // Call color() to update FB, but color() no longer touches self.priorities
                 self.color(x_pos, self.ly, color);
             }
         }
     }
 
     /// Sets the pixel at the given position to the given color id.
-    fn color(&mut self, x: usize, y: u8, color_id: u8) {
+    // In PPU struct, ensure priorities stores the raw Color ID (0-3)
+    fn color(&mut self, x: usize, y: u8, paletted_color: u8) {
         let pos = y as usize * constants::DISPLAY_WIDTH + x;
-        self.priorities[pos] = color_id;
-        let base = color_id as usize * 3;
-        // R.
+        let base = paletted_color as usize * 3;
+
+        // RGBA, in order.
         self.fb[pos * 4 + 0] = self.palette[base];
-        // G.
         self.fb[pos * 4 + 1] = self.palette[base + 1];
-        // B.
         self.fb[pos * 4 + 2] = self.palette[base + 2];
-        // A.
         self.fb[pos * 4 + 3] = 0xff;
     }
 
     fn clear_screen(&mut self) {
-        for v in self.fb.iter_mut() {
-            *v = 255;
-        }
-        for v in self.priorities.iter_mut() {
-            *v = 255;
-        }
+        // Get the first palette color (RGB888 format)
+        let (r, g, b) = (self.palette[0], self.palette[1], self.palette[2]);
+
+        self.fb.chunks_exact_mut(4).for_each(|chunk| {
+            chunk[0] = r;
+            chunk[1] = g;
+            chunk[2] = b;
+            chunk[3] = 0xff;
+        });
+
+        // Set the priorities to all ones
+        self.priorities.fill(0xff);
     }
 
-    fn check_interrupt_lyc_old(&mut self) {
-        if self.stat6 && self.ly == self.lyc {
-            self.i_mask |= 0b0000_0010;
-        }
-    }
     /// Update STAT bit 2 (LYC==LY).
     fn check_interrupt_lyc(&mut self) {
         self.update_stat_ly_lyc();
@@ -752,8 +753,8 @@ impl PPU {
         self.lcdc1 = self.lcdc & 0b0000_0010 != 0;
         self.lcdc0 = self.lcdc & 0b0000_0001 != 0;
 
+        // Transition from LCD ON to OFF.
         if prev_lcd_status && !self.lcdc7 {
-            // Screen went off.
             self.fdot = 0;
             self.ly = 0;
             self.mode = 0;

@@ -23,7 +23,7 @@ use std::path::PathBuf;
 #[command(about = "Not so fancy Game Boy emulator.", long_about = None)]
 /// CLI arguments.
 struct Args {
-    /// Path to the input rom file to load.
+    /// Path to the input ROM file to load.
     input: PathBuf,
     #[arg(short, long, default_value_t = 3, value_parser = clap::value_parser!(u8).range(1..12))]
     /// Display scale.
@@ -45,7 +45,7 @@ fn main() -> io::Result<()> {
         println!("Debug mode is on");
     }
 
-    // Load rom file into cartridge.
+    // Load ROM file into cartridge.
     let cart = Cartridge::new(rom, args.skipcheck).expect("Error reading rom file");
 
     let sdl_context = sdl2::init().unwrap();
@@ -56,6 +56,6 @@ fn main() -> io::Result<()> {
     // Start the machine.
     gameboy.start();
 
-    // Finish gracefully by returning ok.
+    // Finish gracefully by returning OK.
     Ok(())
 }
