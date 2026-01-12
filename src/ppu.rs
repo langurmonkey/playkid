@@ -2,7 +2,7 @@ use crate::constants;
 
 use std::collections::HashMap;
 
-/// Key for sprite tile row cache
+/// Key for sprite tile row cache.
 type SpriteTileKey = (u8, u8, bool, bool);
 
 /// # PPU
@@ -248,7 +248,7 @@ impl PPU {
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0x8000..=0x9FFF => {
-                // VRAM only accessible when mode != 3
+                // VRAM only accessible when mode != 3.
                 if self.mode != 3 {
                     self.vram[(address - 0x8000) as usize] = value;
                 }
@@ -321,20 +321,20 @@ impl PPU {
             self.check_interrupt_lyc();
 
             if self.ly == 144 {
-                self.update_mode(1); // VBlank start
+                self.update_mode(1); // VBlank start.
             } else if self.ly == 0 {
-                self.update_mode(2); // OAM scan start of new frame
+                self.update_mode(2); // OAM scan start of new frame.
             }
         }
 
         if self.ly < 144 {
-            // Determine mode by fdot range
+            // Determine mode by fdot range.
             let mode = match self.fdot {
-                // OAM scan
+                // OAM scan.
                 0..=80 => 2,
-                // DRAW
+                // DRAW.
                 81..=252 => 3,
-                // H-blank
+                // H-blank.
                 _ => 0,
             };
             if mode != self.mode {
@@ -387,7 +387,7 @@ impl PPU {
 
             // Draw.
             3 => {
-                // Check if window should start on this line
+                // Check if window should start on this line.
                 if self.lcdc5 && self.ly == self.wy {
                     self.wly_flag = true;
                 }
@@ -400,7 +400,7 @@ impl PPU {
         }
     }
 
-    /// Renders a single scanline.
+    /// Renders a single scan line.
     fn render_scanline(&mut self) {
         self.render_bgwin_scanline();
         self.render_sprites();
@@ -410,11 +410,11 @@ impl PPU {
     /// for the background/window.
     fn get_bgwin_tile_data(&mut self, tile_id: u8, line: u16, use_unsigned: bool) -> [u8; 8] {
         let tile_addr_base = if use_unsigned {
-            // Unsigned mode: tile_id directly indexes from 0x8000
+            // Unsigned mode: tile_id directly indexes from 0x8000.
             // 0x8000 + (tile_id * 16)
             self.lcdc4 + (tile_id as u16) * 16
         } else {
-            // Signed mode: tile_id is treated as i8, tile 0 is at 0x9000
+            // Signed mode: tile_id is treated as i8, tile 0 is at 0x9000.
             // 0x9000 + (tile_id as i8 * 16)
             // Which is equivalent to: 0x8800 + ((tile_id as i8 as i16 + 128) * 16)
             let signed_tile_id = tile_id as i8 as i16;
@@ -448,22 +448,22 @@ impl PPU {
         let mut win_cache = [[0u8; 8]; 32];
 
         for x in 0..constants::DISPLAY_WIDTH {
-            // Window is active if WLY has been activated and WX is in range
+            // Window is active if WLY has been activated and WX is in range.
             let use_window = win_y_condition && (x as u16) >= (self.wx.saturating_sub(7) as u16);
 
             let (tile_map, px_x, px_y, tile_x, tile_y, cache) = if use_window {
                 // Window pixel.
 
-                // Window's internal X coordinate: current screen X minus window start position
-                // Window starts at (WX - 7), so internal window X is: x - (WX - 7)
+                // Window's internal X coordinate: current screen X minus window start position.
+                // Window starts at (WX - 7), so internal window X is: x - (WX - 7).
                 let win_x = x.wrapping_sub(self.wx.saturating_sub(7) as usize) as u16;
                 let win_tile_x = (win_x / 8) & 31;
                 let win_tile_y = (self.wly as u16 / 8) & 31;
 
                 (
                     self.lcdc6,
-                    (win_x & 0x07) as u8,     // Pixel X in tile
-                    (self.wly as u16) & 0x07, // Pixel Y in tile
+                    (win_x & 0x07) as u8,
+                    (self.wly as u16) & 0x07,
                     win_tile_x,
                     win_tile_y,
                     &mut win_cache,
@@ -477,17 +477,17 @@ impl PPU {
 
                 (
                     self.lcdc3,
-                    bg_x as u8 & 0x07,  // Pixel X in tile
-                    bg_y as u16 & 0x07, // Pixel Y in tile
+                    bg_x as u8 & 0x07,
+                    bg_y as u16 & 0x07,
                     bg_tile_x,
                     bg_tile_y,
                     &mut bg_cache,
                 )
             } else {
-                continue; // No rendering needed
+                continue;
             };
 
-            // Fetch the tile data if not already cached
+            // Fetch the tile data if not already cached.
             let tile_index = tile_y * 32 + tile_x;
 
             if cache[tile_x as usize] == [0; 8] {
@@ -496,12 +496,12 @@ impl PPU {
                 cache[tile_x as usize] = tile_data;
             }
 
-            // Get the color index from the tile data
+            // Get the color index from the tile data.
             let tile_pixels = cache[tile_x as usize];
             let color_idx = tile_pixels[px_x as usize];
             let color = (self.bgp >> (color_idx * 2)) & 0x03;
 
-            // Store the raw ID for sprite priority checks
+            // Store the raw ID for sprite priority checks.
             self.priorities[self.ly as usize * constants::DISPLAY_WIDTH + x] = color_idx;
             // Render the pixel
             self.color(x, self.ly, color);
@@ -525,7 +525,7 @@ impl PPU {
             let tile_id = self.oam[base + 2];
             let attributes = self.oam[base + 3];
 
-            // Check if the sprite overlaps with the current scanline
+            // Check if the sprite overlaps with the current scan line.
             if self.ly + 16 >= sprite_y && self.ly + 16 < sprite_y + sprite_height {
                 sprites.push(Sprite {
                     y: sprite_y,
@@ -534,8 +534,10 @@ impl PPU {
                     attributes,
                     oam_index: i as u8,
                 });
+
+                // Limit to 10 sprites per line as per Game Boy hardware.
                 if sprites.len() >= constants::MAX_SPRITES_PER_LINE {
-                    break; // Limit to 10 sprites per line as per Game Boy hardware
+                    break;
                 }
             }
         }
@@ -577,7 +579,7 @@ impl PPU {
             };
             (tile, line_in_tile)
         } else {
-            // 8x8 sprites
+            // 8x8 sprites.
             let effective_line = if vflip { 7 - line } else { line };
             (tile_id, effective_line)
         };
@@ -600,7 +602,7 @@ impl PPU {
             pixels[pixel_index] = color_id;
         }
 
-        // Insert into cache
+        // Insert into cache.
         cache.insert(key, pixels);
 
         pixels
@@ -615,7 +617,7 @@ impl PPU {
         let sprites = self.get_sprites_on_scanline(sprite_size);
         let mut sprites = sprites;
 
-        // Game Boy priority: X asc, then OAM index asc
+        // Game Boy priority: X asc, then OAM index asc.
         sprites.sort_by(|a, b| {
             if a.x != b.x {
                 a.x.cmp(&b.x)
@@ -624,12 +626,12 @@ impl PPU {
             }
         });
 
-        // Cache for decoded sprite rows
-        // Key: (tile_id, line, hflip, vflip)
-        // Value: [u8; 8] for the 8 pixels
-        let mut tile_row_cache = HashMap::new();
+        // Cache for decoded sprite rows.
+        // - Key: (tile_id, line, hflip, vflip)
+        // - Value: [u8; 8] for the  pixels
+        let mut tile_row_cache = Hashap::new();
 
-        for sprite in sprites.iter().rev() {
+        for sprite in sprites.iter().ev() {
             self.render_sprite(sprite, &mut tile_row_cache);
         }
     }
@@ -648,21 +650,21 @@ impl PPU {
         for i in 0..8 {
             let x_pos = (sprite.x as i16) - 8 + (i as i16);
             if x_pos < 0 || x_pos >= constants::DISPLAY_WIDTH as i16 {
-                continue; // Ignore pixels outside screen bounds
+                continue; // Ignore pixels outside screen bounds.
             }
             let x_pos = x_pos as usize;
 
             let color_idx = pixels[i];
             if color_idx == 0 {
-                continue; // Skip transparent pixels
+                continue; // Skip transparent pixels.
             }
 
             // Fetch BG color ID from priorities cache.
             let bg_color_id = self.priorities[self.ly as usize * constants::DISPLAY_WIDTH + x_pos];
 
             // Priority logic:
-            // Bit 7 == 0: Sprite always over BG (except when BG is transparent/ID 0? No, always over)
-            // Bit 7 == 1: Sprite only over BG Color ID 0
+            // Bit 7 == 0: Sprite always over BG (except when BG is transparent/ID 0? No, always over).
+            // Bit 7 == 1: Sprite only over BG Color ID 0.
             let sprite_has_priority = (sprite.attributes & 0x80 == 0) || (bg_color_id == 0);
             if sprite_has_priority {
                 let palette = if sprite.attributes & 0x10 != 0 {
@@ -672,7 +674,6 @@ impl PPU {
                 };
                 let color = (palette >> (color_idx * 2)) & 0x03;
 
-                // Call color() to update FB, but color() no longer touches self.priorities
                 self.color(x_pos, self.ly, color);
             }
         }
@@ -692,7 +693,7 @@ impl PPU {
     }
 
     fn clear_screen(&mut self) {
-        // Get the first palette color (RGB888 format)
+        // Get the first palette color (RGB888 format).
         let (r, g, b) = (self.palette[0], self.palette[1], self.palette[2]);
 
         self.fb.chunks_exact_mut(4).for_each(|chunk| {
@@ -702,7 +703,7 @@ impl PPU {
             chunk[3] = 0xff;
         });
 
-        // Set the priorities to all ones
+        // Set the priorities to all ones.
         self.priorities.fill(0xff);
     }
 
@@ -711,16 +712,16 @@ impl PPU {
         self.update_stat_ly_lyc();
         let coincidence = self.ly == self.lyc;
 
-        // Update bit 2 of STAT
+        // Update bit 2 of STAT.
         if coincidence {
-            self.stat |= 0x04; // Set coincidence flag
+            self.stat |= 0x04;
         } else {
             self.stat &= !0x04;
         }
 
-        // Trigger interrupt only on rising edge
+        // Trigger interrupt only on rising edge.
         if self.stat6 && coincidence && !self.last_ly_eq_lyc {
-            self.i_mask |= 0x02; // STAT interrupt
+            self.i_mask |= 0x02;
         }
 
         self.last_ly_eq_lyc = coincidence;
