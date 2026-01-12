@@ -235,10 +235,10 @@ impl PPU {
             // OBP1.
             0xFF49 => self.obp1,
 
-            // WX.
-            0xFF4A => self.wx,
             // WY.
-            0xFF4B => self.wy,
+            0xFF4A => self.wy,
+            // WX.
+            0xFF4B => self.wx,
 
             _ => 0xFF,
         }
@@ -294,10 +294,10 @@ impl PPU {
             // OBP1.
             0xFF49 => self.obp1 = value,
 
-            // WX.
-            0xFF4A => self.wx = value,
             // WY.
-            0xFF4B => self.wy = value,
+            0xFF4A => self.wy = value,
+            // WX.
+            0xFF4B => self.wx = value,
             _ => {}
         }
     }
@@ -408,14 +408,18 @@ impl PPU {
     /// Fetches and combines the two bytes of pixel data (low/high) for a tile row,
     /// for the background/window.
     fn get_bgwin_tile_data(&mut self, tile_id: u8, line: u16, use_unsigned: bool) -> [u8; 8] {
-        let tile_addr_base = self.lcdc4
-            + (if use_unsigned {
-                // Unsigned.
-                tile_id as u16
-            } else {
-                // Signed.
-                (tile_id as i8 as i16 + 128) as u16
-            }) * 16;
+        let tile_addr_base = if use_unsigned {
+            // Unsigned mode: tile_id directly indexes from 0x8000
+            // 0x8000 + (tile_id * 16)
+            self.lcdc4 + (tile_id as u16) * 16
+        } else {
+            // Signed mode: tile_id is treated as i8, tile 0 is at 0x9000
+            // 0x9000 + (tile_id as i8 * 16)
+            // Which is equivalent to: 0x8800 + ((tile_id as i8 as i16 + 128) * 16)
+            let signed_tile_id = tile_id as i8 as i16;
+            // 0x8800 is the base, add (signed_id + 128) * 16 to get to 0x9000 for tile 0
+            (self.lcdc4 as i16 + (signed_tile_id + 128) * 16) as u16
+        };
 
         let tile_addr = tile_addr_base + (line * 2);
 
@@ -428,7 +432,6 @@ impl PPU {
             let color_id = ((high_byte >> (7 - i)) & 0x1) << 1 | ((low_byte >> (7 - i)) & 0x1);
             pixels[i] = color_id;
         }
-
         pixels
     }
 
@@ -436,64 +439,79 @@ impl PPU {
     fn render_bgwin_scanline(&mut self) {
         let use_unsigned = (self.lcdc & 0x10) != 0;
         let win_enabled = self.lcdc5;
-        let win_started = win_enabled && self.ly >= self.wy;
-        // WX gating is only for deciding whether to render the window pixels this scan line.
-        let win_this_line = win_started && self.wx <= 166;
 
-        // Skip rendering entirely if both bg and window are off.
-        if !self.lcdc0 && !win_this_line {
-            return;
+        // Is the window enabled and should it be drawn on this line?
+        let win_started = win_enabled && self.ly >= self.wy;
+        let mut win_used_this_line = false;
+
+        let mut bg_cache = [[0u8; 8]; 32];
+        let mut win_cache = [[0u8; 8]; 32];
+
+        // Track the first window pixel on this line to handle WLY increment
+        if win_started && !self.wly_flag && self.ly == self.wy {
+            self.wly = 0;
+            self.wly_flag = true;
         }
 
-        let mut tile_row_cache = [[0u8; 8]; 32];
-
         for x in 0..constants::DISPLAY_WIDTH {
-            let (tile_map, px_x, px_y, tile_x, tile_y) =
-                if win_this_line && x as u8 >= self.wx.wrapping_sub(7) {
-                    // Window pixel.
-                    let win_x = x.wrapping_sub(self.wx.wrapping_sub(7) as usize);
-                    let win_tile_x = win_x as u16 / 8;
-                    let win_tile_y = (self.wly as u16 >> 3) & 31;
-                    (
-                        self.lcdc6,
-                        (win_x & 0x07) as u8,
-                        self.wly as u16 & 0x07,
-                        win_tile_x,
-                        win_tile_y,
-                    )
-                } else if self.lcdc0 {
-                    // Background pixel.
-                    let bg_x = self.scx as u32 + x as u32;
-                    let bg_y = self.scy.wrapping_add(self.ly);
-                    let bg_tile_x = (bg_x as u16 / 8) & 0x1f;
-                    let bg_tile_y = (bg_y as u16 / 8) & 0x1f;
-                    (
-                        self.lcdc3,
-                        bg_x as u8 & 0x07,
-                        bg_y as u16 & 0x07,
-                        bg_tile_x,
-                        bg_tile_y,
-                    )
-                } else {
-                    continue;
-                };
+            let use_window = win_started && (x as u16) >= (self.wx.saturating_sub(7) as u16);
 
+            let (tile_map, px_x, px_y, tile_x, tile_y, cache) = if use_window {
+                // Window pixel.
+                win_used_this_line = true;
+                // Window's internal X coordinate: current screen X minus window start position
+                // Window starts at (WX - 7), so internal window X is: x - (WX - 7)
+                let win_x = x.wrapping_sub(self.wx.saturating_sub(7) as usize) as u16;
+                let win_tile_x = (win_x / 8) & 31;
+                let win_tile_y = (self.wly as u16 >> 3) & 31;
+
+                (
+                    self.lcdc6,
+                    (win_x & 0x07) as u8,   // Pixel X in tile
+                    self.wly as u16 & 0x07, // Pixel Y in tile
+                    win_tile_x,
+                    win_tile_y,
+                    &mut win_cache,
+                )
+            } else if self.lcdc0 {
+                // Background pixel.
+                let bg_x = self.scx as u32 + x as u32;
+                let bg_y = self.scy.wrapping_add(self.ly);
+                let bg_tile_x = (bg_x as u16 / 8) & 0x1f;
+                let bg_tile_y = (bg_y as u16 / 8) & 0x1f;
+
+                (
+                    self.lcdc3,
+                    bg_x as u8 & 0x07,  // Pixel X in tile
+                    bg_y as u16 & 0x07, // Pixel Y in tile
+                    bg_tile_x,
+                    bg_tile_y,
+                    &mut bg_cache,
+                )
+            } else {
+                continue; // No rendering needed
+            };
+
+            // Fetch the tile data if not already cached
             let tile_index = tile_y * 32 + tile_x;
 
-            if tile_row_cache[tile_x as usize] == [0; 8] {
+            if cache[tile_x as usize] == [0; 8] {
                 let tile_id = self.read(tile_map + tile_index);
-                tile_row_cache[tile_x as usize] =
-                    self.get_bgwin_tile_data(tile_id, px_y, use_unsigned);
+                let tile_data = self.get_bgwin_tile_data(tile_id, px_y, use_unsigned);
+                cache[tile_x as usize] = tile_data;
             }
 
-            let tile_pixels = tile_row_cache[tile_x as usize];
+            // Get the color index from the tile data
+            let tile_pixels = cache[tile_x as usize];
             let color_idx = tile_pixels[px_x as usize];
             let color = (self.bgp >> (color_idx * 2)) & 0x03;
 
+            // Render the pixel
             self.color(x, self.ly, color);
         }
-        // Always increment WLY once the window has *started*, regardless of WX.
-        if win_started {
+
+        // Increment WLY once the window pixels for this line are rendered
+        if win_used_this_line {
             self.wly += 1;
         }
     }
