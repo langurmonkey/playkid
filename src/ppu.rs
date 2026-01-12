@@ -629,9 +629,9 @@ impl PPU {
         // Cache for decoded sprite rows.
         // - Key: (tile_id, line, hflip, vflip)
         // - Value: [u8; 8] for the  pixels
-        let mut tile_row_cache = Hashap::new();
+        let mut tile_row_cache = HashMap::new();
 
-        for sprite in sprites.iter().ev() {
+        for sprite in sprites.iter().rev() {
             self.render_sprite(sprite, &mut tile_row_cache);
         }
     }
