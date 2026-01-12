@@ -131,6 +131,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             _ => 0,
         };
     }
+
     /// Interrupt handling. The IF bit corresponding to this interrupt, and the IME flag
     /// are reset by the CUP. IF acknowledges the interrupt, and IME prevents any other
     /// interrupts from being handled until re-enabled (with RETI).

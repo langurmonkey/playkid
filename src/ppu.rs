@@ -88,7 +88,7 @@ pub struct PPU {
     /// WX: Window X position plus 7.
     wx: u8,
     /// Window line counter.
-    wly: i16,
+    wly: u16,
     /// WLY flag; internal window latch.
     wly_flag: bool,
     /// BGP: Background palette register.
@@ -127,7 +127,7 @@ impl PPU {
             mode: 0,
             lcdc: 0,
             lcdc7: true,
-            lcdc6: 0,
+            lcdc6: 0x9c00,
             lcdc5: true,
             lcdc4: 0,
             lcdc3: 0,
@@ -373,14 +373,15 @@ impl PPU {
 
             // V-blank.
             1 => {
-                self.wly = 0;
                 self.wly_flag = false;
+                self.wly = 0;
                 self.i_mask |= 0x01;
                 self.stat4
             }
 
             // OAM scan.
             2 => {
+                // Nothing else...
                 self.data_available = false;
                 self.stat5
             }
@@ -439,31 +440,32 @@ impl PPU {
     /// Renders the background and window for the current scan line.
     fn render_bgwin_scanline(&mut self) {
         let use_unsigned = (self.lcdc & 0x10) != 0;
-        let win_enabled = self.lcdc5;
 
-        // Is the window enabled and should it be drawn on this line?
-        let win_y_condition = win_enabled && self.wly_flag;
+        // Tracking variable for window rendering.
+        let mut win_was_rendered = false;
 
-        let mut bg_cache = [[0u8; 8]; 32];
-        let mut win_cache = [[0u8; 8]; 32];
+        // Use 0xFF as sentinel since valid color IDs are 0-3.
+        let mut bg_cache = [[0xffu8; 8]; 32];
+        let mut win_cache = [[0xffu8; 8]; 32];
 
         for x in 0..constants::DISPLAY_WIDTH {
+            let win_active_now = self.lcdc5 && self.wly_flag;
             // Window is active if WLY has been activated and WX is in range.
-            let use_window = win_y_condition && (x as u16) >= (self.wx.saturating_sub(7) as u16);
+            let use_window = win_active_now && (x as u16) >= (self.wx.saturating_sub(7) as u16);
 
-            let (tile_map, px_x, px_y, tile_x, tile_y, cache) = if use_window {
+            let (mut tile_map_addr, px_x, px_y, tile_x, tile_y, cache) = if use_window {
                 // Window pixel.
-
+                win_was_rendered = true;
                 // Window's internal X coordinate: current screen X minus window start position.
                 // Window starts at (WX - 7), so internal window X is: x - (WX - 7).
                 let win_x = x.wrapping_sub(self.wx.saturating_sub(7) as usize) as u16;
                 let win_tile_x = (win_x / 8) & 31;
-                let win_tile_y = (self.wly as u16 / 8) & 31;
+                let win_tile_y = (self.wly / 8) & 31;
 
                 (
                     self.lcdc6,
                     (win_x & 0x07) as u8,
-                    (self.wly as u16) & 0x07,
+                    (self.wly) & 0x07,
                     win_tile_x,
                     win_tile_y,
                     &mut win_cache,
@@ -490,8 +492,8 @@ impl PPU {
             // Fetch the tile data if not already cached.
             let tile_index = tile_y * 32 + tile_x;
 
-            if cache[tile_x as usize] == [0; 8] {
-                let tile_id = self.read(tile_map + tile_index);
+            if cache[tile_x as usize][0] == 0xff {
+                let tile_id = self.read(tile_map_addr + tile_index);
                 let tile_data = self.get_bgwin_tile_data(tile_id, px_y, use_unsigned);
                 cache[tile_x as usize] = tile_data;
             }
@@ -507,9 +509,8 @@ impl PPU {
             self.color(x, self.ly, color);
         }
 
-        // Increment WLY only if the window is enabled, triggered, AND visible on screen.
-        // WX >= 167 effectively hides the window and "freezes" the internal counter.
-        if win_y_condition && self.wx < (constants::DISPLAY_WIDTH + 7) as u8 {
+        // Increment WLY only if the window was rendered in this scanline.
+        if win_was_rendered {
             self.wly += 1;
         }
     }
@@ -731,6 +732,7 @@ impl PPU {
     /// in the byte `self.lcdc`.
     fn update_lcdc_flags(&mut self) {
         let prev_lcd_status = self.lcdc7;
+        let prev_lcdc5 = self.lcdc5;
         self.lcdc7 = self.lcdc & 0b1000_0000 != 0;
         self.lcdc6 = if self.lcdc & 0b0100_0000 == 0 {
             0x9800

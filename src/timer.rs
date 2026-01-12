@@ -2,7 +2,7 @@
 pub struct Timer {
     /// Divider. It is incremented internally every T-cycle, but only the upper 8 bits
     /// are readable.
-    div_counter: u16,
+    divider: u16,
     /// Detecting 1->0 edges.
     last_div_bit: bool,
     /// Timer counter. The most common software interface to the timers. It can be configured
@@ -21,7 +21,7 @@ pub struct Timer {
 impl Timer {
     pub fn new() -> Timer {
         Timer {
-            div_counter: 0,
+            divider: 0,
             last_div_bit: false,
             tima: 0,
             tma: 0,
@@ -33,7 +33,7 @@ impl Timer {
 
     /// Resets the state of the timer.
     pub fn reset(&mut self) {
-        self.div_counter = 0;
+        self.divider = 0;
         self.last_div_bit = false;
         self.tima = 0;
         self.tma = 0;
@@ -45,7 +45,7 @@ impl Timer {
     pub fn read(&self, address: u16) -> u8 {
         match address {
             // Only the upper 8 bits of DIV are mapped to memory.
-            0xFF04 => (self.div_counter >> 8) as u8,
+            0xFF04 => (self.divider >> 8) as u8,
             0xFF05 => self.tima,
             0xFF06 => self.tma,
             0xFF07 => {
@@ -65,8 +65,8 @@ impl Timer {
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0xFF04 => {
-                self.div_counter = 0;
-                self.last_div_bit = ((self.div_counter >> self.timer_bit) & 1) != 0;
+                self.divider = 0;
+                self.last_div_bit = ((self.divider >> self.timer_bit) & 1) != 0;
             }
             0xFF05 => {
                 self.tima = value;
@@ -75,7 +75,7 @@ impl Timer {
                 self.tma = value;
             }
             0xFF07 => {
-                let old_bit = (self.div_counter >> self.timer_bit) & 1 != 0;
+                let old_bit = (self.divider >> self.timer_bit) & 1 != 0;
 
                 // Update TAC values.
                 let new_enabled = value & 0x4 != 0;
@@ -86,7 +86,7 @@ impl Timer {
                     0b11 => 7, // 16384 Hz
                     _ => 9,
                 };
-                let new_bit = (self.div_counter >> new_timer_bit) & 1 != 0;
+                let new_bit = (self.divider >> new_timer_bit) & 1 != 0;
                 // Check for a falling edge across the change - even if timer is disabled.
                 if old_bit && !new_bit {
                     self.increment_tima();
@@ -104,9 +104,9 @@ impl Timer {
     /// Advances the timer(s) by the given amount of T-cycles.
     pub fn cycle(&mut self, t_cycles: u32) {
         // DIV increments every M-cycle (4 T-cycles)
-        for _ in 0..(t_cycles / 4) {
-            self.div_counter = self.div_counter.wrapping_add(1);
-            let new_bit = (self.div_counter >> self.timer_bit) & 1 != 0;
+        for _ in 0..t_cycles {
+            self.divider = self.divider.wrapping_add(1);
+            let new_bit = (self.divider >> self.timer_bit) & 1 != 0;
 
             // Update TIMA on falling edge of selected bit
             if self.enabled {
@@ -128,9 +128,9 @@ impl Timer {
     }
 
     pub fn div(&self) -> u8 {
-        (self.div_counter >> 8) as u8
+        (self.divider >> 8) as u8
     }
     pub fn div16(&self) -> u16 {
-        self.div_counter
+        self.divider
     }
 }
