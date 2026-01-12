@@ -516,6 +516,7 @@ impl PPU {
                     x: sprite_x,
                     tile_id,
                     attributes,
+                    oam_index: i as u8,
                 });
                 if sprites.len() >= constants::MAX_SPRITES_PER_LINE {
                     break; // Limit to 10 sprites per line as per Game Boy hardware
@@ -596,6 +597,16 @@ impl PPU {
         }
         let sprite_size = self.lcdc2;
         let sprites = self.get_sprites_on_scanline(sprite_size);
+        let mut sprites = sprites;
+
+        // Game Boy priority: X asc, then OAM index asc
+        sprites.sort_by(|a, b| {
+            if a.x != b.x {
+                a.x.cmp(&b.x)
+            } else {
+                a.oam_index.cmp(&b.oam_index)
+            }
+        });
 
         // Cache for decoded sprite rows
         // Key: (tile_id, line, hflip, vflip)
@@ -758,4 +769,5 @@ struct Sprite {
     x: u8,
     tile_id: u8,
     attributes: u8,
+    oam_index: u8,
 }
