@@ -25,7 +25,7 @@ impl Cartridge {
         let mut data = Vec::new();
         file.read_to_end(&mut data)?;
 
-        // Check Nintendo logo in rom file.
+        // Check Nintendo logo in ROM file.
         // In 0x104 - 0x133, with contents in LOGO.
         if !skip_checksum {
             //Cartridge::check_checksum(&buffer);
@@ -73,37 +73,7 @@ impl Cartridge {
         let cart_type;
         {
             let t = data[0x147];
-            let ct = match t {
-                0x00 => "ROM ONLY",
-                0x01 => "MBC1",
-                0x02 => "MBC1+RAM",
-                0x03 => "MBC1+RAM+BATTERY",
-                0x05 => "MBC2",
-                0x06 => "MBC2+BATTERY",
-                0x08 => "ROM+RAM",
-                0x09 => "ROM+RAM+BATTERY",
-                0x0B => "MMM01",
-                0x0C => "MMM01+RAM",
-                0x0D => "MMM01+RAM+BATTERY",
-                0x0F => "MBC3+TIMER+BATTERY",
-                0x10 => "MBC3+TIMER+RAM+BATTERY",
-                0x11 => "MBC3",
-                0x12 => "MBC3+RAM",
-                0x13 => "MBC3+RAM+BATTERY",
-                0x19 => "MBC5",
-                0x1A => "MBC5+RAM",
-                0x1B => "MBC5+RAM+BATTERY",
-                0x1C => "MBC5+RUMBLE",
-                0x1D => "MBC5+RUMBLE+RAM",
-                0x1E => "MBC5+RUMBLE+RAM+BATTERY",
-                0x20 => "MBC6",
-                0x22 => "MBC7+SENSOR+RUMBLE+RAM+BATTERY",
-                0xFC => "POCKET CAMERA",
-                0xFD => "BANDAI TAMA5",
-                0xFE => "HuC3",
-                0xFF => "MuC1+RAM+BATTERY",
-                _ => &format!("Unknown ({:#40x})", t),
-            };
+            let ct = Cartridge::cart_type_str(t);
             println!(" -> Cartridge type: {} ({})", ct.yellow(), t);
 
             cart_type = t;
@@ -151,7 +121,7 @@ impl Cartridge {
             match dc {
                 0 => println!(" -> Destination code: Japan"),
                 1 => println!(" -> Destination code: Overseas only"),
-                _ => println!(" -> Desination code: Unknown ({:#04x})", dc),
+                _ => println!(" -> Destination code: Unknown ({:#04x})", dc),
             }
         }
         // Header checksum.
@@ -193,9 +163,46 @@ impl Cartridge {
 
         // Check supported modes.
         if cart_type > 0 {
-            panic!("Only ROM ONLY cartridges supported (0)");
+            panic!(
+                "Only ROM ONLY cartridges supported (current is {})",
+                Cartridge::cart_type_str(cart_type)
+            );
         }
 
         Ok(Self { data, cart_type })
+    }
+
+    pub fn cart_type_str(cart_type: u8) -> String {
+        match cart_type {
+            0x00 => "ROM ONLY".to_string(),
+            0x01 => "MBC1".to_string(),
+            0x02 => "MBC1+RAM".to_string(),
+            0x03 => "MBC1+RAM+BATTERY".to_string(),
+            0x05 => "MBC2".to_string(),
+            0x06 => "MBC2+BATTERY".to_string(),
+            0x08 => "ROM+RAM".to_string(),
+            0x09 => "ROM+RAM+BATTERY".to_string(),
+            0x0B => "MMM01".to_string(),
+            0x0C => "MMM01+RAM".to_string(),
+            0x0D => "MMM01+RAM+BATTERY".to_string(),
+            0x0F => "MBC3+TIMER+BATTERY".to_string(),
+            0x10 => "MBC3+TIMER+RAM+BATTERY".to_string(),
+            0x11 => "MBC3".to_string(),
+            0x12 => "MBC3+RAM".to_string(),
+            0x13 => "MBC3+RAM+BATTERY".to_string(),
+            0x19 => "MBC5".to_string(),
+            0x1A => "MBC5+RAM".to_string(),
+            0x1B => "MBC5+RAM+BATTERY".to_string(),
+            0x1C => "MBC5+RUMBLE".to_string(),
+            0x1D => "MBC5+RUMBLE+RAM".to_string(),
+            0x1E => "MBC5+RUMBLE+RAM+BATTERY".to_string(),
+            0x20 => "MBC6".to_string(),
+            0x22 => "MBC7+SENSOR+RUMBLE+RAM+BATTERY".to_string(),
+            0xFC => "POCKET CAMERA".to_string(),
+            0xFD => "BANDAI TAMA5".to_string(),
+            0xFE => "HuC3".to_string(),
+            0xFF => "MuC1+RAM+BATTERY".to_string(),
+            _ => format!("Unknown ({:#40x})", cart_type),
+        }
     }
 }
