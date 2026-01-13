@@ -143,52 +143,63 @@ impl<'a, 'b> Machine<'a, 'b> {
     fn interrupt_handling(&mut self) -> u32 {
         let pending = self.memory.ie & self.memory.iff;
 
-        // Wake from HALT if any interrupt is pending (even if IME is disabled).
-        if pending == 0 {
-            return 0;
-        } else {
-            self.halted = false;
-        }
-
-        if self.ime && pending != 0 {
-            // Reset IME.
-            self.ime = false;
-
-            // IE and IF have the following format:
-            //
-            // | 7  6  5 |    4   |    3   |   2   |   1  |    0   |
-            // |    1    | Joypad | Serial | Timer |  LCD | VBlank |
-            //
-            for i in 0..5 {
-                let bit = 1 << i;
-                if pending & bit != 0 {
-                    self.memory.iff &= !bit;
-                    let pc = self.registers.pc;
-                    self.push_stack(pc);
-                    self.registers.pc = match bit {
-                        0x01 => 0x0040,
-                        0x02 => 0x0048,
-                        0x04 => 0x0050,
-                        0x08 => 0x0058,
-                        0x10 => 0x0060,
-                        _ => panic!("Unknown interrupt bit {}", bit),
-                    };
-                    break;
-                }
+        // Debug logging
+        static mut COUNTER: u32 = 0;
+        unsafe {
+            COUNTER += 1;
+            if COUNTER % 10000 == 0 {
+                println!(
+                    "Interrupt check #{}: IE={:02X} IF={:02X} pending={:02X} IME={} halted={}",
+                    COUNTER, self.memory.ie, self.memory.iff, pending, self.ime, self.halted
+                );
             }
-
-            5 // 5 M-cycles = 20 T-cycles
-        } else {
-            // IME is not enabled.
-            0
         }
+
+        // Wake from HALT if any interrupt is pending (even if IME is disabled).
+        if pending != 0 {
+            if self.halted {
+                println!("CPU woken from HALT! pending={:02X}", pending);
+                self.halted = false;
+            }
+        }
+
+        // If no interrupts are pending OR IME is disabled, return
+        if !self.ime || pending == 0 {
+            return 0;
+        }
+
+        println!("Servicing interrupt: {:02X}", pending);
+        // Reset IME.
+        self.ime = false;
+
+        // IE and IF have the following format:
+        //
+        // | 7  6  5 |    4   |    3   |   2   |   1  |    0   |
+        // |    1    | Joypad | Serial | Timer |  LCD | VBlank |
+        //
+        for i in 0..5 {
+            let bit = 1 << i;
+            if pending & bit != 0 {
+                self.memory.iff &= !bit;
+                let pc = self.registers.pc;
+                self.push_stack(pc);
+                self.registers.pc = match bit {
+                    0x01 => 0x0040,
+                    0x02 => 0x0048,
+                    0x04 => 0x0050,
+                    0x08 => 0x0058,
+                    0x10 => 0x0060,
+                    _ => panic!("Unknown interrupt bit {}", bit),
+                };
+                break;
+            }
+        }
+
+        5 // 5 M-cycles = 20 T-cycles
     }
 
     /// Run a machine cycle.
     fn machine_cycle(&mut self) -> (u32, u32) {
-        // Update IME.
-        self.ime_update();
-
         // CPU instruction.
         // One machine cycle (M-cycle) is 4 clock cycles.
         let mut m_cycles = if self.running {
@@ -213,6 +224,9 @@ impl<'a, 'b> Machine<'a, 'b> {
             t_cycles = 0;
             m_cycles = 0;
         }
+
+        // Update IME.
+        self.ime_update();
 
         // Handle interrupts if necessary.
         let interrupt_m_cycles = self.interrupt_handling();
@@ -263,7 +277,11 @@ impl<'a, 'b> Machine<'a, 'b> {
             }
             // HALT
             Instruction::HALT() => {
-                self.halt();
+                // HALT only halts if IME is enabled.
+                if self.ime {
+                    self.halt();
+                }
+                // Otherwise, HALT acts like NOP.
                 1
             }
 
@@ -1279,26 +1297,25 @@ impl<'a, 'b> Machine<'a, 'b> {
                 let h = self.registers.get_h();
                 let n = self.registers.get_n();
 
+                let mut adjust = if c { 0x60 } else { 0x00 };
+                if h {
+                    adjust |= 0x06;
+                };
                 if !n {
-                    // After addition.
-                    if c || a > 0x99 {
-                        a += 0x60;
-                        self.registers.c(true);
-                    }
-                    if h || (a & 0x0F) > 0x09 {
-                        a += 0x6;
-                    }
+                    if a & 0x0F > 0x09 {
+                        adjust |= 0x06;
+                    };
+                    if a > 0x99 {
+                        adjust |= 0x60;
+                    };
+                    a = a.wrapping_add(adjust);
                 } else {
-                    // After subtraction.
-                    if c {
-                        a -= 0x60;
-                    }
-                    if h {
-                        a -= 0x6;
-                    }
+                    a = a.wrapping_sub(adjust);
                 }
-                self.registers.z(a == 0);
+
+                self.registers.c(adjust >= 0x60);
                 self.registers.h(false);
+                self.registers.z(a == 0);
                 self.registers.a = a;
                 1
             }

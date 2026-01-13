@@ -378,6 +378,7 @@ impl PPU {
                 self.wly_flag = false;
                 self.wly = 0;
                 self.i_mask |= 0x01;
+                println!("PPU: VBlank interrupt requested");
                 self.stat4
             }
 
@@ -405,6 +406,12 @@ impl PPU {
 
     /// Renders a single scan line.
     fn render_scanline(&mut self) {
+        // Clear priorities for this scanline before rendering.
+        let line_start = self.ly as usize * constants::DISPLAY_WIDTH;
+        let line_end = line_start + constants::DISPLAY_WIDTH;
+        self.priorities[line_start..line_end].fill(0);
+
+        // Actual render of Background/Window and sprites.
         self.render_bgwin_scanline();
         self.render_sprites();
     }
@@ -488,6 +495,10 @@ impl PPU {
                     &mut bg_cache,
                 )
             } else {
+                // LCDC0 disabled: render white background (color 0).
+                // Still need to set priorities for sprite rendering!
+                self.priorities[self.ly as usize * constants::DISPLAY_WIDTH + x] = 0;
+                self.color(x, self.ly, 0);
                 continue;
             };
 
@@ -569,7 +580,7 @@ impl PPU {
                 // Flip vertical line within the 16 lines.
                 let flipped_line = 15 - line;
                 if flipped_line < 8 {
-                    (top_tile, flipped_line) // Bottom tile flipped -> top tile index + 1.
+                    (top_tile, flipped_line)
                 } else {
                     (top_tile | 1, flipped_line - 8)
                 }
@@ -666,9 +677,18 @@ impl PPU {
             let bg_color_id = self.priorities[self.ly as usize * constants::DISPLAY_WIDTH + x_pos];
 
             // Priority logic:
-            // Bit 7 == 0: Sprite always over BG (except when BG is transparent/ID 0? No, always over).
-            // Bit 7 == 1: Sprite only over BG Color ID 0.
-            let sprite_has_priority = (sprite.attributes & 0x80 == 0) || (bg_color_id == 0);
+            // Bit 7 (OBJ-to-BG Priority):
+            //   0 = OBJ above BG (always draw sprite if not transparent)
+            //   1 = OBJ behind BG colors 1-3 (only draw if BG is color 0)
+            let obj_behind_bg = (sprite.attributes & 0x80) != 0;
+            let sprite_has_priority = if obj_behind_bg {
+                // Priority bit set: only draw sprite over BG color 0
+                bg_color_id == 0
+            } else {
+                // Priority bit clear: always draw sprite (over any BG color)
+                true
+            };
+
             if sprite_has_priority {
                 let palette = if sprite.attributes & 0x10 != 0 {
                     self.obp1
