@@ -280,18 +280,6 @@ impl<'b> Joypad<'b> {
             self.i_mask = 0b0001_0000;
             self.request_interrupt = false;
         }
-
-        println!(
-            "A:{} B:{} U:{} D:{} R:{} L:{} St:{} Se:{}",
-            if self.a { "o" } else { "x" },
-            if self.b { "o" } else { "x" },
-            if self.up { "o" } else { "x" },
-            if self.down { "o" } else { "x" },
-            if self.right { "o" } else { "x" },
-            if self.left { "o" } else { "x" },
-            if self.start { "o" } else { "x" },
-            if self.select { "o" } else { "x" }
-        );
     }
 
     /// Updates the flags in bits 5 and 4 (select buttons, select D-pad) of JOYP.
