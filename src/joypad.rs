@@ -280,68 +280,69 @@ impl<'b> Joypad<'b> {
             self.i_mask = 0b0001_0000;
             self.request_interrupt = false;
         }
+
+        println!(
+            "A:{} B:{} U:{} D:{} R:{} L:{} St:{} Se:{}",
+            if self.a { "o" } else { "x" },
+            if self.b { "o" } else { "x" },
+            if self.up { "o" } else { "x" },
+            if self.down { "o" } else { "x" },
+            if self.right { "o" } else { "x" },
+            if self.left { "o" } else { "x" },
+            if self.start { "o" } else { "x" },
+            if self.select { "o" } else { "x" }
+        );
     }
 
     /// Updates the flags in bits 5 and 4 (select buttons, select D-pad) of JOYP.
     fn update_state(&mut self) {
-        // If bit 5 is zero, SsBA are in the lower nibble.
+        // Start with all buttons unpressed (1 is unpressed in GB logic)
+        // Keep the selection bits (4-5) as set by the CPU
+        let mut res = self.joyp | 0x0F;
+
         self.select_buttons = (self.joyp & 0x20) == 0;
-        // If bit 4 is zero, d-pad buttons are in the lower nibble.
         self.select_dpad = (self.joyp & 0x10) == 0;
 
+        // Use separate IF blocks because BOTH can be selected at once
         if self.select_buttons {
             if self.a {
-                self.joyp = self.joyp & 0xfe;
+                res &= 0xFE;
                 self.request_interrupt = true;
-            } else {
-                self.joyp = self.joyp | 0x01;
             }
             if self.b {
-                self.joyp = self.joyp & 0xfd;
+                res &= 0xFD;
                 self.request_interrupt = true;
-            } else {
-                self.joyp = self.joyp | 0x02;
             }
             if self.select {
-                self.joyp = self.joyp & 0xfb;
+                res &= 0xFB;
                 self.request_interrupt = true;
-            } else {
-                self.joyp = self.joyp | 0x04;
             }
             if self.start {
-                self.joyp = self.joyp & 0xf7;
+                res &= 0xF7;
                 self.request_interrupt = true;
-            } else {
-                self.joyp = self.joyp | 0x08;
             }
-        } else if self.select_buttons {
+        }
+
+        if self.select_dpad {
+            // Fixed the variable name here
             if self.right {
-                self.joyp = self.joyp & 0xfe;
+                res &= 0xFE;
                 self.request_interrupt = true;
-            } else {
-                self.joyp = self.joyp | 0x01;
             }
             if self.left {
-                self.joyp = self.joyp & 0xfd;
+                res &= 0xFD;
                 self.request_interrupt = true;
-            } else {
-                self.joyp = self.joyp | 0x02;
             }
             if self.up {
-                self.joyp = self.joyp & 0xfb;
+                res &= 0xFB;
                 self.request_interrupt = true;
-            } else {
-                self.joyp = self.joyp | 0x04;
             }
             if self.down {
-                self.joyp = self.joyp & 0xf7;
+                res &= 0xF7;
                 self.request_interrupt = true;
-            } else {
-                self.joyp = self.joyp | 0x08;
             }
-        } else {
-            // All off.
-            self.joyp = self.joyp | 0xff;
         }
+
+        self.joyp = res;
     }
 }

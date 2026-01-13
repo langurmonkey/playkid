@@ -13,7 +13,7 @@ pub const DISPLAY_WIDTH: usize = 160;
 /// Display height.
 pub const DISPLAY_HEIGHT: usize = 144;
 /// Target frame rate.
-pub const TARGET_FPS: u64 = 60;
+pub const TARGET_FPS: u64 = 120;
 /// Target frame duration.
 pub const TARGET_FRAME_DURATION: std::time::Duration =
     std::time::Duration::from_millis(1000 / TARGET_FPS);
