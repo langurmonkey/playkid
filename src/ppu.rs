@@ -378,7 +378,6 @@ impl PPU {
                 self.wly_flag = false;
                 self.wly = 0;
                 self.i_mask |= 0x01;
-                println!("PPU: VBlank interrupt requested");
                 self.stat4
             }
 
