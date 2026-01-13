@@ -765,7 +765,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                 }
                 R8::HL => {
                     let val = self.memory.read8(self.registers.get_hl());
-                    self.add(val, false);
+                    self.add(val, true);
                     2
                 }
             },
@@ -837,7 +837,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                 }
                 R8::HL => {
                     let val = self.memory.read8(self.registers.get_hl());
-                    self.sub(val, false);
+                    self.sub(val, true);
                     2
                 }
             },
@@ -1240,7 +1240,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                     3
                 }
                 R8::A => {
-                    self.registers.a = self.inc(self.registers.a);
+                    self.registers.a = self.dec(self.registers.a);
                     1
                 }
             },
@@ -1308,8 +1308,8 @@ impl<'a, 'b> Machine<'a, 'b> {
             // SCF
             Instruction::SCF() => {
                 self.registers.c(true);
-                self.registers.h(true);
-                self.registers.n(true);
+                self.registers.h(false);
+                self.registers.n(false);
                 1
             }
             // CPL
@@ -2334,37 +2334,37 @@ impl<'a, 'b> Machine<'a, 'b> {
             },
             Instruction::RES6(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b & 0xDF;
+                    self.registers.b = self.registers.b & 0xBF;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c & 0xDF;
+                    self.registers.c = self.registers.c & 0xBF;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d & 0xDF;
+                    self.registers.d = self.registers.d & 0xBF;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e & 0xDF;
+                    self.registers.e = self.registers.e & 0xBF;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h & 0xDF;
+                    self.registers.h = self.registers.h & 0xBF;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l & 0xDF;
+                    self.registers.l = self.registers.l & 0xBF;
                     2
                 }
                 R8::HL => {
                     let hl = self.registers.get_hl();
-                    let val = self.memory.read8(hl) & 0xDF;
+                    let val = self.memory.read8(hl) & 0xBF;
                     self.memory.write8(hl, val);
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a & 0xDF;
+                    self.registers.a = self.registers.a & 0xBF;
                     2
                 }
             },
@@ -2857,8 +2857,6 @@ impl<'a, 'b> Machine<'a, 'b> {
         let hl = self.registers.get_hl();
         // Actual addition.
         let result = hl.wrapping_add(value);
-        // Update zero flag.
-        self.registers.z(result == 0);
         // Update subtraction flag.
         self.registers.n(false);
         // Update carry flag (overflow from bit 15).
@@ -2900,9 +2898,8 @@ impl<'a, 'b> Machine<'a, 'b> {
         // Update carry flag.
         self.registers.c(overflow);
         // Update half-carry flag. The half-carry is 1 if the addition of the
-        // lower nibbles of a and target overflows.
-        self.registers
-            .h((a & 0x0F) + (result & 0x0F) + carry > 0x0F);
+        // lower nibbles of `a` and target overflows.
+        self.registers.h((a & 0x0F) + (value & 0x0F) + carry > 0x0F);
 
         // Result -> a.
         self.registers.a = result;
