@@ -288,7 +288,9 @@ impl PPU {
                 // This is implemented in `memory.rs`.
             }
             // BGP.
-            0xFF47 => self.bgp = value,
+            0xFF47 => {
+                self.bgp = value;
+            }
             // OBP0.
             0xFF48 => self.obp0 = value,
             // OBP1.

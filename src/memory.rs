@@ -96,7 +96,8 @@ impl<'a, 'b> Memory<'a, 'b> {
         // SC
         self.write8(0xFF02, 0x7E);
         // DIV
-        self.write8(0xFF04, 0xAB);
+        // Do not use memory interface, for it sets DIV to 0!
+        self.timer.set_initial_div(0xAB);
         // TIMA
         self.write8(0xFF05, 0x00);
         // TMA

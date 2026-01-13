@@ -42,6 +42,10 @@ impl Timer {
         self.i_mask = 0;
     }
 
+    pub fn set_initial_div(&mut self, value: u8) {
+        self.divider = (value as u16) << 8;
+    }
+
     pub fn read(&self, address: u16) -> u8 {
         match address {
             // Only the upper 8 bits of DIV are mapped to memory.

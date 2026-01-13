@@ -32,6 +32,8 @@ pub struct Machine<'a, 'b> {
     di: u8,
     /// Flag that holds the running status.
     running: bool,
+    /// CPU halted.
+    halted: bool,
     /// T-states, basic unit of time, and 1:1 with the clock.
     t_cycles: u32,
     /// M-cycles, base unit for CPU instructions, and 1:4 with the clock.
@@ -51,6 +53,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             ei: 0,
             di: 0,
             running: false,
+            halted: false,
             t_cycles: 324,
             m_cycles: 0,
             debug: DebugMonitor::new(debug),
@@ -139,9 +142,12 @@ impl<'a, 'b> Machine<'a, 'b> {
     /// to the stack, and then setting it to the address of the interrupt handler.
     fn interrupt_handling(&mut self) -> u32 {
         let pending = self.memory.ie & self.memory.iff;
-        // Wake from HALT if any interrupt is pending.
+
+        // Wake from HALT if any interrupt is pending (even if IME is disabled).
         if pending == 0 {
             return 0;
+        } else {
+            self.halted = false;
         }
 
         if self.ime && pending != 0 {
@@ -186,8 +192,13 @@ impl<'a, 'b> Machine<'a, 'b> {
         // CPU instruction.
         // One machine cycle (M-cycle) is 4 clock cycles.
         let mut m_cycles = if self.running {
-            // Run next CPU instruction.
-            self.cycle() as u32
+            if self.halted {
+                // CPU is halted, don't execute instructions but still consume 1 M-cycle.
+                1
+            } else {
+                // Run next CPU instruction.
+                self.cycle() as u32
+            }
         } else {
             // NOOP instruction.
             1
@@ -2685,7 +2696,7 @@ impl<'a, 'b> Machine<'a, 'b> {
 
     /// Halt the machine by setting the running flag.
     fn halt(&mut self) {
-        //self.running = false;
+        self.halted = true;
     }
 
     /// TODO: implement this.
