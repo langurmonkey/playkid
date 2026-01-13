@@ -40,7 +40,7 @@ pub struct Memory<'a, 'b> {
     // IE flag: interrupt enable.
     pub ie: u8,
     // Cartridge reference.
-    pub cart: &'a Cartridge,
+    pub cart: &'a mut Cartridge,
     /// Our PPU, picture processing unit.
     pub ppu: PPU,
     /// The timer.
@@ -51,7 +51,7 @@ pub struct Memory<'a, 'b> {
 
 impl<'a, 'b> Memory<'a, 'b> {
     /// Create a new memory instance.
-    pub fn new(cart: &'a Cartridge, sdl: &'b Sdl) -> Self {
+    pub fn new(cart: &'a mut Cartridge, sdl: &'b Sdl) -> Self {
         Memory {
             wram: [0; constants::WRAM_SIZE],
             hram: [0; constants::HRAM_SIZE],
@@ -217,19 +217,11 @@ impl<'a, 'b> Memory<'a, 'b> {
         match address {
             0x0000..=0x3FFF => {
                 // 16kB bank #0 (cartridge).
-                *self
-                    .cart
-                    .data
-                    .get(address as usize)
-                    .expect("Error getting cartridge data")
+                self.cart.read(address)
             }
             0x4000..=0x7FFF => {
                 // 16kB switchable ROM bank (cartridge).
-                *self
-                    .cart
-                    .data
-                    .get(address as usize)
-                    .expect("Error getting cartridge data")
+                self.cart.read(address)
             }
             0x8000..=0x9FFF => {
                 // VRAM.
@@ -237,11 +229,7 @@ impl<'a, 'b> Memory<'a, 'b> {
             }
             0xA000..=0xBFFF => {
                 // 8kB switchable RAM bank (cartridge).
-                *self
-                    .cart
-                    .data
-                    .get((address - 0xA000) as usize)
-                    .expect("Error getting cartridge data")
+                self.cart.read_ram(address)
             }
             0xC000..=0xDFFF => {
                 // 8kB WRAM.
@@ -292,7 +280,7 @@ impl<'a, 'b> Memory<'a, 'b> {
         match address {
             0x0000..=0x7FFF => {
                 // Cartridge (ROM + switchable banks).
-                // println!("Attempted to write to cartridge ROM: ${:04x}", address);
+                self.cart.write(address, value);
             }
             0x8000..=0x9FFF => {
                 // VRAM.
@@ -300,7 +288,7 @@ impl<'a, 'b> Memory<'a, 'b> {
             }
             0xA000..=0xBFFF => {
                 // 8kB switchable RAM bank (cartridge).
-                // println!("Write to cartridge RAM: ${:04x}", address);
+                self.cart.write(address, value)
             }
             0xC000..=0xDFFF => {
                 // 8kB WRAM.

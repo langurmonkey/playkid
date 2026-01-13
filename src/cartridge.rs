@@ -1,15 +1,22 @@
+mod mbc1;
+
 use colored::Colorize;
+use mbc1::Mbc1;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind, Result};
 use std::str;
 
-/// A representation of a cartridge..
+pub enum CartridgeType {
+    RomOnly,
+    Mbc1(Box<Mbc1>),
+}
+
+/// A representation of a cartridge.
 pub struct Cartridge {
+    pub cart_type: CartridgeType,
     /// Holds the ROM data in an array of bytes.
-    pub data: Vec<u8>,
-    /// Cartridge type byte.
-    pub cart_type: u8,
+    data: Vec<u8>,
 }
 
 /// Game Boy logo sequence.
@@ -162,14 +169,72 @@ impl Cartridge {
         }
 
         // Check supported modes.
-        if cart_type > 0 {
-            panic!(
-                "Only ROM ONLY cartridges supported (current is {})",
-                Cartridge::cart_type_str(cart_type)
-            );
-        }
+        let cart_type_enum = match cart_type {
+            0x00 => {
+                println!(" -> Using ROM ONLY mode");
+                CartridgeType::RomOnly
+            }
+            0x01 | 0x02 | 0x03 => {
+                println!(" -> Using MBC1 mode");
+                let rom_size_code = data[0x148];
+                let ram_size_code = data[0x149];
+                CartridgeType::Mbc1(Box::new(Mbc1::new(
+                    data.clone(),
+                    rom_size_code,
+                    ram_size_code,
+                )))
+            }
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    format!(
+                        "Unsupported cartridge type: {}",
+                        Cartridge::cart_type_str(cart_type)
+                    ),
+                ));
+            }
+        };
 
-        Ok(Self { data, cart_type })
+        Ok(Self {
+            cart_type: cart_type_enum,
+            data,
+        })
+    }
+
+    pub fn read(&self, address: u16) -> u8 {
+        match &self.cart_type {
+            CartridgeType::RomOnly => {
+                if address < self.data.len() as u16 {
+                    self.data[address as usize]
+                } else {
+                    0xFF
+                }
+            }
+            CartridgeType::Mbc1(mbc) => mbc.read_rom(address),
+        }
+    }
+
+    pub fn write(&mut self, address: u16, value: u8) {
+        match &mut self.cart_type {
+            CartridgeType::RomOnly => {
+                // ROM only has no banking, ignore writes
+            }
+            CartridgeType::Mbc1(mbc) => mbc.write_rom(address, value),
+        }
+    }
+
+    pub fn read_ram(&self, address: u16) -> u8 {
+        match &self.cart_type {
+            CartridgeType::RomOnly => 0xFF, // No RAM for ROM only
+            CartridgeType::Mbc1(mbc) => mbc.read_ram(address),
+        }
+    }
+
+    pub fn write_ram(&mut self, address: u16, value: u8) {
+        match &mut self.cart_type {
+            CartridgeType::RomOnly => {} // No RAM for ROM only
+            CartridgeType::Mbc1(mbc) => mbc.write_ram(address, value),
+        }
     }
 
     pub fn cart_type_str(cart_type: u8) -> String {

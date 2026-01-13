@@ -46,11 +46,11 @@ fn main() -> io::Result<()> {
     }
 
     // Load ROM file into cartridge.
-    let cart = Cartridge::new(rom, args.skipcheck).expect("Error reading rom file");
+    let mut cart = Cartridge::new(rom, args.skipcheck).expect("Error reading rom file");
 
     let sdl_context = sdl2::init().unwrap();
     // Create a game boy with the given cartridge.
-    let mut gameboy = Machine::new(&cart, &sdl_context, args.scale, args.debug);
+    let mut gameboy = Machine::new(&mut cart, &sdl_context, args.scale, args.debug);
     // Initialize the Game Boy state.
     gameboy.init();
     // Start the machine.

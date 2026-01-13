@@ -44,7 +44,7 @@ pub struct Machine<'a, 'b> {
 
 impl<'a, 'b> Machine<'a, 'b> {
     /// Create a new instance of the Game Boy.
-    pub fn new(cart: &'a Cartridge, sdl: &'b Sdl, scale: u8, debug: bool) -> Self {
+    pub fn new(cart: &'a mut Cartridge, sdl: &'b Sdl, scale: u8, debug: bool) -> Self {
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
@@ -143,22 +143,9 @@ impl<'a, 'b> Machine<'a, 'b> {
     fn interrupt_handling(&mut self) -> u32 {
         let pending = self.memory.ie & self.memory.iff;
 
-        // Debug logging
-        static mut COUNTER: u32 = 0;
-        unsafe {
-            COUNTER += 1;
-            if COUNTER % 10000 == 0 {
-                println!(
-                    "Interrupt check #{}: IE={:02X} IF={:02X} pending={:02X} IME={} halted={}",
-                    COUNTER, self.memory.ie, self.memory.iff, pending, self.ime, self.halted
-                );
-            }
-        }
-
         // Wake from HALT if any interrupt is pending (even if IME is disabled).
         if pending != 0 {
             if self.halted {
-                println!("CPU woken from HALT! pending={:02X}", pending);
                 self.halted = false;
             }
         }
@@ -168,7 +155,6 @@ impl<'a, 'b> Machine<'a, 'b> {
             return 0;
         }
 
-        println!("Servicing interrupt: {:02X}", pending);
         // Reset IME.
         self.ime = false;
 
