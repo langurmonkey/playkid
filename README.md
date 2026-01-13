@@ -4,9 +4,9 @@
 
 # Play Kid, a Game Boy emulator
 
-This is a WIP. Check back later.
+Play Kid is yet another Game Boy emulator, written in Rust. But hey, it is MY Game Boy emulator, and I'm proud of it. Currently, only ROM and MBC1 are implemented, and there is no audio. It passes DMG-ACID2, and it plays games like Tetris and Super Mario Land perfectly.
 
-# Some links
+# Useful links
 
 Pandocs: https://gbdev.io/pandocs/
 Complete tech reference: https://gekkio.fi/files/gb-docs/gbctr.pdf

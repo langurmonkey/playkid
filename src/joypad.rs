@@ -39,7 +39,7 @@ pub struct Joypad<'b> {
     pub debug_flag: bool,
     /// Cycle counter,
     cycles: usize,
-    /// The event pum.
+    /// The event pump.
     event_pump: EventPump,
     /// Reference to the main SDL object.
     sdl: &'b Sdl,
@@ -96,14 +96,6 @@ impl<'b> Joypad<'b> {
     }
 
     pub fn cycle(&mut self) {
-        // Event loop
-        // Only poll events once every frame.
-        //
-        self.cycles += 1;
-        if self.cycles < constants::CYCLES_PER_FRAME {
-            return;
-        }
-
         // Reset cycles.
         self.cycles = 0;
 
