@@ -18,9 +18,13 @@ use std::io;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(name = "playkid")]
-#[command(version = "1.0")]
-#[command(about = "Not so fancy Game Boy emulator.", long_about = None)]
+#[command(
+    name = "Play Kid",
+    version = "1.0",
+    about = "Minimalist Game Boy emulator for the cool kids.",
+    author = "Toni Sagristà - tonisagrista.com",
+    help_template = "{name} {version}\n{author}\n\n{about}\n\n{usage-heading} {usage}\n\n{all-args}"
+)]
 /// CLI arguments.
 struct Args {
     /// Path to the input ROM file to load.
