@@ -216,8 +216,8 @@ impl PPU {
             }
             // LCDC.
             0xFF40 => self.lcdc,
-            // STAT.
-            0xFF41 => self.stat,
+            // STAT - bit 7 is always 1 when STAT is read, hence the OR.
+            0xFF41 => self.stat | 0x80,
             // SCY.
             0xFF42 => self.scy,
             // SCX.

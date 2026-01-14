@@ -1,15 +1,15 @@
-/// MBC1 Memory Bank Controller
+/// MBC1 Memory Bank Controller.
 pub struct Mbc1 {
     rom: Vec<u8>,
     ram: Vec<u8>,
 
-    // MBC1 state
+    // MBC1 state.
     rom_bank: usize,
     ram_bank: usize,
     ram_enabled: bool,
     banking_mode: u8,
 
-    // ROM/RAM sizes
+    // ROM/RAM sizes.
     rom_size: usize,
     ram_size: usize,
 }
@@ -46,7 +46,7 @@ impl Mbc1 {
         Self {
             rom,
             ram: vec![0; ram_size],
-            rom_bank: 1, // Start at bank 1 (bank 0 is fixed)
+            rom_bank: 1,
             ram_bank: 0,
             ram_enabled: false,
             banking_mode: 0,
@@ -57,12 +57,12 @@ impl Mbc1 {
 
     pub fn read_rom(&self, address: u16) -> u8 {
         match address {
-            // Fixed ROM bank 0
+            // Fixed ROM bank 0, always there.
             0x0000..=0x3FFF => self.rom[address as usize],
-            // Switchable ROM bank
+            // Switchable ROM bank.
             0x4000..=0x7FFF => {
                 let bank = if self.banking_mode == 0 {
-                    // In mode 0, upper bits are ignored for ROM
+                    // In mode 0, upper bits are ignored for ROM.
                     self.rom_bank & 0x1F
                 } else {
                     self.rom_bank & 0x7F
@@ -80,30 +80,31 @@ impl Mbc1 {
 
     pub fn write_rom(&mut self, address: u16, value: u8) {
         match address {
-            // RAM enable
+            // RAM enable.
             0x0000..=0x1FFF => {
                 self.ram_enabled = (value & 0x0F) == 0x0A;
             }
-            // ROM bank number (lower 5 bits)
+            // ROM bank number (lower 5 bits).
             0x2000..=0x3FFF => {
                 let mut bank = value as usize & 0x1F;
+                // Bank 0 is not allowed, becomes bank 1.
                 if bank == 0 {
-                    bank = 1; // Bank 0 is not allowed, becomes bank 1
+                    bank = 1;
                 }
                 self.rom_bank = (self.rom_bank & 0x60) | bank;
             }
-            // RAM bank number or upper bits of ROM bank
+            // RAM bank number or upper bits of ROM bank.
             0x4000..=0x5FFF => {
                 let bits = value as usize & 0x03;
                 if self.banking_mode == 0 {
-                    // ROM banking mode: bits go to upper ROM bank
+                    // ROM banking mode: bits go to upper ROM bank.
                     self.rom_bank = (bits << 5) | (self.rom_bank & 0x1F);
                 } else {
-                    // RAM banking mode
+                    // RAM banking mode.
                     self.ram_bank = bits;
                 }
             }
-            // Banking mode select
+            // Banking mode select.
             0x6000..=0x7FFF => {
                 self.banking_mode = value & 0x01;
             }
@@ -111,16 +112,17 @@ impl Mbc1 {
         }
     }
 
+    /// Read from currently mapped banks.
     pub fn read_ram(&self, address: u16) -> u8 {
         if !self.ram_enabled || self.ram.is_empty() {
             return 0xFF;
         }
 
         let offset = if self.ram_size <= 8 * 1024 {
-            // For 8KB RAM, ignore banking
+            // For 8KB RAM, ignore banking.
             address as usize - 0xA000
         } else {
-            // For larger RAM, use banking
+            // For larger RAM, use banking.
             let bank = if self.banking_mode == 1 {
                 self.ram_bank
             } else {
@@ -136,6 +138,7 @@ impl Mbc1 {
         }
     }
 
+    /// Write to RAM is unused in MBC1, but just in case...
     pub fn write_ram(&mut self, address: u16, value: u8) {
         if !self.ram_enabled || self.ram.is_empty() {
             return;

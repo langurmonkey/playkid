@@ -38,7 +38,7 @@ pub struct Machine<'a, 'b> {
     t_cycles: u32,
     /// M-cycles, base unit for CPU instructions, and 1:4 with the clock.
     m_cycles: u32,
-    /// The debug monitor
+    /// The debug monitor.
     debug: DebugMonitor,
 }
 
@@ -100,7 +100,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                 self.display.render(&self.memory);
             }
 
-            // Now, sleep for the remaining time in the frame
+            // Now, sleep for the remaining time in the frame.
             let elapsed = frame_start_time.elapsed();
             if elapsed < constants::TARGET_FRAME_DURATION {
                 let remaining = constants::TARGET_FRAME_DURATION - elapsed;
@@ -2697,12 +2697,12 @@ impl<'a, 'b> Machine<'a, 'b> {
         }
     }
 
-    /// Halt the machine by setting the running flag.
+    /// Halt the machine by setting the `halted` flag to true.
     fn halt(&mut self) {
         self.halted = true;
     }
 
-    /// TODO: implement this.
+    /// Stop the machine by setting the `running` flag to false.
     fn stop(&mut self) {
         // Reset DIV register.
         self.memory.write8(0xFF04, 0x00);
@@ -2725,26 +2725,31 @@ impl<'a, 'b> Machine<'a, 'b> {
         result
     }
 
+    /// Push a word to the stack.
     fn push_stack(&mut self, value: u16) {
         self.registers.sp = self.registers.sp.wrapping_sub(2);
         self.memory.write16(self.registers.sp, value);
     }
 
+    /// Pop a word from the stack.
     fn pop_stack(&mut self) -> u16 {
         let result = self.memory.read16(self.registers.sp);
         self.registers.sp += 2;
         result
     }
 
+    /// Set `pc` to next 2 bytes in RAM.
     fn jp(&mut self) {
         self.registers.pc = self.read16();
     }
 
+    /// Jump operation.
     fn jr(&mut self) {
         let j = self.read8() as i8;
         self.registers.pc = ((self.registers.pc as i32) + (j as i32)) as u16;
     }
 
+    /// Increment the value, update flags, return.
     fn inc(&mut self, value: u8) -> u8 {
         let result = value.wrapping_add(1);
         self.registers.z(result == 0);
@@ -2753,6 +2758,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         result
     }
 
+    /// Decrement the value, update flags, return it.
     fn dec(&mut self, value: u8) -> u8 {
         let result = value.wrapping_sub(1);
         self.registers.z(result == 0);
@@ -2761,7 +2767,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         result
     }
 
-    /// Set flags after a bit shift operation (RR, RL, RLC, RRC, SLA, SRA, SLR)
+    /// Set flags after a bit shift operation.
     fn rotate_flags(&mut self, result: u8, carry: bool) {
         self.registers.z(result == 0);
         self.registers.c(carry);
@@ -2929,6 +2935,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.registers.a = result;
     }
 
+    /// Logic AND.
     fn and(&mut self, value: u8) {
         let result = self.registers.a & value;
         self.registers.z(result == 0);
@@ -2939,6 +2946,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.registers.a = result;
     }
 
+    /// Logic XOR.
     fn xor(&mut self, value: u8) {
         let result = self.registers.a ^ value;
         self.registers.z(result == 0);
@@ -2949,6 +2957,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.registers.a = result;
     }
 
+    /// Logic OR.
     fn or(&mut self, value: u8) {
         let result = self.registers.a | value;
         self.registers.z(result == 0);

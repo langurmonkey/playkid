@@ -19,8 +19,6 @@ pub const TARGET_FRAME_DURATION: std::time::Duration =
     std::time::Duration::from_millis(1000 / TARGET_FPS);
 /// CPU frequency [Hz].
 pub const CPU_FREQ_HZ: usize = 4194304;
-/// CPU period [ns].
-pub const CPU_CLOCK_NS: usize = (1000_000_000.0 / CPU_FREQ_HZ as f64) as usize;
 /// CPU cycles per frame.
 pub const CYCLES_PER_FRAME: usize = (CPU_FREQ_HZ as f64 / 59.7) as usize;
 /// Maximum number of sprites per line.
