@@ -631,12 +631,15 @@ impl APU {
         ];
 
         let signal = patterns[duty_idx][self.ch2_duty_step];
-        let vol = (self.ch2_volume as f32 / 15.0) * 0.05;
+
+        // Scale by volume (0.0 to 1.0 range).
+        // We use a small multiplier (0.05) so it's not too loud.
+        let volume_multiplier = (self.ch2_volume as f32 / 15.0) * 0.05;
 
         if signal == 1 {
-            vol
+            volume_multiplier
         } else {
-            -vol
+            -volume_multiplier
         }
     }
 

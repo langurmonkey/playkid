@@ -1,5 +1,5 @@
 /// MBC1 Memory Bank Controller.
-pub struct Mbc1 {
+pub struct MBC1 {
     rom: Vec<u8>,
     ram: Vec<u8>,
 
@@ -14,7 +14,7 @@ pub struct Mbc1 {
     ram_size: usize,
 }
 
-impl Mbc1 {
+impl MBC1 {
     pub fn new(rom_data: Vec<u8>, rom_size_code: u8, ram_size_code: u8) -> Self {
         let rom_size = match rom_size_code {
             0 => 32 * 1024,   // 32KB, 2 banks
@@ -55,7 +55,7 @@ impl Mbc1 {
         }
     }
 
-    pub fn read_rom(&self, address: u16) -> u8 {
+    pub fn read(&self, address: u16) -> u8 {
         match address {
             // Fixed ROM bank 0, always there.
             0x0000..=0x3FFF => self.rom[address as usize],
@@ -78,7 +78,7 @@ impl Mbc1 {
         }
     }
 
-    pub fn write_rom(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) {
         match address {
             // RAM enable.
             0x0000..=0x1FFF => {

@@ -4,7 +4,7 @@
 
 # Play Kid, a Game Boy emulator
 
-Play Kid is yet another Game Boy emulator, written in Rust. But hey, it is MY Game Boy emulator, and I'm proud of it. Currently, only ROM and MBC1 are implemented, and there is no audio. It passes DMG-ACID2, and it plays games like Tetris and Super Mario Land perfectly.
+Play Kid is yet another Game Boy emulator, written in Rust. But hey, it is MY Game Boy emulator, and I'm proud of it. Currently, only ROM and MBC1 are implemented. Audio is also fully implemented (4 channels, with envelopes, sweep, and stereo). It passes DMG-ACID2, and it plays games like Tetris, Pokémon, and Super Mario Land (1 and 2) perfectly.
 
 # Useful links
 

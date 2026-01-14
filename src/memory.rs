@@ -286,7 +286,7 @@ impl<'a> Memory<'a> {
             }
             0xA000..=0xBFFF => {
                 // 8kB switchable RAM bank (cartridge).
-                self.cart.write(address, value)
+                self.cart.write_ram(address, value)
             }
             0xC000..=0xDFFF => {
                 // 8kB WRAM.

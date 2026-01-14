@@ -1,7 +1,11 @@
 mod mbc1;
+mod mbc2;
+mod mbc3;
 
 use colored::Colorize;
-use mbc1::Mbc1;
+use mbc1::MBC1;
+use mbc2::MBC2;
+use mbc3::MBC3;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind, Result};
@@ -9,7 +13,9 @@ use std::str;
 
 pub enum CartridgeType {
     RomOnly,
-    Mbc1(Box<Mbc1>),
+    MBC1(Box<MBC1>),
+    MBC2(Box<MBC2>),
+    MBC3(Box<MBC3>),
 }
 
 /// A representation of a cartridge.
@@ -178,7 +184,22 @@ impl Cartridge {
                 println!(" -> Using MBC1 mode");
                 let rom_size_code = data[0x148];
                 let ram_size_code = data[0x149];
-                CartridgeType::Mbc1(Box::new(Mbc1::new(
+                CartridgeType::MBC1(Box::new(MBC1::new(
+                    data.clone(),
+                    rom_size_code,
+                    ram_size_code,
+                )))
+            }
+            0x05 | 0x06 => {
+                println!(" -> Using MBC2 mode");
+                let rom_size_code = data[0x148];
+                CartridgeType::MBC2(Box::new(MBC2::new(data.clone(), rom_size_code)))
+            }
+            0x0F..=0x13 => {
+                println!(" -> Using MBC3 mode");
+                let rom_size_code = data[0x148];
+                let ram_size_code = data[0x149];
+                CartridgeType::MBC3(Box::new(MBC3::new(
                     data.clone(),
                     rom_size_code,
                     ram_size_code,
@@ -210,7 +231,9 @@ impl Cartridge {
                     0xFF
                 }
             }
-            CartridgeType::Mbc1(mbc) => mbc.read_rom(address),
+            CartridgeType::MBC1(mbc) => mbc.read(address),
+            CartridgeType::MBC2(mbc) => mbc.read(address),
+            CartridgeType::MBC3(mbc) => mbc.read(address),
         }
     }
 
@@ -219,21 +242,27 @@ impl Cartridge {
             CartridgeType::RomOnly => {
                 // ROM only has no banking, ignore writes
             }
-            CartridgeType::Mbc1(mbc) => mbc.write_rom(address, value),
+            CartridgeType::MBC1(mbc) => mbc.write(address, value),
+            CartridgeType::MBC2(mbc) => mbc.write(address, value),
+            CartridgeType::MBC3(mbc) => mbc.write(address, value),
         }
     }
 
     pub fn read_ram(&self, address: u16) -> u8 {
         match &self.cart_type {
             CartridgeType::RomOnly => 0xFF, // No RAM for ROM only
-            CartridgeType::Mbc1(mbc) => mbc.read_ram(address),
+            CartridgeType::MBC1(mbc) => mbc.read_ram(address),
+            CartridgeType::MBC2(mbc) => mbc.read_ram(address),
+            CartridgeType::MBC3(mbc) => mbc.read_ram(address),
         }
     }
 
     pub fn write_ram(&mut self, address: u16, value: u8) {
         match &mut self.cart_type {
             CartridgeType::RomOnly => {} // No RAM for ROM only
-            CartridgeType::Mbc1(mbc) => mbc.write_ram(address, value),
+            CartridgeType::MBC1(mbc) => mbc.write_ram(address, value),
+            CartridgeType::MBC2(mbc) => mbc.write_ram(address, value),
+            CartridgeType::MBC3(mbc) => mbc.write_ram(address, value),
         }
     }
 
