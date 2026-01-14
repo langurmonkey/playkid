@@ -102,7 +102,11 @@ impl<'a, 'b> Machine<'a, 'b> {
 
             // Execute cycles for one full frame
             while cycles_this_frame < constants::CYCLES_PER_FRAME {
-                let (t, m) = self.machine_cycle();
+                let (t, m, r) = self.machine_cycle();
+                if !r {
+                    // Early exit due to joypad.
+                    break;
+                }
                 self.m_cycles += m;
                 self.t_cycles += t;
                 cycles_this_frame += t as usize;
@@ -206,7 +210,7 @@ impl<'a, 'b> Machine<'a, 'b> {
     }
 
     /// Run a machine cycle.
-    fn machine_cycle(&mut self) -> (u32, u32) {
+    fn machine_cycle(&mut self) -> (u32, u32, bool) {
         // CPU instruction.
         // One machine cycle (M-cycle) is 4 clock cycles.
         let mut m_cycles = if self.running {
@@ -226,7 +230,12 @@ impl<'a, 'b> Machine<'a, 'b> {
         let mut t_cycles = m_cycles * 4;
         if m_cycles > 0 {
             // Memory cycle.
-            self.memory.cycle(t_cycles);
+            let (_, r) = self.memory.cycle(t_cycles);
+            if !r {
+                // Close down.
+                self.running = false;
+                return (0, 0, false);
+            }
         } else {
             t_cycles = 0;
             m_cycles = 0;
@@ -240,9 +249,9 @@ impl<'a, 'b> Machine<'a, 'b> {
 
         // Return.
         if interrupt_m_cycles > 0 {
-            (interrupt_m_cycles * 4, interrupt_m_cycles)
+            (interrupt_m_cycles * 4, interrupt_m_cycles, true)
         } else {
-            (t_cycles, m_cycles)
+            (t_cycles, m_cycles, true)
         }
     }
 

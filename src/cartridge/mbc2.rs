@@ -75,4 +75,14 @@ impl MBC2 {
         // Only the lower 4 bits are stored.
         self.ram[index] = value & 0x0F;
     }
+
+    pub fn get_ram(&self) -> &[u8] {
+        &self.ram
+    }
+
+    // Copy from the loaded buffer into the fixed array
+    pub fn set_ram(&mut self, data: &[u8]) {
+        let len = data.len().min(512);
+        self.ram[..len].copy_from_slice(&data[..len]);
+    }
 }

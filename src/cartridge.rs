@@ -9,6 +9,7 @@ use mbc3::MBC3;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind, Result};
+use std::path::Path;
 use std::str;
 
 pub enum CartridgeType {
@@ -59,8 +60,9 @@ impl Cartridge {
         // Get title.
         {
             let slice = &data[0x134..0x142];
-            let title = str::from_utf8(slice).expect("Error getting ROM title");
-            println!("Title: {}", title.bright_blue());
+            let title =
+                str::from_utf8(slice).expect(&format!("{}: Error getting ROM title", "ERR".red()));
+            println!("{}: Title: {}", "OK".green(), title.bright_blue());
         }
 
         // Color or not color.
@@ -165,7 +167,7 @@ impl Cartridge {
             if gc != cs as u16 {
                 panic!(
                     "{}: Global checksum incorrect: [mem]{:#06x} != [cs]{:#06X}",
-                    "KO".red(),
+                    "ERR".red(),
                     gc,
                     cs as u16
                 );
@@ -177,11 +179,11 @@ impl Cartridge {
         // Check supported modes.
         let cart_type_enum = match cart_type {
             0x00 => {
-                println!(" -> Using ROM ONLY mode");
+                println!("{}: Using ROM ONLY mode", "OK".green());
                 CartridgeType::RomOnly
             }
             0x01 | 0x02 | 0x03 => {
-                println!(" -> Using MBC1 mode");
+                println!("{}: Using MBC1 mode", "OK".green());
                 let rom_size_code = data[0x148];
                 let ram_size_code = data[0x149];
                 CartridgeType::MBC1(Box::new(MBC1::new(
@@ -191,12 +193,12 @@ impl Cartridge {
                 )))
             }
             0x05 | 0x06 => {
-                println!(" -> Using MBC2 mode");
+                println!("{}: Using MBC2 mode", "OK".green());
                 let rom_size_code = data[0x148];
                 CartridgeType::MBC2(Box::new(MBC2::new(data.clone(), rom_size_code)))
             }
             0x0F..=0x13 => {
-                println!(" -> Using MBC3 mode");
+                println!("{}: Using MBC3 mode", "OK".green());
                 let rom_size_code = data[0x148];
                 let ram_size_code = data[0x149];
                 CartridgeType::MBC3(Box::new(MBC3::new(
@@ -209,7 +211,8 @@ impl Cartridge {
                 return Err(Error::new(
                     ErrorKind::InvalidData,
                     format!(
-                        "Unsupported cartridge type: {}",
+                        "{}: Unsupported cartridge type: {}",
+                        "ERR".red(),
                         Cartridge::cart_type_str(cart_type)
                     ),
                 ));
@@ -297,6 +300,72 @@ impl Cartridge {
             0xFE => "HuC3".to_string(),
             0xFF => "MuC1+RAM+BATTERY".to_string(),
             _ => format!("Unknown ({:#40x})", cart_type),
+        }
+    }
+
+    /// Save RAM to `.sav` file.
+    pub fn save_sram(&self, rom_path: &str) {
+        let save_path = Path::new(rom_path).with_extension("sav");
+
+        // Only save if the mapper actually has RAM
+        let ram_data = match &self.cart_type {
+            CartridgeType::MBC1(mbc) => &mbc.get_ram(),
+            CartridgeType::MBC2(mbc) => &mbc.get_ram(),
+            CartridgeType::MBC3(mbc) => &mbc.get_ram(),
+            _ => return,
+        };
+
+        if !ram_data.is_empty() || matches!(self.cart_type, CartridgeType::MBC2(_)) {
+            if let Ok(mut file) = File::create(&save_path) {
+                let _ = file.write_all(ram_data);
+                println!(
+                    "{}: Save data written to disk: {}",
+                    "OK".green(),
+                    save_path.display()
+                );
+            }
+        }
+    }
+
+    /// Load `.sav` file into RAM.
+    pub fn load_sram(&mut self, rom_path: &str) {
+        let save_path = Path::new(rom_path).with_extension("sav");
+
+        // Use a reference here (&save_path) so we don't move the value
+        if !save_path.exists() {
+            return;
+        }
+
+        // Use a reference here as well
+        if let Ok(mut file) = File::open(&save_path) {
+            let mut buffer = Vec::new();
+            if file.read_to_end(&mut buffer).is_ok() {
+                match &mut self.cart_type {
+                    CartridgeType::MBC1(mbc) => {
+                        if mbc.get_ram().len() == buffer.len() {
+                            mbc.set_ram(buffer);
+                        } else {
+                            println!("{}: Save file size mismatch!", "Warning".yellow());
+                        }
+                    }
+                    CartridgeType::MBC2(mbc) => mbc.set_ram(&buffer),
+                    CartridgeType::MBC3(mbc) => {
+                        if mbc.get_ram().len() == buffer.len() {
+                            mbc.set_ram(buffer);
+                        } else {
+                            println!("{}: Save file size mismatch!", "Warning".yellow());
+                        }
+                    }
+                    _ => (),
+                }
+
+                // Now save_path is still available here!
+                println!(
+                    "{}: Save data loaded from disk: {}",
+                    "OK".green(),
+                    save_path.display()
+                );
+            }
         }
     }
 }

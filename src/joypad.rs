@@ -1,5 +1,6 @@
 use crate::constants;
 
+use colored::Colorize;
 use crossterm::{execute, terminal::LeaveAlternateScreen};
 use sdl2::controller::{Axis, Button, GameController};
 use sdl2::event::Event;
@@ -88,26 +89,34 @@ impl Joypad {
             .map_err(|e| format!("can't enumerate joysticks: {}", e))
             .unwrap();
 
-        println!("Found {} joystick(s)", available);
+        println!("{}: Found {} joystick(s)", "OK".green(), available);
 
         // Try to open the first controller
         for id in 0..available {
             if self.controller_subsystem.is_game_controller(id) {
                 match self.controller_subsystem.open(id) {
                     Ok(c) => {
-                        println!("Controller {} opened: {}", id, c.name());
+                        println!(
+                            "{}: Controller {} opened: {}",
+                            "OK".green(),
+                            id,
+                            c.name().purple()
+                        );
                         self.controller = Some(c);
                         break;
                     }
                     Err(e) => {
-                        println!("Failed to open controller {}: {}", id, e);
+                        println!("{}: Failed to open controller {}: {}", "ERR".red(), id, e);
                     }
                 }
             }
         }
 
         if self.controller.is_none() {
-            println!("No game controllers found, using keyboard only");
+            println!(
+                "{}: No game controllers found, using keyboard only",
+                "OK".green()
+            );
         }
     }
 
@@ -138,12 +147,12 @@ impl Joypad {
         }
     }
 
-    pub fn cycle(&mut self) {
+    pub fn cycle(&mut self) -> bool {
         // Poll events twice per frame.
         // Polling once per frame results in too much latency.
         self.cycles += 1;
         if self.cycles * 2 < constants::CYCLES_PER_FRAME {
-            return;
+            return true;
         }
         // Reset cycles.
         self.cycles = 0;
@@ -165,11 +174,11 @@ impl Joypad {
                         Err(error) => println!("{:?}", error),
                         _ => {}
                     }
-                    println!("Bye bye!");
-                    process::exit(0);
+                    println!("{}: Bye bye!", "OK".green());
+                    return false;
                 }
 
-                // Debug pause ('s' for stop).
+                // Debug pause (`s` for stop).
                 Event::KeyDown {
                     keycode: Some(Keycode::S),
                     ..
@@ -314,16 +323,21 @@ impl Joypad {
 
                 // Controller connected.
                 Event::ControllerDeviceAdded { which, .. } => {
-                    println!("Connected!");
                     if self.controller.is_none() {
                         // For 'Added' events, 'which' is the device index.
                         if self.controller_subsystem.is_game_controller(which) {
                             match self.controller_subsystem.open(which) {
                                 Ok(c) => {
-                                    println!("Controller connected: {}", c.name());
+                                    println!(
+                                        "{}: Controller connected: {}",
+                                        "OK".green(),
+                                        c.name()
+                                    );
                                     self.controller = Some(c);
                                 }
-                                Err(e) => println!("Failed to open controller: {}", e),
+                                Err(e) => {
+                                    println!("{}: Failed to open controller: {}", "ERR".red(), e)
+                                }
                             }
                         }
                     }
@@ -331,7 +345,6 @@ impl Joypad {
 
                 // Controller disconnected.
                 Event::ControllerDeviceRemoved { which, .. } => {
-                    println!("Removed!");
                     // For 'Removed' events, 'which' is the Instance ID.
                     let is_current = self
                         .controller
@@ -340,7 +353,8 @@ impl Joypad {
 
                     if is_current {
                         println!(
-                            "Controller disconnected: {}",
+                            "{}: Controller disconnected: {}",
+                            "OK".green(),
                             self.controller.as_ref().unwrap().name()
                         );
                         self.controller = None;
@@ -358,6 +372,7 @@ impl Joypad {
             self.i_mask = 0b0001_0000;
             self.request_interrupt = false;
         }
+        true
     }
 
     /// Updates the flags in bits 5 and 4 (select buttons, select D-pad) of JOYP.

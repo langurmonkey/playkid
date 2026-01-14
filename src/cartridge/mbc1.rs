@@ -9,8 +9,7 @@ pub struct MBC1 {
     ram_enabled: bool,
     banking_mode: u8,
 
-    // ROM/RAM sizes.
-    rom_size: usize,
+    // RAM size.
     ram_size: usize,
 }
 
@@ -45,12 +44,11 @@ impl MBC1 {
 
         Self {
             rom,
-            ram: vec![0; ram_size],
+            ram: vec![0xFF; ram_size],
             rom_bank: 1,
             ram_bank: 0,
             ram_enabled: false,
             banking_mode: 0,
-            rom_size,
             ram_size,
         }
     }
@@ -157,6 +155,16 @@ impl MBC1 {
 
         if offset < self.ram.len() {
             self.ram[offset] = value;
+        }
+    }
+
+    pub fn get_ram(&self) -> &[u8] {
+        &self.ram
+    }
+
+    pub fn set_ram(&mut self, data: Vec<u8>) {
+        if data.len() == self.ram.len() {
+            self.ram = data;
         }
     }
 }

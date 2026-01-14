@@ -321,7 +321,7 @@ impl<'a> Memory<'a> {
                 let dest0 = 0xFE00;
                 for i in 0..0xA0 {
                     let byte = self.read8(src0 + i);
-                    self.write8(dest0 + i, byte);
+                    self.ppu.write(dest0 + i, byte);
                 }
             }
             // VRAM registers.
@@ -344,12 +344,12 @@ impl<'a> Memory<'a> {
         self.write8(address + 1, (value >> 8) as u8);
     }
 
-    pub fn cycle(&mut self, t_cycles: u32) -> u32 {
+    pub fn cycle(&mut self, t_cycles: u32) -> (u32, bool) {
         let vram_cycles = 0;
         let ppu_cycles = t_cycles + vram_cycles;
 
         // Joypad.
-        self.joypad.cycle();
+        let ret = self.joypad.cycle();
         self.iff |= self.joypad.i_mask;
         self.joypad.i_mask = 0;
 
@@ -368,6 +368,6 @@ impl<'a> Memory<'a> {
         self.iff |= self.apu.i_mask;
         self.apu.i_mask = 0;
 
-        ppu_cycles
+        (ppu_cycles, ret)
     }
 }

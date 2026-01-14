@@ -37,7 +37,7 @@ impl MBC3 {
 
         Self {
             rom,
-            ram: vec![0; ram_size],
+            ram: vec![0xFF; ram_size],
             rom_bank: 1,
             ram_bank: 0,
             ram_enabled: false,
@@ -136,4 +136,14 @@ impl MBC3 {
     }
 
     fn update_rtc(&mut self) {}
+
+    pub fn get_ram(&self) -> &[u8] {
+        &self.ram
+    }
+
+    pub fn set_ram(&mut self, data: Vec<u8>) {
+        if data.len() == self.ram.len() {
+            self.ram = data;
+        }
+    }
 }

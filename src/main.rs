@@ -14,6 +14,7 @@ mod timer;
 
 use cartridge::Cartridge;
 use clap::Parser;
+use colored::Colorize;
 use machine::Machine;
 use std::io;
 use std::path::PathBuf;
@@ -47,22 +48,34 @@ struct Args {
 fn main() -> io::Result<()> {
     let args = Args::parse();
     let rom = args.input.as_path().to_str().unwrap();
-    println!("Using rom file: {}", rom);
+    println!("{}: Using rom file: {}", "OK".green(), rom);
 
     if args.debug {
-        println!("Debug mode is on");
+        println!("{}: Debug mode is on", "WARN".yellow());
     }
 
     // Load ROM file into cartridge.
-    let mut cart = Cartridge::new(rom, args.skipcheck).expect("Error reading rom file");
+    let mut cart = Cartridge::new(rom, args.skipcheck)
+        .expect(&format!("{}: Error reading rom file", "ERR".red()));
+
+    // Load existing save data from disk.
+    cart.load_sram(rom);
 
     let sdl_context = sdl2::init().unwrap();
-    // Create a game boy with the given cartridge.
-    let mut gameboy = Machine::new(&mut cart, &sdl_context, args.scale, args.debug, args.fps);
-    // Initialize the Game Boy state.
-    gameboy.init();
-    // Start the machine.
-    gameboy.start();
+
+    // Create the machine.
+    {
+        // Create a game boy with the given cartridge.
+        let mut gameboy = Machine::new(&mut cart, &sdl_context, args.scale, args.debug, args.fps);
+        // Initialize the Game Boy state.
+        gameboy.init();
+        // Start the machine.
+        gameboy.start();
+    }
+
+    println!("HERE");
+    // Save data back to disk after the machine stops running.
+    cart.save_sram(rom);
 
     // Finish gracefully by returning OK.
     Ok(())
