@@ -23,6 +23,11 @@ pub struct APU {
     /// The envelope enables automatic volume adjustment over time.
     env_clock_timer: u32,
 
+    /// Frame sequencer.
+    frame_sequencer: u8,
+    frame_timer: u32,
+    env_clock_timer_alt: bool,
+
     // Channel 1.
     ch1_enabled: bool,
     ch1_timer: i32,
@@ -30,6 +35,9 @@ pub struct APU {
     ch1_volume: u8,
     ch1_envelope_timer: u8,
     ch1_envelope_running: bool,
+    ch1_sweep_timer: u8,
+    ch1_sweep_shadow_freq: u16,
+    ch1_sweep_enabled: bool,
 
     // Channel 2.
     ch2_enabled: bool,
@@ -51,6 +59,16 @@ pub struct APU {
     ch4_volume: u8,
     ch4_envelope_timer: u8,
     ch4_envelope_running: bool,
+
+    // Length Counters.
+    ch1_length_timer: u16,
+    ch1_length_enabled: bool,
+    ch2_length_timer: u16,
+    ch2_length_enabled: bool,
+    ch3_length_timer: u16,
+    ch3_length_enabled: bool,
+    ch4_length_timer: u16,
+    ch4_length_enabled: bool,
 }
 
 impl APU {
@@ -80,6 +98,9 @@ impl APU {
             t_cycles_per_sample: 4194304.0 / 44100.0,
 
             env_clock_timer: 0,
+            frame_sequencer: 0,
+            frame_timer: 8192,
+            env_clock_timer_alt: false,
 
             // CH1.
             ch1_enabled: false,
@@ -88,6 +109,9 @@ impl APU {
             ch1_volume: 0,
             ch1_envelope_timer: 0,
             ch1_envelope_running: false,
+            ch1_sweep_timer: 0,
+            ch1_sweep_shadow_freq: 0,
+            ch1_sweep_enabled: false,
             // CH2.
             ch2_enabled: false,
             ch2_timer: 0,
@@ -106,6 +130,15 @@ impl APU {
             ch4_volume: 0,
             ch4_envelope_timer: 0,
             ch4_envelope_running: false,
+            // Length counters.
+            ch1_length_timer: 0,
+            ch1_length_enabled: false,
+            ch2_length_timer: 0,
+            ch2_length_enabled: false,
+            ch3_length_timer: 0,
+            ch3_length_enabled: false,
+            ch4_length_timer: 0,
+            ch4_length_enabled: false,
         }
     }
 
@@ -150,50 +183,51 @@ impl APU {
         }
 
         match address {
+            // Length registers.
+            0xFF11 => self.ch1_length_timer = 64 - (value & 0x3F) as u16,
+            0xFF16 => self.ch2_length_timer = 64 - (value & 0x3F) as u16,
+            0xFF1B => self.ch3_length_timer = 256 - value as u16,
+            0xFF20 => self.ch4_length_timer = 64 - (value & 0x3F) as u16,
+
+            // Triggers.
             0xFF14 => {
-                // CH1 trigger.
+                // CH1.
+                self.ch1_length_enabled = (value & 0x40) != 0;
                 if value & 0x80 != 0 {
-                    self.ch1_enabled = true;
-                    self.ch1_envelope_running = true;
-                    let nr12 = self.read(0xFF12);
-                    self.ch1_volume = (nr12 & 0xF0) >> 4;
-                    self.ch1_envelope_timer = nr12 & 0x07;
-                    self.ch1_duty_step = 0;
-                    let freq = ((value as u16 & 0x07) << 8) | self.read(0xFF13) as u16;
-                    self.ch1_timer = (2048 - freq as i32) * 4;
+                    self.trigger_ch1(value);
+                    if self.ch1_length_timer == 0 {
+                        self.ch1_length_timer = 64;
+                    }
                 }
             }
             0xFF19 => {
-                // CH2 trigger.
+                // CH2.
+                self.ch2_length_enabled = (value & 0x40) != 0;
                 if value & 0x80 != 0 {
-                    self.ch2_enabled = true;
-                    self.ch2_envelope_running = true;
-                    let nr22 = self.read(0xFF17);
-                    self.ch2_volume = (nr22 & 0xF0) >> 4;
-                    self.ch2_envelope_timer = nr22 & 0x07;
-                    self.ch2_duty_step = 0;
-                    let freq = ((value as u16 & 0x07) << 8) | self.read(0xFF18) as u16;
-                    self.ch2_timer = (2048 - freq as i32) * 4;
+                    self.trigger_ch2(value);
+                    if self.ch2_length_timer == 0 {
+                        self.ch2_length_timer = 64;
+                    }
                 }
             }
             0xFF1E => {
-                // CH3 trigger.
+                // CH3.
+                self.ch3_length_enabled = (value & 0x40) != 0;
                 if value & 0x80 != 0 {
-                    self.ch3_enabled = true;
-                    self.ch3_sample_idx = 0;
-                    let freq = ((value as u16 & 0x07) << 8) | self.read(0xFF1D) as u16;
-                    self.ch3_timer = (2048 - freq as i32) * 2; // Note: Ch3 timer is *2, not *4
+                    self.trigger_ch3(value);
+                    if self.ch3_length_timer == 0 {
+                        self.ch3_length_timer = 256;
+                    }
                 }
             }
             0xFF23 => {
-                // CH4 trigger.
+                // CH4.
+                self.ch4_length_enabled = (value & 0x40) != 0;
                 if value & 0x80 != 0 {
-                    self.ch4_enabled = true;
-                    self.ch4_envelope_running = true;
-                    let nr42 = self.read(0xFF21);
-                    self.ch4_volume = (nr42 & 0xF0) >> 4;
-                    self.ch4_envelope_timer = nr42 & 0x07;
-                    self.ch4_lfsr = 0x7FFF; // Reset LFSR
+                    self.trigger_ch4();
+                    if self.ch4_length_timer == 0 {
+                        self.ch4_length_timer = 64;
+                    }
                 }
             }
 
@@ -215,6 +249,67 @@ impl APU {
         }
     }
 
+    /// Channel 1 trigger function.
+    pub fn trigger_ch1(&mut self, value: u8) {
+        self.ch1_enabled = true;
+        self.ch1_envelope_running = true;
+
+        // Sweep initialization.
+        let nr10 = self.read(0xFF10);
+        let sweep_pace = (nr10 & 0x70) >> 4;
+        let sweep_step = nr10 & 0x07;
+
+        let freq_low = self.read(0xFF13) as u16;
+        let freq_high = (value & 0x07) as u16;
+        self.ch1_sweep_shadow_freq = (freq_high << 8) | freq_low;
+
+        self.ch1_sweep_timer = if sweep_pace > 0 { sweep_pace } else { 8 };
+        self.ch1_sweep_enabled = sweep_pace > 0 || sweep_step > 0;
+
+        // If step is > 0, overflow check happens immediately on trigger.
+        if sweep_step > 0 {
+            self.check_sweep_overflow();
+        }
+        // End sweep init.
+
+        let nr12 = self.read(0xFF12);
+        self.ch1_volume = (nr12 & 0xF0) >> 4;
+        self.ch1_envelope_timer = nr12 & 0x07;
+        self.ch1_duty_step = 0;
+        self.ch1_timer = (2048 - self.ch1_sweep_shadow_freq as i32) * 4;
+    }
+
+    /// Channel 2 trigger function.
+    pub fn trigger_ch2(&mut self, value: u8) {
+        self.ch2_enabled = true;
+        self.ch2_envelope_running = true;
+        let nr22 = self.read(0xFF17);
+        self.ch2_volume = (nr22 & 0xF0) >> 4;
+        self.ch2_envelope_timer = nr22 & 0x07;
+        self.ch2_duty_step = 0;
+        let freq = ((value as u16 & 0x07) << 8) | self.read(0xFF18) as u16;
+        self.ch2_timer = (2048 - freq as i32) * 4;
+    }
+
+    /// Channel 3 trigger function.
+    pub fn trigger_ch3(&mut self, value: u8) {
+        self.ch3_enabled = true;
+        self.ch3_sample_idx = 0;
+        let freq = ((value as u16 & 0x07) << 8) | self.read(0xFF1D) as u16;
+        self.ch3_timer = (2048 - freq as i32) * 2; // Note: Ch3 timer is *2, not *4
+    }
+
+    /// Channel 4 trigger function.
+    pub fn trigger_ch4(&mut self) {
+        self.ch4_enabled = true;
+        self.ch4_envelope_running = true;
+        let nr42 = self.read(0xFF21);
+        self.ch4_volume = (nr42 & 0xF0) >> 4;
+        self.ch4_envelope_timer = nr42 & 0x07;
+        // Reset LFSR.
+        self.ch4_lfsr = 0x7FFF;
+    }
+
     /// Run the APU for `t_cycles` T-cycles.
     pub fn cycle(&mut self, t_cycles: u32) {
         // Update Channel 1 Frequency Timer.
@@ -222,12 +317,12 @@ impl APU {
         let freq_low = self.read(0xFF13) as u16;
         let freq_high = (self.read(0xFF14) & 0x07) as u16;
         let frequency = (freq_high << 8) | freq_low;
-        let period = (2048 - frequency as i32) * 4;
+        let period_ch1 = (2048 - frequency as i32) * 4;
 
         // Channel 1.
         self.ch1_timer -= t_cycles as i32;
         if self.ch1_timer <= 0 {
-            self.ch1_timer += period;
+            self.ch1_timer += period_ch1;
             self.ch1_duty_step = (self.ch1_duty_step + 1) % 8;
         }
 
@@ -261,11 +356,11 @@ impl APU {
             7 => 112,
             _ => 8,
         };
-        let period = divisor << shift;
+        let period_ch4 = divisor << shift;
 
         self.ch4_timer -= t_cycles as i32;
         if self.ch4_timer <= 0 {
-            self.ch4_timer += period;
+            self.ch4_timer += period_ch4;
 
             // LFSR Step.
             let bit0 = self.ch4_lfsr & 0x01;
@@ -280,12 +375,27 @@ impl APU {
         }
 
         // 64Hz Envelope Clock (65536 T-cycles)
-        self.env_clock_timer += t_cycles;
-        if self.env_clock_timer >= 65536 {
-            self.env_clock_timer -= 65536;
-            self.step_envelope_ch1();
-            self.step_envelope_ch2();
-            self.step_envelope_ch4();
+        self.frame_timer += t_cycles;
+
+        if self.frame_timer >= 8192 {
+            // 512Hz
+            self.frame_timer -= 8192;
+
+            match self.frame_sequencer {
+                0 | 2 | 4 | 6 => {
+                    self.step_length();
+                    if self.frame_sequencer == 2 || self.frame_sequencer == 6 {
+                        self.step_sweep();
+                    }
+                }
+                7 => {
+                    self.step_envelope_ch1();
+                    self.step_envelope_ch2();
+                    self.step_envelope_ch4();
+                }
+                _ => {}
+            }
+            self.frame_sequencer = (self.frame_sequencer + 1) % 8;
         }
 
         // Sample Generation Logic.
@@ -304,6 +414,37 @@ impl APU {
                 }
                 self.device.queue_audio(&self.buffer).unwrap();
                 self.buffer.clear();
+            }
+        }
+    }
+
+    fn step_length(&mut self) {
+        // Channel 1.
+        if self.ch1_length_enabled && self.ch1_length_timer > 0 {
+            self.ch1_length_timer -= 1;
+            if self.ch1_length_timer == 0 {
+                self.ch1_enabled = false;
+            }
+        }
+        // Channel 2.
+        if self.ch2_length_enabled && self.ch2_length_timer > 0 {
+            self.ch2_length_timer -= 1;
+            if self.ch2_length_timer == 0 {
+                self.ch2_enabled = false;
+            }
+        }
+        // Channel 3.
+        if self.ch3_length_enabled && self.ch3_length_timer > 0 {
+            self.ch3_length_timer -= 1;
+            if self.ch3_length_timer == 0 {
+                self.ch3_enabled = false;
+            }
+        }
+        // Channel 4.
+        if self.ch4_length_enabled && self.ch4_length_timer > 0 {
+            self.ch4_length_timer -= 1;
+            if self.ch4_length_timer == 0 {
+                self.ch4_enabled = false;
             }
         }
     }
@@ -510,5 +651,62 @@ impl APU {
         } else {
             -vol
         }
+    }
+
+    fn step_sweep(&mut self) {
+        if !self.ch1_sweep_enabled {
+            return;
+        }
+
+        if self.ch1_sweep_timer > 0 {
+            self.ch1_sweep_timer -= 1;
+        }
+
+        if self.ch1_sweep_timer == 0 {
+            let nr10 = self.read(0xFF10);
+            let sweep_pace = (nr10 & 0x70) >> 4;
+            self.ch1_sweep_timer = if sweep_pace > 0 { sweep_pace } else { 8 };
+
+            if sweep_pace > 0 {
+                let new_freq = self.calculate_sweep_freq();
+
+                let sweep_step = nr10 & 0x07;
+                if new_freq <= 2047 && sweep_step > 0 {
+                    // Update shadow frequency
+                    self.ch1_sweep_shadow_freq = new_freq;
+
+                    // Update NR13 and NR14 registers
+                    self.regs[0x03] = (new_freq & 0xFF) as u8;
+                    self.regs[0x04] = (self.regs[0x04] & 0xF8) | ((new_freq >> 8) & 0x07) as u8;
+
+                    // Overflow check again with the NEW frequency
+                    self.calculate_sweep_freq();
+                }
+            }
+        }
+    }
+
+    fn calculate_sweep_freq(&mut self) -> u16 {
+        let nr10 = self.read(0xFF10);
+        let sweep_step = nr10 & 0x07;
+        let descending = (nr10 & 0x08) != 0;
+
+        let delta = self.ch1_sweep_shadow_freq >> sweep_step;
+        let new_freq = if descending {
+            self.ch1_sweep_shadow_freq.saturating_sub(delta)
+        } else {
+            self.ch1_sweep_shadow_freq + delta
+        };
+
+        // Overflow check.
+        if new_freq > 2047 {
+            self.ch1_enabled = false;
+        }
+
+        new_freq
+    }
+
+    fn check_sweep_overflow(&mut self) {
+        self.calculate_sweep_freq();
     }
 }
