@@ -2,9 +2,9 @@ use sdl2::audio::AudioQueue;
 use sdl2::Sdl;
 
 pub struct APU {
-    /// APU Registers $FF10-$FF3F
+    /// APU Registers 0xFF10-0xFF3F.
     regs: [u8; 0x30],
-    /// Internal Wave RAM $FF30-$FF3F
+    /// Internal Wave RAM 0xFF30-0xFF3F.
     wave_ram: [u8; 16],
     /// APU interrupt mask for registers IE and IF.
     pub i_mask: u8,
@@ -19,14 +19,9 @@ pub struct APU {
     /// Cycles per sample.
     t_cycles_per_sample: f32,
 
-    /// Clock for the 64Hz envelope.
-    /// The envelope enables automatic volume adjustment over time.
-    env_clock_timer: u32,
-
     /// Frame sequencer.
     frame_sequencer: u8,
     frame_timer: u32,
-    env_clock_timer_alt: bool,
 
     // Channel 1.
     ch1_enabled: bool,
@@ -77,7 +72,8 @@ impl APU {
 
         let desired_spec = sdl2::audio::AudioSpecDesired {
             freq: Some(44100),
-            channels: Some(1), // Mono
+            // Stereo.
+            channels: Some(2),
             samples: Some(1024),
         };
 
@@ -92,15 +88,13 @@ impl APU {
             wave_ram: [0; 16],
             i_mask: 0,
             device,
-            buffer: Vec::with_capacity(4096),
+            buffer: Vec::with_capacity(1024),
             sample_timer: 0.0,
             // 4194304 Hz / 44100 Hz = 95.1089...
             t_cycles_per_sample: 4194304.0 / 44100.0,
 
-            env_clock_timer: 0,
             frame_sequencer: 0,
             frame_timer: 8192,
-            env_clock_timer_alt: false,
 
             // CH1.
             ch1_enabled: false,
@@ -403,10 +397,12 @@ impl APU {
         while self.sample_timer >= self.t_cycles_per_sample {
             self.sample_timer -= self.t_cycles_per_sample;
 
-            let sample = self.generate_sample();
-            self.buffer.push(sample);
+            let (l_sample, r_sample) = self.generate_sample();
+            self.buffer.push(l_sample);
+            self.buffer.push(r_sample);
 
-            if self.buffer.len() >= 1024 {
+            // 1024 for mono, 2040 for stereo.
+            if self.buffer.len() >= 2048 {
                 // Throttle: If the queue is getting too full, wait a bit.
                 // This prevents the emulator from running at 500% speed.
                 while self.device.size() > 8192 {
@@ -541,22 +537,58 @@ impl APU {
         }
     }
 
-    fn generate_sample(&self) -> f32 {
-        // Bit 7 of NR52 ($FF26) is the Master Sound On/Off switch.
+    /// Generates a stereo sample from the channels.
+    fn generate_sample(&self) -> (f32, f32) {
+        // Bit 7 of NR52 (0xFF26) is the Master Sound on/off switch.
         let master_on = (self.read(0xFF26) & 0x80) != 0;
         if !master_on {
-            return 0.0;
+            return (0.0, 0.0);
         }
 
-        // Compute channels.
-        let out1 = self.calculate_ch1();
-        let out2 = self.calculate_ch2();
-        let out3 = self.calculate_ch3();
-        let out4 = self.calculate_ch4();
+        let ch1 = self.calculate_ch1();
+        let ch2 = self.calculate_ch2();
+        let ch3 = self.calculate_ch3();
+        let ch4 = self.calculate_ch4();
 
-        // Mix by adding them together.
-        // Audio might clip?
-        out1 + out2 + out3 + out4
+        let nr51 = self.read(0xFF25);
+        let mut left = 0.0;
+        let mut right = 0.0;
+
+        // Right Channel Panning.
+        if nr51 & 0x01 != 0 {
+            right += ch1;
+        }
+        if nr51 & 0x02 != 0 {
+            right += ch2;
+        }
+        if nr51 & 0x04 != 0 {
+            right += ch3;
+        }
+        if nr51 & 0x08 != 0 {
+            right += ch4;
+        }
+
+        // Left Channel Panning.
+        if nr51 & 0x10 != 0 {
+            left += ch1;
+        }
+        if nr51 & 0x20 != 0 {
+            left += ch2;
+        }
+        if nr51 & 0x40 != 0 {
+            left += ch3;
+        }
+        if nr51 & 0x80 != 0 {
+            left += ch4;
+        }
+
+        // Master Volume (NR50).
+        let nr50 = self.read(0xFF24);
+        let r_vol = ((nr50 & 0x07) as f32 + 1.0) / 8.0;
+        let l_vol = (((nr50 & 0x70) >> 4) as f32 + 1.0) / 8.0;
+
+        // Apply master volume and a small safety gain to prevent digital clipping
+        (left * l_vol * 0.2, right * r_vol * 0.2)
     }
 
     fn calculate_ch1(&self) -> f32 {
