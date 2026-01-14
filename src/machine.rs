@@ -40,11 +40,13 @@ pub struct Machine<'a, 'b> {
     m_cycles: u32,
     /// The debug monitor.
     debug: DebugMonitor,
+    /// Print FPS every second.
+    fps: bool,
 }
 
 impl<'a, 'b> Machine<'a, 'b> {
     /// Create a new instance of the Game Boy.
-    pub fn new(cart: &'a mut Cartridge, sdl: &'b Sdl, scale: u8, debug: bool) -> Self {
+    pub fn new(cart: &'a mut Cartridge, sdl: &'b Sdl, scale: u8, debug: bool, fps: bool) -> Self {
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
@@ -57,6 +59,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             t_cycles: 324,
             m_cycles: 0,
             debug: DebugMonitor::new(debug),
+            fps: fps,
         }
     }
 
@@ -84,8 +87,16 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.display.present();
 
         const SPIN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(2);
+        if self.fps {
+            println!("Target FPS: {}", constants::TARGET_FPS);
+        }
 
-        'mainloop: while self.running {
+        // FPS tracking
+        let mut frame_count = 0u32;
+        let mut fps_timer = std::time::Instant::now();
+        const FPS_LOG_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
+        while self.running {
             let frame_start_time = std::time::Instant::now();
             let mut cycles_this_frame: usize = 0;
 
@@ -98,6 +109,16 @@ impl<'a, 'b> Machine<'a, 'b> {
 
                 // Render if we have pixels.
                 self.display.render(&self.memory);
+            }
+
+            frame_count += 1;
+
+            // Log FPS every second
+            if self.fps && fps_timer.elapsed() >= FPS_LOG_INTERVAL {
+                let actual_fps = frame_count as f64 / fps_timer.elapsed().as_secs_f64();
+                println!("FPS: {:.2}", actual_fps);
+                frame_count = 0;
+                fps_timer = std::time::Instant::now();
             }
 
             // Now, sleep for the remaining time in the frame.

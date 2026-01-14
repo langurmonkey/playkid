@@ -35,6 +35,9 @@ struct Args {
     /// Activate debug mode.
     #[arg(short, long)]
     debug: bool,
+    /// Print FPS every second to standard output.
+    #[arg(short, long)]
+    fps: bool,
     /// Skip global checksum, header checksum, and logo sequence check.
     #[arg(long)]
     skipcheck: bool,
@@ -54,7 +57,7 @@ fn main() -> io::Result<()> {
 
     let sdl_context = sdl2::init().unwrap();
     // Create a game boy with the given cartridge.
-    let mut gameboy = Machine::new(&mut cart, &sdl_context, args.scale, args.debug);
+    let mut gameboy = Machine::new(&mut cart, &sdl_context, args.scale, args.debug, args.fps);
     // Initialize the Game Boy state.
     gameboy.init();
     // Start the machine.

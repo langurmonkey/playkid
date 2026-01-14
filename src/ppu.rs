@@ -461,7 +461,7 @@ impl PPU {
             // Window is active if WLY has been activated and WX is in range.
             let use_window = win_active_now && (x as u16) >= (self.wx.saturating_sub(7) as u16);
 
-            let (mut tile_map_addr, px_x, px_y, tile_x, tile_y, cache) = if use_window {
+            let (tile_map_addr, px_x, px_y, tile_x, tile_y, cache) = if use_window {
                 // Window pixel.
                 win_was_rendered = true;
                 // Window's internal X coordinate: current screen X minus window start position.
@@ -753,7 +753,6 @@ impl PPU {
     /// in the byte `self.lcdc`.
     fn update_lcdc_flags(&mut self) {
         let prev_lcd_status = self.lcdc7;
-        let prev_lcdc5 = self.lcdc5;
         self.lcdc7 = self.lcdc & 0b1000_0000 != 0;
         self.lcdc6 = if self.lcdc & 0b0100_0000 == 0 {
             0x9800
