@@ -1,0 +1,185 @@
+[1m[38;5;2m@[0m  [1m[38;5;13mvk[38;5;8mzknqnz[39m [38;5;3mme@tonisagrista.com[39m [38;5;14m2026-01-14 13:20:35[39m [38;5;12m8a[38;5;8m8a06b7[39m[0m
+│  [1m[38;5;3m(no description set)[39m[0m
+[1m[38;5;14m◆[0m  [1m[38;5;5mpt[0m[38;5;8mqlotls[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-14 12:03:16[39m [38;5;5mmaster[39m [1m[38;5;4m189[0m[38;5;8mec224[39m
+│  fix: Controller hotplug now works.
+[1m[38;5;14m◆[0m  [1m[38;5;5mkq[0m[38;5;8mstoopp[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-14 10:39:28[39m [1m[38;5;4m9c[0m[38;5;8me62463[39m
+│  feat: Add game controller support via SDL2. Fix query issue.
+[1m[38;5;14m◆[0m  [1m[38;5;5mmx[0m[38;5;8morvlzv[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-14 09:33:16[39m [1m[38;5;4mb6[0m[38;5;8m3ac10c[39m
+│  fix: Enforce bit 7 of STAT to always read to 1. Other minor stuff.
+[1m[38;5;14m◆[0m  [1m[38;5;5mxm[0m[38;5;8mrxuuqz[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 20:16:09[39m [1m[38;5;4m49[0m[38;5;8mc88350[39m
+│  feat: Clean up CLI presentation with parser.
+[1m[38;5;14m◆[0m  [1m[38;5;5mqz[0m[38;5;8mmqprrl[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 19:59:37[39m [1m[38;5;4m6e[0m[38;5;8mfbcfb8[39m
+│  fix: Do away with input lag. Improve README file a bit.
+[1m[38;5;14m◆[0m  [1m[38;5;5mxqxz[0m[38;5;8mwqlw[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 19:38:19[39m [1m[38;5;4mba[0m[38;5;8md21c7b[39m
+│  fix: Fix various bugs in CPU instructions' implementations.
+[1m[38;5;14m◆[0m  [1m[38;5;5mmq[0m[38;5;8mokxnvw[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 15:08:48[39m [1m[38;5;4mcf[0m[38;5;8m789570[39m
+│  none: Remove debug print.
+[1m[38;5;14m◆[0m  [1m[38;5;5mwrrw[0m[38;5;8mwytu[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 15:07:45[39m [1m[38;5;4me9[0m[38;5;8m8d1dea[39m
+│  feat: Implement MBC1 cartridge type.
+[1m[38;5;14m◆[0m  [1m[38;5;5mpxm[0m[38;5;8mklmrp[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 14:43:49[39m [1m[38;5;4me7[0m[38;5;8m212d2b[39m
+│  none: Some random fixes that fix nothing.
+[1m[38;5;14m◆[0m  [1m[38;5;5mrw[0m[38;5;8movxlpr[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 13:57:43[39m [1m[38;5;4me4e[0m[38;5;8m0b14f[39m
+│  fix: Fix HALT handling in machine.rs.
+[1m[38;5;14m◆[0m  [1m[38;5;5myk[0m[38;5;8mvspwpq[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 13:23:56[39m [1m[38;5;4m18b[0m[38;5;8m9dd29[39m
+│  feat: Improve cartridge reporting.
+[1m[38;5;14m◆[0m  [1m[38;5;5mpv[0m[38;5;8myxwvss[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 13:04:21[39m [1m[38;5;4m11[0m[38;5;8m168a89[39m
+│  none: Remove print.
+[1m[38;5;14m◆[0m  [1m[38;5;5mnl[0m[38;5;8mqwlspv[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 12:23:08[39m [1m[38;5;4m5bc[0m[38;5;8mf9d79[39m
+│  fix: Joypad input in tetris menus. Increase target FPS to 120.
+[1m[38;5;14m◆[0m  [1m[38;5;5mrt[0m[38;5;8mtylrym[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-13 12:01:26[39m [1m[38;5;4m3a[0m[38;5;8m980639[39m
+│  none: Change some things around leading to nothing, update SDL2.
+[1m[38;5;14m◆[0m  [1m[38;5;5mlvr[0m[38;5;8mqomyv[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-12 13:57:08[39m [1m[38;5;4mb02[0m[38;5;8m6ca5b[39m
+│  fix: Regression in past commit.
+[1m[38;5;14m◆[0m  [1m[38;5;5mws[0m[38;5;8mxzlntr[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-12 13:44:05[39m [1m[38;5;4ma1[0m[38;5;8m016a01[39m
+│  docs: Consolidate comments.
+[1m[38;5;14m◆[0m  [1m[38;5;5myv[0m[38;5;8mpuqwlp[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-12 13:36:51[39m [1m[38;5;4ma8e[0m[38;5;8mb729a[39m
+│  fix: Clear screen to first palette problem, start solving last problem in acid2 -> right chin not showing up.
+[1m[38;5;14m◆[0m  [1m[38;5;5msw[0m[38;5;8mlnloxr[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-12 11:16:22[39m [1m[38;5;4m13[0m[38;5;8mf5e85e[39m
+│  fix: Right eye problem in ACID2 -> rendered using the window, WX to off-screen value so window is hidden until WX is set again for drawing right chin.
+[1m[38;5;14m◆[0m  [1m[38;5;5mpxl[0m[38;5;8msxppu[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-12 10:05:22[39m [1m[38;5;4m7e[0m[38;5;8m4295eb[39m
+│  fix: Mole mole (to the left of nose) in ACID2 -> priority problem.
+[1m[38;5;14m◆[0m  [1m[38;5;5mqv[0m[38;5;8myqlupv[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2026-01-12 08:45:56[39m [1m[38;5;4m1a[0m[38;5;8m6646d5[39m
+│  Update README.
+[1m[38;5;14m◆[0m  [1m[38;5;5mvlt[0m[38;5;8mqursw[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2025-07-16 10:12:43[39m [1m[38;5;4md6[0m[38;5;8md7635d[39m
+│  none: Some more fixes, but they lead nowhere...
+[1m[38;5;14m◆[0m  [1m[38;5;5msqt[0m[38;5;8mpltrv[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2025-07-15 14:55:14[39m [1m[38;5;4m76[0m[38;5;8m8145b7[39m
+│  none: Fixing timers.
+[1m[38;5;14m◆[0m  [1m[38;5;5mvp[0m[38;5;8mvwqtut[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2025-07-15 13:59:54[39m [1m[38;5;4m62[0m[38;5;8mc4195c[39m
+│  [38;5;2m(empty)[39m fix: Looking for more issues.
+[1m[38;5;14m◆[0m  [1m[38;5;5mvsn[0m[38;5;8mwuzvl[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2025-07-15 13:59:17[39m [1m[38;5;4mca[0m[38;5;8maa3b56[39m
+│  fix: Fixing timer issue.
+[1m[38;5;14m◆[0m  [1m[38;5;5mtr[0m[38;5;8mrkqzru[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2025-07-15 13:51:21[39m [1m[38;5;4m9d[0m[38;5;8m956c94[39m
+│  fix: issues with performance and sprites.
+[1m[38;5;14m◆[0m  [1m[38;5;5mur[0m[38;5;8mppztxu[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2025-07-15 11:10:22[39m [1m[38;5;4m16[0m[38;5;8m4e0831[39m
+│  perf: fixing performance hotspots to get 1.4 million cycles per second.
+[1m[38;5;14m◆[0m  [1m[38;5;5mxs[0m[38;5;8mkqkxvz[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2025-07-15 10:09:02[39m [1m[38;5;4m1d[0m[38;5;8m9538b9[39m
+│  [38;5;2m(empty)[39m none: fix issues with rendering and more.
+[1m[38;5;14m◆[0m  [1m[38;5;5mko[0m[38;5;8mxmxzmn[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2025-07-15 10:07:07[39m [1m[38;5;4m48[0m[38;5;8m9328a8[39m
+│  fix: prevent creation of event pump every CPU cycle, resuling in sever slow-down.
+[1m[38;5;14m◆[0m  [1m[38;5;5mwl[0m[38;5;8mkwwprx[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2025-03-28 10:08:33[39m [1m[38;5;4m5b1[0m[38;5;8md754b[39m
+│  fix: alignment of debug messages.
+[1m[38;5;14m◆[0m  [1m[38;5;5mpqz[0m[38;5;8mnqvlm[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-18 17:54:28[39m [1m[38;5;4m8e[0m[38;5;8mf1c62c[39m
+│  none: various.
+[1m[38;5;14m◆[0m  [1m[38;5;5mnsw[0m[38;5;8mnmvkr[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-18 14:30:42[39m [1m[38;5;4m530[0m[38;5;8m700e7[39m
+│  fix: joypad interrupts.
+[1m[38;5;14m◆[0m  [1m[38;5;5mmw[0m[38;5;8moyovzn[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-18 13:32:30[39m [1m[38;5;4m8f[0m[38;5;8m6ff89b[39m
+│  fix: joypad code now works, so we can pass the title screen in tetris and dr mario.
+[1m[38;5;14m◆[0m  [1m[38;5;5mooo[0m[38;5;8mtlyqr[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-18 12:36:17[39m [1m[38;5;4mb0f[0m[38;5;8me438e[39m
+│  feat: new implementation of bg and win.
+[1m[38;5;14m◆[0m  [1m[38;5;5mwn[0m[38;5;8mzlzmzy[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-16 19:38:16[39m [1m[38;5;4m24[0m[38;5;8m11ca66[39m
+│  feat: trying to figure out window rendering.
+[1m[38;5;14m◆[0m  [1m[38;5;5mzw[0m[38;5;8mvuwnvw[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-16 19:10:38[39m [1m[38;5;4m36[0m[38;5;8m91d6a4[39m
+│  feat: some more work on the PPU.
+[1m[38;5;14m◆[0m  [1m[38;5;5mxqxw[0m[38;5;8mqyut[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-15 12:07:32[39m [1m[38;5;4m59[0m[38;5;8m0c7c88[39m
+│  feat: display is now finished (?).
+[1m[38;5;14m◆[0m  [1m[38;5;5myo[0m[38;5;8mqqvols[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-15 10:51:39[39m [1m[38;5;4md45[0m[38;5;8m3e962[39m
+│  feat: new render method, still WIP.
+[1m[38;5;14m◆[0m  [1m[38;5;5mzz[0m[38;5;8mmwqlsz[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-15 10:39:00[39m [1m[38;5;4me45[0m[38;5;8me71dc[39m
+│  feat: add 's' keybinding to stop current execution for debug. This only works in the emulator window, not the terminal.
+[1m[38;5;14m◆[0m  [1m[38;5;5mum[0m[38;5;8muwkzkm[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-12 14:13:27[39m [1m[38;5;4mb05[0m[38;5;8mff0e3[39m
+│  feat: implemented sprites.
+[1m[38;5;14m◆[0m  [1m[38;5;5mvoro[0m[38;5;8mxror[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-12 13:54:32[39m [1m[38;5;4ma89[0m[38;5;8m90883[39m
+│  feat: well...
+[1m[38;5;14m◆[0m  [1m[38;5;5mrr[0m[38;5;8mpwqusm[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-12 12:34:13[39m [1m[38;5;4mb2[0m[38;5;8m7da0ed[39m
+│  feat: background render works now.
+[1m[38;5;14m◆[0m  [1m[38;5;5mvly[0m[38;5;8mzrqzq[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-11 17:53:33[39m [1m[38;5;4m4c[0m[38;5;8m3991a5[39m
+│  feat: more progress...
+[1m[38;5;14m◆[0m  [1m[38;5;5mlvk[0m[38;5;8mqqqrt[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-11 15:36:24[39m [1m[38;5;4m54[0m[38;5;8ma6080b[39m
+│  feat: trying to make render work.
+[1m[38;5;14m◆[0m  [1m[38;5;5mkn[0m[38;5;8mvlwnwv[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-09 18:05:02[39m [1m[38;5;4m651[0m[38;5;8meb508[39m
+│  feat: clean up terminal, use crossterm.
+[1m[38;5;14m◆[0m  [1m[38;5;5mos[0m[38;5;8msztmqm[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-08 14:06:28[39m [1m[38;5;4m72[0m[38;5;8m896f8f[39m
+│  feat: WIP implementation of cycle-accurate sprite rendering.
+[1m[38;5;14m◆[0m  [1m[38;5;5mzp[0m[38;5;8mkyosqq[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-06 15:03:46[39m [1m[38;5;4m28[0m[38;5;8ma68e8a[39m
+│  feat: graphics are started to be rendered!
+[1m[38;5;14m◆[0m  [1m[38;5;5moos[0m[38;5;8mturst[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-06 09:50:47[39m [1m[38;5;4ma9[0m[38;5;8m5f5c7c[39m
+│  feat: add reset function.
+[1m[38;5;14m◆[0m  [1m[38;5;5mvorq[0m[38;5;8msrzt[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-05 14:51:08[39m [1m[38;5;4md4d[0m[38;5;8m68075[39m
+│  feat: made some good progress in general.
+[1m[38;5;14m◆[0m  [1m[38;5;5mku[0m[38;5;8mssnlxs[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-04 15:40:00[39m [1m[38;5;4md97[0m[38;5;8mf8850[39m
+│  feat: not much more.
+[1m[38;5;14m◆[0m  [1m[38;5;5msqn[0m[38;5;8mpyqlp[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-02 16:56:49[39m [1m[38;5;4ma5[0m[38;5;8m47888c[39m
+│  feat: some comments.
+[1m[38;5;14m◆[0m  [1m[38;5;5mlo[0m[38;5;8mwtulkv[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-02 11:28:13[39m [1m[38;5;4me1[0m[38;5;8m47aa44[39m
+│  feat: add delete breakpoint.
+[1m[38;5;14m◆[0m  [1m[38;5;5mor[0m[38;5;8mtsnzuz[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-01 21:25:30[39m [1m[38;5;4mf9[0m[38;5;8mb1bd2f[39m
+│  feat: improve debug with ability to add breakpoints, step over, and continue.
+[1m[38;5;14m◆[0m  [1m[38;5;5mln[0m[38;5;8mzkyors[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-11-01 20:28:41[39m [1m[38;5;4m50[0m[38;5;8m556541[39m
+│  feat: add color and better instruction printing with operands.
+[1m[38;5;14m◆[0m  [1m[38;5;5mwmz[0m[38;5;8mkmnwp[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-31 16:54:45[39m [1m[38;5;4md92[0m[38;5;8m52b82[39m
+│  feat: more on PPU.
+[1m[38;5;14m◆[0m  [1m[38;5;5mxu[0m[38;5;8mtowxqk[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-31 15:38:44[39m [1m[38;5;4mf7[0m[38;5;8m0a9941[39m
+│  feat: fix some issues, start implementing M-cycles and clock cycles.
+[1m[38;5;14m◆[0m  [1m[38;5;5mlyt[0m[38;5;8mrspun[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-30 15:34:30[39m [1m[38;5;4m8c6[0m[38;5;8m0f78b[39m
+│  feat: implement joypad, interrupts, and more.
+[1m[38;5;14m◆[0m  [1m[38;5;5muk[0m[38;5;8mxskxzv[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-29 15:50:11[39m [1m[38;5;4m7d[0m[38;5;8m46ae82[39m
+│  fix: debug instructions step-by-step and fix errors.
+[1m[38;5;14m◆[0m  [1m[38;5;5mtu[0m[38;5;8mslrvqr[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-28 15:28:37[39m [1m[38;5;4m53d[0m[38;5;8m3836f[39m
+│  feat: timer and more.
+[1m[38;5;14m◆[0m  [1m[38;5;5myn[0m[38;5;8mrvuksu[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-28 13:12:59[39m [1m[38;5;4m6a[0m[38;5;8m1374d0[39m
+│  fix: substitute all panics with printlns, for now.
+[1m[38;5;14m◆[0m  [1m[38;5;5mvsz[0m[38;5;8mqukpt[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-28 12:48:20[39m [1m[38;5;4mfa[0m[38;5;8m90b511[39m
+│  feat: implementing display.
+[1m[38;5;14m◆[0m  [1m[38;5;5mtn[0m[38;5;8mmmwpmy[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-25 13:56:01[39m [1m[38;5;4m99[0m[38;5;8m14e9be[39m
+│  feat: minor changes.
+[1m[38;5;14m◆[0m  [1m[38;5;5msqv[0m[38;5;8mktvlr[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-25 13:49:26[39m [1m[38;5;4m57[0m[38;5;8mb40d22[39m
+│  feat: separate VRAM and OAM into PPU.
+[1m[38;5;14m◆[0m  [1m[38;5;5mrp[0m[38;5;8mwzrvxz[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-25 12:44:32[39m [1m[38;5;4m68[0m[38;5;8m3697e2[39m
+│  feat: add palettes, reference display, and more.
+[1m[38;5;14m◆[0m  [1m[38;5;5mpr[0m[38;5;8mrzlzxw[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-25 11:42:53[39m [1m[38;5;4mb09[0m[38;5;8med046[39m
+│  feat: add display, initialize registers and RAM.
+[1m[38;5;14m◆[0m  [1m[38;5;5mys[0m[38;5;8mspplml[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-25 09:51:58[39m [1m[38;5;4m0f[0m[38;5;8m530b02[39m
+│  feat: log cartridge type correctly.
+[1m[38;5;14m◆[0m  [1m[38;5;5mpql[0m[38;5;8mwnqml[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-25 09:05:31[39m [1m[38;5;4m8c0[0m[38;5;8m7f5da[39m
+│  feat: implement destination code parsing, header checksum and global checksum.
+[1m[38;5;14m◆[0m  [1m[38;5;5mrx[0m[38;5;8mzwvtxv[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-24 14:28:22[39m [1m[38;5;4m4f[0m[38;5;8md3a11e[39m
+│  feat: implement more checks, like ROM/RAM size.
+[1m[38;5;14m◆[0m  [1m[38;5;5mnsr[0m[38;5;8mvwmqk[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-24 13:58:09[39m [1m[38;5;4m658[0m[38;5;8m78548[39m
+│  feat: read title, GB type, and cartridge type from rom file.
+[1m[38;5;14m◆[0m  [1m[38;5;5mwvz[0m[38;5;8muzoos[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-24 13:50:00[39m [1m[38;5;4m32[0m[38;5;8m734f8f[39m
+│  feat: get and print rom title.
+[1m[38;5;14m◆[0m  [1m[38;5;5mvop[0m[38;5;8mltyll[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-24 13:34:21[39m [1m[38;5;4m5a[0m[38;5;8m1ba7c7[39m
+│  feat: fix opcode fetching, and more.
+[1m[38;5;14m◆[0m  [1m[38;5;5mzo[0m[38;5;8mowsups[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-24 12:52:51[39m [1m[38;5;4m9a[0m[38;5;8m4e70b5[39m
+│  feat: add memory map with all memory regions (emulated), add main loop, and debug mode.
+[1m[38;5;14m◆[0m  [1m[38;5;5mlyz[0m[38;5;8mmlpsy[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-22 13:58:14[39m [38;5;5mpush-lyzmlpsyxzqx[39m [1m[38;5;4mc5e[0m[38;5;8m0be49[39m
+│  feat: refactor errors and flags, and more cool stuff.
+[1m[38;5;14m◆[0m  [1m[38;5;5mpp[0m[38;5;8mokmsuy[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-21 18:13:05[39m [1m[38;5;4mb1[0m[38;5;8mdd346d[39m
+│  feat: check logo in cartridge.
+[1m[38;5;14m◆[0m  [1m[38;5;5mkvz[0m[38;5;8mmlols[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-21 17:56:02[39m [1m[38;5;4m4b[0m[38;5;8m2a16c7[39m
+│  feat: more.
+[1m[38;5;14m◆[0m  [1m[38;5;5mmz[0m[38;5;8mxuyztq[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-21 13:58:59[39m [1m[38;5;4m22[0m[38;5;8m3b8185[39m
+│  feat: a little bit of code re-factoring.
+[1m[38;5;14m◆[0m  [1m[38;5;5mtx[0m[38;5;8mzoknzt[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-21 12:44:10[39m [1m[38;5;4me5[0m[38;5;8m3dffe3[39m
+│  feat: all 8- and 16-bit instructions implemented.
+[1m[38;5;14m◆[0m  [1m[38;5;5mvoq[0m[38;5;8mokmln[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-18 20:50:58[39m [1m[38;5;4md4b[0m[38;5;8m6a315[39m
+│  feat: more instructions implemented.
+[1m[38;5;14m◆[0m  [1m[38;5;5mwrrs[0m[38;5;8mzqxs[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-18 20:41:04[39m [1m[38;5;4ma2[0m[38;5;8mb03877[39m
+│  feat: almost all 8-bit opcodes implemented.
+[1m[38;5;14m◆[0m  [1m[38;5;5mxn[0m[38;5;8mrkuxrr[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-18 13:57:40[39m [1m[38;5;4mcb[0m[38;5;8m728570[39m
+│  feat: finish definition of first batch of instructions (not 0xCB), and implementation of most of them.
+[1m[38;5;14m◆[0m  [1m[38;5;5mqr[0m[38;5;8mzmosyu[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-17 14:25:43[39m [1m[38;5;4m6f[0m[38;5;8maf3010[39m
+│  feat: more instruction definitions (not implementation).
+[1m[38;5;14m◆[0m  [1m[38;5;5mwmm[0m[38;5;8mlnwyn[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-17 14:16:01[39m [1m[38;5;4m5e[0m[38;5;8m0c94ce[39m
+│  feat: implemented all LD, JP, JR and more operations. Add definitions for all INC/DEC.
+[1m[38;5;14m◆[0m  [1m[38;5;5mkvv[0m[38;5;8mnrxsm[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-16 14:21:33[39m [1m[38;5;4m80[0m[38;5;8m78ef7f[39m
+│  feat: started implementing opcodes (ADD, ADC, SUB, SBC, AND, XOR, OR, CP).
+[1m[38;5;14m◆[0m  [1m[38;5;5mwvv[0m[38;5;8msxrkn[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-15 18:58:17[39m [1m[38;5;4m14[0m[38;5;8m8e17d7[39m
+│  none: pixelated logo.
+[1m[38;5;14m◆[0m  [1m[38;5;5mtt[0m[38;5;8mltrqwz[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-15 18:56:45[39m [1m[38;5;4m4d[0m[38;5;8mc0c554[39m
+│  none: logo.
+[1m[38;5;14m◆[0m  [1m[38;5;5mlz[0m[38;5;8mkswlkl[39m [38;5;3mlangurmonkey@noreply.codeberg.org[39m [38;5;6m2024-10-15 18:54:38[39m [1m[38;5;4mac[0m[38;5;8m5918a6[39m
+│  none: more on logo.
+[1m[38;5;14m◆[0m  [1m[38;5;5msu[0m[38;5;8msmxuso[39m [38;5;3mlangurmonkey@noreply.codeberg.org[39m [38;5;6m2024-10-15 18:53:10[39m [1m[38;5;4mec[0m[38;5;8m0d184a[39m
+│  none: try increase logo size.
+[1m[38;5;14m◆[0m  [1m[38;5;5mky[0m[38;5;8mkwwzlk[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-15 18:50:13[39m [1m[38;5;4m07[0m[38;5;8me750b5[39m
+│  none: logo to readme.
+[1m[38;5;14m◆[0m  [1m[38;5;5muq[0m[38;5;8mnsvypw[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-15 18:47:39[39m [1m[38;5;4mbb[0m[38;5;8mf58155[39m
+│  feat: update logo.
+[1m[38;5;14m◆[0m  [1m[38;5;5mlu[0m[38;5;8mpstzty[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-15 14:57:46[39m [1m[38;5;4m45[0m[38;5;8mc6cbc1[39m
+│  feat: add project logo.
+[1m[38;5;14m◆[0m  [1m[38;5;5mll[0m[38;5;8mulpyzq[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-15 14:45:16[39m [1m[38;5;4mda[0m[38;5;8m90cbd4[39m
+│  feat: add readme file.
+[1m[38;5;14m◆[0m  [1m[38;5;5mol[0m[38;5;8mwnwpqu[39m [38;5;3mme@tonisagrista.com[39m [38;5;6m2024-10-15 14:44:22[39m [1m[38;5;4mc58[0m[38;5;8mb84b3[39m
+│  feat: initial import. WIP.
+~

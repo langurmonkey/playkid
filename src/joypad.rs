@@ -9,7 +9,7 @@ use std::io;
 use std::process;
 
 /// Describes the current state of the Game Boy joypad.
-pub struct Joypad<'b> {
+pub struct Joypad {
     /// The P1/JOYP register.
     joyp: u8,
     /// Bits 0-4 contain the state of SsAB.
@@ -42,16 +42,14 @@ pub struct Joypad<'b> {
     cycles: usize,
     /// The event pump.
     event_pump: EventPump,
-    /// Reference to the main SDL object.
-    sdl: &'b Sdl,
     // Keep controller subsystem alive to handle hotplug events.
     controller_subsystem: sdl2::GameControllerSubsystem,
     /// Connected game controller.
     controller: Option<GameController>,
 }
 
-impl<'b> Joypad<'b> {
-    pub fn new(sdl: &'b Sdl) -> Self {
+impl Joypad {
+    pub fn new(sdl: &Sdl) -> Self {
         let mut joypad = Joypad {
             joyp: 0xFF,
             select_buttons: false,
@@ -69,7 +67,6 @@ impl<'b> Joypad<'b> {
             debug_flag: false,
             cycles: 0,
             event_pump: sdl.event_pump().unwrap(),
-            sdl,
             controller_subsystem: sdl.game_controller().unwrap(),
             controller: None,
         };

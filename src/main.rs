@@ -1,3 +1,4 @@
+mod apu;
 mod canvas;
 mod cartridge;
 mod constants;

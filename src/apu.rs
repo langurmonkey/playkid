@@ -1,0 +1,514 @@
+use sdl2::audio::AudioQueue;
+use sdl2::Sdl;
+
+pub struct APU {
+    /// APU Registers $FF10-$FF3F
+    regs: [u8; 0x30],
+    /// Internal Wave RAM $FF30-$FF3F
+    wave_ram: [u8; 16],
+    /// APU interrupt mask for registers IE and IF.
+    pub i_mask: u8,
+
+    /// Audio device,
+    device: AudioQueue<f32>,
+    /// Audio buffer.
+    buffer: Vec<f32>,
+
+    /// The sample timer.
+    sample_timer: f32,
+    /// Cycles per sample.
+    t_cycles_per_sample: f32,
+
+    /// Clock for the 64Hz envelope.
+    /// The envelope enables automatic volume adjustment over time.
+    env_clock_timer: u32,
+
+    // Channel 1.
+    ch1_enabled: bool,
+    ch1_timer: i32,
+    ch1_duty_step: usize,
+    ch1_volume: u8,
+    ch1_envelope_timer: u8,
+    ch1_envelope_running: bool,
+
+    // Channel 2.
+    ch2_enabled: bool,
+    ch2_timer: i32,
+    ch2_duty_step: usize,
+    ch2_volume: u8,
+    ch2_envelope_timer: u8,
+    ch2_envelope_running: bool,
+
+    // Channel 3.
+    ch3_enabled: bool,
+    ch3_timer: i32,
+    ch3_sample_idx: usize,
+
+    // Channel 4.
+    ch4_enabled: bool,
+    ch4_timer: i32,
+    ch4_lfsr: u16,
+    ch4_volume: u8,
+    ch4_envelope_timer: u8,
+    ch4_envelope_running: bool,
+}
+
+impl APU {
+    pub fn new(sdl: &Sdl) -> Self {
+        let audio_subsystem = sdl.audio().unwrap();
+
+        let desired_spec = sdl2::audio::AudioSpecDesired {
+            freq: Some(44100),
+            channels: Some(1), // Mono
+            samples: Some(1024),
+        };
+
+        // Start audio playback.
+        let device = audio_subsystem
+            .open_queue::<f32, _>(None, &desired_spec)
+            .unwrap();
+        device.resume();
+
+        Self {
+            regs: [0; 0x30],
+            wave_ram: [0; 16],
+            i_mask: 0,
+            device,
+            buffer: Vec::with_capacity(4096),
+            sample_timer: 0.0,
+            // 4194304 Hz / 44100 Hz = 95.1089...
+            t_cycles_per_sample: 4194304.0 / 44100.0,
+
+            env_clock_timer: 0,
+
+            // CH1.
+            ch1_enabled: false,
+            ch1_timer: 0,
+            ch1_duty_step: 0,
+            ch1_volume: 0,
+            ch1_envelope_timer: 0,
+            ch1_envelope_running: false,
+            // CH2.
+            ch2_enabled: false,
+            ch2_timer: 0,
+            ch2_duty_step: 0,
+            ch2_volume: 0,
+            ch2_envelope_timer: 0,
+            ch2_envelope_running: false,
+            // CH3.
+            ch3_enabled: false,
+            ch3_timer: 0,
+            ch3_sample_idx: 0,
+            // CH4.
+            ch4_enabled: false,
+            ch4_timer: 0,
+            ch4_lfsr: 0,
+            ch4_volume: 0,
+            ch4_envelope_timer: 0,
+            ch4_envelope_running: false,
+        }
+    }
+
+    pub fn read(&self, address: u16) -> u8 {
+        match address {
+            0xFF10..=0xFF25 => self.regs[(address - 0xFF10) as usize],
+            0xFF26 => {
+                let mut val = self.regs[0x16] & 0x80; // Get the Master On/Off bit
+                if self.ch1_enabled {
+                    val |= 0x01;
+                }
+                if self.ch2_enabled {
+                    val |= 0x02;
+                }
+                if self.ch3_enabled {
+                    val |= 0x04;
+                }
+                if self.ch4_enabled {
+                    val |= 0x08;
+                }
+                val | 0x70 // Unused bits are usually read as 1
+            }
+            0xFF30..=0xFF3F => self.wave_ram[(address - 0xFF30) as usize],
+            _ => 0xFF,
+        }
+    }
+
+    pub fn write(&mut self, address: u16, value: u8) {
+        // Check current state of NR52: Audio master control.
+        let master_on = (self.regs[0x16] & 0x80) != 0;
+
+        // If APU is off, ignore writes to $FF10-$FF25.
+        if !master_on && (0xFF10..=0xFF25).contains(&address) {
+            return;
+        }
+
+        // Always store in regs array so read() works.
+        if (0xFF10..=0xFF2F).contains(&address) {
+            self.regs[(address - 0xFF10) as usize] = value;
+        } else if (0xFF30..=0xFF3F).contains(&address) {
+            self.wave_ram[(address - 0xFF30) as usize] = value;
+        }
+
+        match address {
+            0xFF14 => {
+                // CH1 trigger.
+                if value & 0x80 != 0 {
+                    self.ch1_enabled = true;
+                    self.ch1_envelope_running = true;
+                    let nr12 = self.read(0xFF12);
+                    self.ch1_volume = (nr12 & 0xF0) >> 4;
+                    self.ch1_envelope_timer = nr12 & 0x07;
+                    self.ch1_duty_step = 0;
+                    let freq = ((value as u16 & 0x07) << 8) | self.read(0xFF13) as u16;
+                    self.ch1_timer = (2048 - freq as i32) * 4;
+                }
+            }
+            0xFF19 => {
+                // CH2 trigger.
+                if value & 0x80 != 0 {
+                    self.ch2_enabled = true;
+                    self.ch2_envelope_running = true;
+                    let nr22 = self.read(0xFF17);
+                    self.ch2_volume = (nr22 & 0xF0) >> 4;
+                    self.ch2_envelope_timer = nr22 & 0x07;
+                    self.ch2_duty_step = 0;
+                    let freq = ((value as u16 & 0x07) << 8) | self.read(0xFF18) as u16;
+                    self.ch2_timer = (2048 - freq as i32) * 4;
+                }
+            }
+            0xFF1E => {
+                // CH3 trigger.
+                if value & 0x80 != 0 {
+                    self.ch3_enabled = true;
+                    self.ch3_sample_idx = 0;
+                    let freq = ((value as u16 & 0x07) << 8) | self.read(0xFF1D) as u16;
+                    self.ch3_timer = (2048 - freq as i32) * 2; // Note: Ch3 timer is *2, not *4
+                }
+            }
+            0xFF23 => {
+                // CH4 trigger.
+                if value & 0x80 != 0 {
+                    self.ch4_enabled = true;
+                    self.ch4_envelope_running = true;
+                    let nr42 = self.read(0xFF21);
+                    self.ch4_volume = (nr42 & 0xF0) >> 4;
+                    self.ch4_envelope_timer = nr42 & 0x07;
+                    self.ch4_lfsr = 0x7FFF; // Reset LFSR
+                }
+            }
+
+            0xFF26 => {
+                // NR52 - Audio master control.
+                // If bit 7 is being toggled OFF.
+                if value & 0x80 == 0 {
+                    // Clear all registers $FF10-$FF25.
+                    for i in 0..0x16 {
+                        self.regs[i] = 0;
+                    }
+                    self.ch1_enabled = false;
+                    self.ch2_enabled = false;
+                    self.ch3_enabled = false;
+                    self.ch4_enabled = false;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Run the APU for `t_cycles` T-cycles.
+    pub fn cycle(&mut self, t_cycles: u32) {
+        // Update Channel 1 Frequency Timer.
+        // The timer period is (2048 - frequency) * 4.
+        let freq_low = self.read(0xFF13) as u16;
+        let freq_high = (self.read(0xFF14) & 0x07) as u16;
+        let frequency = (freq_high << 8) | freq_low;
+        let period = (2048 - frequency as i32) * 4;
+
+        // Channel 1.
+        self.ch1_timer -= t_cycles as i32;
+        if self.ch1_timer <= 0 {
+            self.ch1_timer += period;
+            self.ch1_duty_step = (self.ch1_duty_step + 1) % 8;
+        }
+
+        // Channel 2.
+        let ch2_freq = (((self.read(0xFF19) & 0x07) as u16) << 8) | self.read(0xFF18) as u16;
+        self.ch2_timer -= t_cycles as i32;
+        if self.ch2_timer <= 0 {
+            self.ch2_timer += (2048 - ch2_freq as i32) * 4;
+            self.ch2_duty_step = (self.ch2_duty_step + 1) % 8;
+        }
+
+        // Channel 3.
+        let ch3_freq = (((self.read(0xFF1E) & 0x07) as u16) << 8) | self.read(0xFF1D) as u16;
+        self.ch3_timer -= t_cycles as i32;
+        if self.ch3_timer <= 0 {
+            self.ch3_timer += (2048 - ch3_freq as i32) * 2;
+            self.ch3_sample_idx = (self.ch3_sample_idx + 1) % 32;
+        }
+
+        // Channel 4.
+        let nr43 = self.read(0xFF22);
+        let shift = (nr43 >> 4) as i32;
+        let divisor = match nr43 & 0x07 {
+            0 => 8,
+            1 => 16,
+            2 => 32,
+            3 => 48,
+            4 => 64,
+            5 => 80,
+            6 => 96,
+            7 => 112,
+            _ => 8,
+        };
+        let period = divisor << shift;
+
+        self.ch4_timer -= t_cycles as i32;
+        if self.ch4_timer <= 0 {
+            self.ch4_timer += period;
+
+            // LFSR Step.
+            let bit0 = self.ch4_lfsr & 0x01;
+            let bit1 = (self.ch4_lfsr >> 1) & 0x01;
+            let result = bit0 ^ bit1;
+
+            self.ch4_lfsr = (self.ch4_lfsr >> 1) | (result << 14);
+            if (nr43 & 0x08) != 0 {
+                // Short mode (7-bit)
+                self.ch4_lfsr = (self.ch4_lfsr & !(1 << 6)) | (result << 6);
+            }
+        }
+
+        // 64Hz Envelope Clock (65536 T-cycles)
+        self.env_clock_timer += t_cycles;
+        if self.env_clock_timer >= 65536 {
+            self.env_clock_timer -= 65536;
+            self.step_envelope_ch1();
+            self.step_envelope_ch2();
+            self.step_envelope_ch4();
+        }
+
+        // Sample Generation Logic.
+        self.sample_timer += t_cycles as f32;
+        while self.sample_timer >= self.t_cycles_per_sample {
+            self.sample_timer -= self.t_cycles_per_sample;
+
+            let sample = self.generate_sample();
+            self.buffer.push(sample);
+
+            if self.buffer.len() >= 1024 {
+                // Throttle: If the queue is getting too full, wait a bit.
+                // This prevents the emulator from running at 500% speed.
+                while self.device.size() > 8192 {
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                }
+                self.device.queue_audio(&self.buffer).unwrap();
+                self.buffer.clear();
+            }
+        }
+    }
+
+    /// Channel 1 envelope step.
+    fn step_envelope_ch1(&mut self) {
+        let nr12 = self.read(0xFF12);
+        let sweep_pace = nr12 & 0x07;
+
+        // If pace is 0, the envelope is disabled.
+        if sweep_pace == 0 {
+            return;
+        }
+
+        if self.ch1_envelope_running && self.ch1_envelope_timer > 0 {
+            self.ch1_envelope_timer -= 1;
+
+            if self.ch1_envelope_timer == 0 {
+                self.ch1_envelope_timer = sweep_pace;
+
+                // True = up, False = down.
+                let direction = (nr12 & 0x08) != 0;
+                if direction && self.ch1_volume < 15 {
+                    self.ch1_volume += 1;
+                } else if !direction && self.ch1_volume > 0 {
+                    self.ch1_volume -= 1;
+                }
+
+                if self.ch1_volume == 0 || self.ch1_volume == 15 {
+                    self.ch1_envelope_running = false;
+                }
+            }
+        }
+    }
+    /// Channel 2 envelope step.
+    fn step_envelope_ch2(&mut self) {
+        let nr22 = self.read(0xFF17);
+        let sweep_pace = nr22 & 0x07;
+
+        // If pace is 0, the envelope is disabled.
+        if sweep_pace == 0 {
+            return;
+        }
+
+        if self.ch2_envelope_running && self.ch2_envelope_timer > 0 {
+            self.ch2_envelope_timer -= 1;
+
+            if self.ch2_envelope_timer == 0 {
+                self.ch2_envelope_timer = sweep_pace;
+
+                // True = up, False = down.
+                let direction = (nr22 & 0x08) != 0;
+                if direction && self.ch2_volume < 15 {
+                    self.ch2_volume += 1;
+                } else if !direction && self.ch2_volume > 0 {
+                    self.ch2_volume -= 1;
+                }
+
+                if self.ch2_volume == 0 || self.ch2_volume == 15 {
+                    self.ch2_envelope_running = false;
+                }
+            }
+        }
+    }
+
+    /// Channel 4 envelope step.
+    fn step_envelope_ch4(&mut self) {
+        let nr42 = self.read(0xFF21);
+        let sweep_pace = nr42 & 0x07;
+
+        // If pace is 0, the envelope is disabled.
+        if sweep_pace == 0 {
+            return;
+        }
+
+        if self.ch4_envelope_running && self.ch4_envelope_timer > 0 {
+            self.ch4_envelope_timer -= 1;
+
+            if self.ch4_envelope_timer == 0 {
+                self.ch4_envelope_timer = sweep_pace;
+
+                // True = up, False = down.
+                let direction = (nr42 & 0x08) != 0;
+                if direction && self.ch4_volume < 15 {
+                    self.ch4_volume += 1;
+                } else if !direction && self.ch4_volume > 0 {
+                    self.ch4_volume -= 1;
+                }
+
+                if self.ch4_volume == 0 || self.ch4_volume == 15 {
+                    self.ch4_envelope_running = false;
+                }
+            }
+        }
+    }
+
+    fn generate_sample(&self) -> f32 {
+        // Bit 7 of NR52 ($FF26) is the Master Sound On/Off switch.
+        let master_on = (self.read(0xFF26) & 0x80) != 0;
+        if !master_on {
+            return 0.0;
+        }
+
+        // Compute channels.
+        let out1 = self.calculate_ch1();
+        let out2 = self.calculate_ch2();
+        let out3 = self.calculate_ch3();
+        let out4 = self.calculate_ch4();
+
+        // Mix by adding them together.
+        // Audio might clip?
+        out1 + out2 + out3 + out4
+    }
+
+    fn calculate_ch1(&self) -> f32 {
+        if !self.ch1_enabled || self.ch1_volume == 0 {
+            return 0.0;
+        }
+
+        let duty_idx = (self.read(0xFF11) >> 6) as usize;
+        let patterns = [
+            [0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 1, 1, 1],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+        ];
+
+        let signal = patterns[duty_idx][self.ch1_duty_step];
+
+        // Scale by volume (0.0 to 1.0 range).
+        // We use a small multiplier (0.05) so it's not too loud.
+        let volume_multiplier = (self.ch1_volume as f32 / 15.0) * 0.05;
+
+        if signal == 1 {
+            volume_multiplier
+        } else {
+            -volume_multiplier
+        }
+    }
+
+    fn calculate_ch2(&self) -> f32 {
+        if !self.ch2_enabled || self.ch2_volume == 0 {
+            return 0.0;
+        }
+
+        let duty_idx = (self.read(0xFF16) >> 6) as usize;
+        let patterns = [
+            [0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 1, 1, 1],
+            [0, 1, 1, 1, 1, 1, 1, 0],
+        ];
+
+        let signal = patterns[duty_idx][self.ch2_duty_step];
+        let vol = (self.ch2_volume as f32 / 15.0) * 0.05;
+
+        if signal == 1 {
+            vol
+        } else {
+            -vol
+        }
+    }
+
+    fn calculate_ch3(&self) -> f32 {
+        let nr30 = self.read(0xFF1A);
+        if !self.ch3_enabled || (nr30 & 0x80 == 0) {
+            return 0.0;
+        }
+
+        // Volume shift: bits 5-6 of NR32 ($FF1C)
+        let volume_shift = match (self.read(0xFF1C) >> 5) & 0x03 {
+            0 => 4, // Mute (actually shifts out all bits)
+            1 => 0, // 100%
+            2 => 1, // 50%
+            3 => 2, // 25%
+            _ => 4,
+        };
+
+        // Get 4-bit sample from Wave RAM (32 samples total, 2 per byte)
+        let byte = self.wave_ram[self.ch3_sample_idx / 2];
+        let mut sample = if self.ch3_sample_idx % 2 == 0 {
+            byte >> 4 // High nibble
+        } else {
+            byte & 0x0F // Low nibble
+        };
+
+        sample >>= volume_shift;
+
+        // Normalize 0..15 to -1.0..1.0
+        (sample as f32 / 7.5 - 1.0) * 0.05
+    }
+
+    fn calculate_ch4(&self) -> f32 {
+        if !self.ch4_enabled || self.ch4_volume == 0 {
+            return 0.0;
+        }
+
+        // Result is the inverse of the first bit
+        let bit = (!self.ch4_lfsr) & 0x01;
+        let vol = (self.ch4_volume as f32 / 15.0) * 0.05;
+
+        if bit == 1 {
+            vol
+        } else {
+            -vol
+        }
+    }
+}

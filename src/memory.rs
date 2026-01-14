@@ -1,9 +1,11 @@
+use crate::apu;
 use crate::cartridge;
 use crate::constants;
 use crate::joypad;
 use crate::ppu;
 use crate::timer;
 
+use apu::APU;
 use cartridge::Cartridge;
 use joypad::Joypad;
 use ppu::PPU;
@@ -28,7 +30,7 @@ use timer::Timer;
 /// 0xFF80-0xFFFE: High RAM                       (HRAM)
 /// 0xFF80-0xFFFF: Interrupt Enable Register      (IER)
 
-pub struct Memory<'a, 'b> {
+pub struct Memory<'a> {
     /// Work RAM.
     pub wram: [u8; constants::WRAM_SIZE],
     // High RAM.
@@ -41,17 +43,19 @@ pub struct Memory<'a, 'b> {
     pub ie: u8,
     // Cartridge reference.
     pub cart: &'a mut Cartridge,
-    /// Our PPU, picture processing unit.
+    /// The PPU, Picture Processing Unit.
     pub ppu: PPU,
     /// The timer.
     pub timer: Timer,
     /// The joypad.
-    pub joypad: Joypad<'b>,
+    pub joypad: Joypad,
+    /// The APU, Audio Processing Unit.
+    pub apu: APU,
 }
 
-impl<'a, 'b> Memory<'a, 'b> {
+impl<'a> Memory<'a> {
     /// Create a new memory instance.
-    pub fn new(cart: &'a mut Cartridge, sdl: &'b Sdl) -> Self {
+    pub fn new(cart: &'a mut Cartridge, sdl: &Sdl) -> Self {
         Memory {
             wram: [0; constants::WRAM_SIZE],
             hram: [0; constants::HRAM_SIZE],
@@ -62,6 +66,7 @@ impl<'a, 'b> Memory<'a, 'b> {
             ppu: PPU::new(0x194),
             timer: Timer::new(),
             joypad: Joypad::new(sdl),
+            apu: APU::new(sdl),
         }
     }
 
@@ -202,16 +207,6 @@ impl<'a, 'b> Memory<'a, 'b> {
         self.write8(0xFFFF, 0x00);
     }
 
-    /// Gets the value of the IE register.
-    pub fn get_ie(&self) -> u8 {
-        self.read8(0xFFFF)
-    }
-    /// Gets the address of the Tile Data Table for the background,
-    /// which is in register LCDC.
-    pub fn get_lcdc(&self) -> u16 {
-        self.read16(0xFF40)
-    }
-
     /// Read a byte of memory at the given `address`.
     pub fn read8(&self, address: u16) -> u8 {
         match address {
@@ -255,6 +250,9 @@ impl<'a, 'b> Memory<'a, 'b> {
             0xFF04..=0xFF07 => self.timer.read(address),
             // Interrupt flag.
             0xFF0F => self.iff | 0b1110_0000,
+
+            // Audio.
+            0xFF10..=0xFF3F => self.apu.read(address),
 
             // VRAM registers.
             0xFF40..=0xFF4F => self.ppu.read(address),
@@ -313,6 +311,9 @@ impl<'a, 'b> Memory<'a, 'b> {
             // IF: interrupt flag.
             0xFF0F => self.iff = value,
 
+            // Audio.
+            0xFF10..=0xFF3F => self.apu.write(address, value),
+
             // OAM DMA.
             0xFF46 => {
                 // ROM/RAM to OAM.
@@ -361,6 +362,11 @@ impl<'a, 'b> Memory<'a, 'b> {
         self.ppu.cycle(t_cycles);
         self.iff |= self.ppu.i_mask;
         self.ppu.i_mask = 0;
+
+        // APU
+        self.apu.cycle(t_cycles);
+        self.iff |= self.apu.i_mask;
+        self.apu.i_mask = 0;
 
         ppu_cycles
     }

@@ -21,7 +21,7 @@ pub struct Machine<'a, 'b> {
     /// Our registers.
     pub registers: Registers,
     /// The main memory.
-    pub memory: Memory<'a, 'b>,
+    pub memory: Memory<'a>,
     /// The display.
     display: Display<'b>,
     /// Interrupt master enable flag.
@@ -59,7 +59,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             t_cycles: 324,
             m_cycles: 0,
             debug: DebugMonitor::new(debug),
-            fps: fps,
+            fps,
         }
     }
 
