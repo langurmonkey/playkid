@@ -44,6 +44,8 @@ pub struct Joypad<'b> {
     event_pump: EventPump,
     /// Reference to the main SDL object.
     sdl: &'b Sdl,
+    // Keep controller subsystem alive to handle hotplug events.
+    controller_subsystem: sdl2::GameControllerSubsystem,
     /// Connected game controller.
     controller: Option<GameController>,
 }
@@ -68,6 +70,7 @@ impl<'b> Joypad<'b> {
             cycles: 0,
             event_pump: sdl.event_pump().unwrap(),
             sdl,
+            controller_subsystem: sdl.game_controller().unwrap(),
             controller: None,
         };
 
@@ -79,9 +82,11 @@ impl<'b> Joypad<'b> {
 
     /// Initialize the first available game controller.
     fn init_controller(&mut self) {
-        let game_controller = self.sdl.game_controller().unwrap();
+        // Enable background events for controller connection/disconnection.
+        sdl2::hint::set("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1");
 
-        let available = game_controller
+        let available = self
+            .controller_subsystem
             .num_joysticks()
             .map_err(|e| format!("can't enumerate joysticks: {}", e))
             .unwrap();
@@ -90,8 +95,8 @@ impl<'b> Joypad<'b> {
 
         // Try to open the first controller
         for id in 0..available {
-            if game_controller.is_game_controller(id) {
-                match game_controller.open(id) {
+            if self.controller_subsystem.is_game_controller(id) {
+                match self.controller_subsystem.open(id) {
                     Ok(c) => {
                         println!("Controller {} opened: {}", id, c.name());
                         self.controller = Some(c);
@@ -137,7 +142,8 @@ impl<'b> Joypad<'b> {
     }
 
     pub fn cycle(&mut self) {
-        // Only poll events twice per frame, to capture mid-frame events.
+        // Poll events twice per frame.
+        // Polling once per frame results in too much latency.
         self.cycles += 1;
         if self.cycles * 2 < constants::CYCLES_PER_FRAME {
             return;
@@ -309,27 +315,38 @@ impl<'b> Joypad<'b> {
                     }
                 }
 
-                // Controller connected/disconnected
+                // Controller connected.
                 Event::ControllerDeviceAdded { which, .. } => {
+                    println!("Connected!");
                     if self.controller.is_none() {
-                        let game_controller = self.sdl.game_controller().unwrap();
-                        match game_controller.open(which) {
-                            Ok(c) => {
-                                println!("Controller connected: {}", c.name());
-                                self.controller = Some(c);
-                            }
-                            Err(e) => {
-                                println!("Failed to open controller: {}", e);
+                        // For 'Added' events, 'which' is the device index.
+                        if self.controller_subsystem.is_game_controller(which) {
+                            match self.controller_subsystem.open(which) {
+                                Ok(c) => {
+                                    println!("Controller connected: {}", c.name());
+                                    self.controller = Some(c);
+                                }
+                                Err(e) => println!("Failed to open controller: {}", e),
                             }
                         }
                     }
                 }
+
+                // Controller disconnected.
                 Event::ControllerDeviceRemoved { which, .. } => {
-                    if let Some(ref controller) = self.controller {
-                        if controller.instance_id() as u32 == which {
-                            println!("Controller disconnected");
-                            self.controller = None;
-                        }
+                    println!("Removed!");
+                    // For 'Removed' events, 'which' is the Instance ID.
+                    let is_current = self
+                        .controller
+                        .as_ref()
+                        .map_or(false, |c| c.instance_id() == which);
+
+                    if is_current {
+                        println!(
+                            "Controller disconnected: {}",
+                            self.controller.as_ref().unwrap().name()
+                        );
+                        self.controller = None;
                     }
                 }
 
