@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="img/logo.avif" width="300%" height="300%"/>
+  <img src="img/logo.avif" width="200px" style="image-rendering: pixelated;"/>
 </p>
 
 # Play Kid, a Game Boy emulator
