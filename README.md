@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="img/logo-3x.avif" />
+  <img src="assets/img/logo-3x.avif" />
 </p>
 
 **Play Kid** is yet another Game Boy emulator, written in Rust. But hey, it is MY Game Boy emulator, and I'm proud of it. Here are the implemented features:
@@ -49,15 +49,19 @@ Arguments:
 Options:
   -s, --scale <SCALE>  Initial window scale. It can also be resized manually [default: 3]
   -d, --debug          Activate debug mode
-  -f, --fps            Print FPS every second to standard output
+  -f, --fps            Show FPS counter
       --skipcheck      Skip global checksum, header checksum, and logo sequence check
   -h, --help           Print help
   -V, --version        Print version
 ```
 
+# FPS
+
+You can print the current FPS at any time by pressing <kbd>f</kbd>.
+
 # Debug mode
 
-Running with `-d` enables debug mode. In this mode, the game steps through the instructions one-by-one, unless continue (`c`) is hit in the terminal. The terminal outputs the state of the machine after each instruction:
+Running with `-d` enables debug mode. In this mode, the game steps through the instructions one-by-one, unless continue (<kbd>c</kbd>) is hit in the terminal. The terminal outputs the state of the machine after each instruction:
 
 ```
 $006f:     JR NZ, s8   0x006b
@@ -91,9 +95,9 @@ Joypad:    _ _ _ _ _ _ _ _
 > 
 ```
 
-Here are the key bindings:
+Here are the key bindings and commands:
 
-- `Enter` -- step to next instruction
+- <kbd>Enter</kbd> -- step to next instruction
 - `c` -- continue (until breakpoint)
 - `b $ADDR` -- set a breakpoint at the given address. Example: `b $006a`
 - `b list` -- list current breakpoints
@@ -101,7 +105,7 @@ Here are the key bindings:
 - `r` -- reset emulator
 - `q` -- quit
 
-Even if not starting the emulator with the debug flag `-d`, you can always press `s` in the emulator window to stop it at the current instruction and enter debug mode. Operation carries on in the terminal window.
+Even if you did not start the emulator with the debug flag `-d`, you can always press <kbd>d</kbd> in the emulator window to stop it at the current instruction and enter debug mode. Operation carries on in the terminal window in the usual way.
 
 # Useful links
 

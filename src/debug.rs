@@ -45,17 +45,14 @@ impl DebugMonitor {
         pc: u16,
         run_instr: &RunInstr,
         opcode: u8,
-        mem: &Memory,
+        mem: &mut Memory,
         reg: &Registers,
     ) -> bool {
         // Debug if needed.
-        let stop = self.breakpoints.contains(&pc) || mem.joypad.debug_flag;
-        if self.debug || stop {
-            if self.step || stop {
-                return self.debug_step(pc, reg, mem, run_instr, opcode, cycles);
-            } else {
-                self.debug(pc, reg, mem, run_instr, opcode, cycles);
-            }
+        let joy_debug = mem.joypad.read_debug_flag();
+        let stop = self.breakpoints.contains(&pc) || joy_debug;
+        if self.debug || self.step || stop {
+            return self.debug_step(pc, reg, mem, run_instr, opcode, cycles);
         }
         false
     }

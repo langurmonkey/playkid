@@ -31,13 +31,13 @@ use std::path::PathBuf;
 struct Args {
     /// Path to the input ROM file to load.
     input: PathBuf,
-    #[arg(short, long, default_value_t = 3, value_parser = clap::value_parser!(u8).range(1..12))]
+    #[arg(short, long, default_value_t = 5, value_parser = clap::value_parser!(u8).range(1..15))]
     /// Initial window scale. It can also be resized manually.
     scale: u8,
-    /// Activate debug mode.
+    /// Activate debug mode. Use 'd' to stop program at any point.
     #[arg(short, long)]
     debug: bool,
-    /// Print FPS every second to standard output.
+    /// Show FPS counter. Use 'f' to toggle on and off.
     #[arg(short, long)]
     fps: bool,
     /// Skip global checksum, header checksum, and logo sequence check.
@@ -62,11 +62,19 @@ fn main() -> io::Result<()> {
     cart.load_sram(rom);
 
     let sdl_context = sdl2::init().unwrap();
+    let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).unwrap();
 
     // Create the machine.
     {
         // Create a game boy with the given cartridge.
-        let mut gameboy = Machine::new(&mut cart, &sdl_context, args.scale, args.debug, args.fps);
+        let mut gameboy = Machine::new(
+            &mut cart,
+            &sdl_context,
+            &ttf_context,
+            args.scale,
+            args.debug,
+            args.fps,
+        );
         // Initialize the Game Boy state.
         gameboy.init();
         // Start the machine.

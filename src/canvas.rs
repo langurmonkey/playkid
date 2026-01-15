@@ -1,6 +1,9 @@
+use sdl2::pixels::Color;
 use sdl2::rect::Rect;
+use sdl2::ttf::Font;
 use sdl2::{pixels::PixelFormatEnum, render::Texture, render::TextureCreator, Sdl};
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 type Error = Box<dyn std::error::Error>;
 
@@ -15,10 +18,15 @@ pub struct Canvas<'a> {
     data: Vec<u8>,
     width: usize,
     height: usize,
+    /// The font to render text.
+    font: Font<'a, 'static>,
+    /// Map text ID to the string and layers (Texture, Rect).
+    text_cache: HashMap<usize, (String, Vec<(Texture<'static>, Rect)>)>,
 }
 impl<'a> Canvas<'a> {
     pub fn new(
         sdl: &'a Sdl,
+        ttf: &'a sdl2::ttf::Sdl2TtfContext,
         title: &str,
         width: usize,
         height: usize,
@@ -31,6 +39,7 @@ impl<'a> Canvas<'a> {
         let window = video_subsystem
             .window(title, (width * scale) as u32, (height * scale) as u32)
             .resizable()
+            .allow_highdpi()
             .position_centered()
             .build()?;
         let sdl_canvas = window.into_canvas().build()?;
@@ -41,7 +50,14 @@ impl<'a> Canvas<'a> {
             height as u32,
         )?;
 
+        // The texture to render the Game Boy screen.
         let texture = unsafe { std::mem::transmute::<_, Texture<'static>>(texture) };
+
+        // The text hash map.
+        let text_cache = HashMap::new();
+
+        // Load font file.
+        let font = ttf.load_font("assets/fnt/PixelatedElegance.ttf", 14)?;
 
         Ok(Canvas {
             width,
@@ -51,6 +67,8 @@ impl<'a> Canvas<'a> {
             sdl,
             creator,
             texture: RefCell::new(texture),
+            font,
+            text_cache,
         })
     }
 
@@ -64,6 +82,72 @@ impl<'a> Canvas<'a> {
         self.sdl_canvas
             .set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
         self.sdl_canvas.clear();
+    }
+
+    /// Add a new text to the text cache with the given ID, string, position, and color.
+    /// Only update the texture if the ID doesn't exist.
+    /// The text will be rendered to the canvas during the next call to `flush()`.
+    pub fn draw_text(&mut self, id: usize, text: &str, x: i32, y: i32, color: Color) {
+        self.draw_text_shadow(id, text, x, y, color, false);
+    }
+
+    /// Variant of `draw_text()` where a shadow is optionally rendered behind the text,
+    /// in black.
+    pub fn draw_text_shadow(
+        &mut self,
+        id: usize,
+        text: &str,
+        x: i32,
+        y: i32,
+        color: Color,
+        shadow: bool,
+    ) {
+        // Shadow offset, in pixels.
+        let offset = 1;
+
+        // Check if we can skip the expensive texture creation.
+        if let Some((old_text, layers)) = self.text_cache.get_mut(&id) {
+            if old_text == text {
+                // Text is the same! Just update the positions (Rects) and return.
+                // Layer 0 is shadow, Layer 1 is foreground.
+                layers[0].1 = Rect::new(
+                    x + offset,
+                    y + offset,
+                    layers[0].1.width(),
+                    layers[0].1.height(),
+                );
+                layers[1].1 = Rect::new(x, y, layers[1].1.width(), layers[1].1.height());
+                return;
+            }
+        }
+
+        // If we reach here, text changed or ID is new. Re-render surfaces.
+        let mut layers = Vec::new();
+
+        if shadow {
+            // Shadow layer.
+            let s_surf = self.font.render(text).blended(Color::RGB(0, 0, 0)).unwrap();
+            let s_tex = self.creator.create_texture_from_surface(&s_surf).unwrap();
+            let s_tex = unsafe { std::mem::transmute::<_, Texture<'static>>(s_tex) };
+            layers.push((
+                s_tex,
+                Rect::new(x + offset, y + offset, s_surf.width(), s_surf.height()),
+            ));
+        }
+
+        // Text layer.
+        let f_surf = self.font.render(text).blended(color).unwrap();
+        let f_tex = self.creator.create_texture_from_surface(&f_surf).unwrap();
+        let f_tex = unsafe { std::mem::transmute::<_, Texture<'static>>(f_tex) };
+        layers.push((f_tex, Rect::new(x, y, f_surf.width(), f_surf.height())));
+
+        // Update the cache.
+        self.text_cache.insert(id, (text.to_string(), layers));
+    }
+
+    /// Remove the text with the given ID from the text cache.
+    pub fn remove_text(&mut self, id: usize) {
+        self.text_cache.remove(&id);
     }
 
     /// Flushes the current texture.
@@ -93,10 +177,65 @@ impl<'a> Canvas<'a> {
         self.sdl_canvas
             .set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
         self.sdl_canvas.clear();
-        // Render.
+        // Render Game Boy frame.
         self.sdl_canvas
             .copy(&texture, None, Some(target_rect))
             .unwrap();
+
+        // Render UI (text elements).
+        let window_display_index = self.sdl_canvas.window().display_index().unwrap_or(0);
+        // Get DPI of current display.
+        let (ddpi, _, _) = self
+            .sdl
+            .video()
+            .unwrap()
+            .display_dpi(window_display_index)
+            .unwrap_or((96.0, 96.0, 96.0));
+        // Calculate a scale relative to standard 96 DPI
+        let scale_factor = ddpi / 96.0;
+
+        self.sdl_canvas
+            .set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
+        self.sdl_canvas.clear();
+        self.sdl_canvas
+            .copy(&texture, None, Some(target_rect))
+            .unwrap();
+
+        // Draw UI with DPI scaling.
+        self.sdl_canvas
+            .set_blend_mode(sdl2::render::BlendMode::Blend);
+
+        for (_, (_, layers)) in &self.text_cache {
+            if let Some((_, text_rect)) = layers.get(1) {
+                // Apply DPI scale to the padding and background box
+                let padding = (4.0 * scale_factor) as i32;
+
+                let bg_rect = Rect::new(
+                    (text_rect.x() as f32 * scale_factor) as i32 - padding,
+                    (text_rect.y() as f32 * scale_factor) as i32 - padding,
+                    (text_rect.width() as f32 * scale_factor) as u32 + (padding as u32 * 2),
+                    (text_rect.height() as f32 * scale_factor) as u32 + (padding as u32 * 2),
+                );
+
+                self.sdl_canvas
+                    .set_draw_color(sdl2::pixels::Color::RGBA(0, 0, 0, 128));
+                self.sdl_canvas.fill_rect(bg_rect).unwrap();
+            }
+        }
+
+        // Draw Text Layers with scaled coordinates and sizes.
+        for (_, (_, layers)) in &self.text_cache {
+            for (tex, rect) in layers {
+                let scaled_rect = Rect::new(
+                    (rect.x() as f32 * scale_factor) as i32,
+                    (rect.y() as f32 * scale_factor) as i32,
+                    (rect.width() as f32 * scale_factor) as u32,
+                    (rect.height() as f32 * scale_factor) as u32,
+                );
+                self.sdl_canvas.copy(tex, None, Some(scaled_rect)).unwrap();
+            }
+        }
+
         self.sdl_canvas.present();
     }
 

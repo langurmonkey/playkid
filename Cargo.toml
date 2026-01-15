@@ -6,7 +6,7 @@ authors = ["Toni Sagristà Sellés <me@tonisagrista.com>"]
 edition = "2021"
 
 [dependencies]
-sdl2 = "0.38.*"
+sdl2 = { version = "0.38.*", features = ["ttf"] }
 clap = { version = "4.5.*", features = ["derive"] }
 clap_derive = { version = "4.0.0-rc.1"}
 colored = "2.*"

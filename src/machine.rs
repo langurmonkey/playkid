@@ -12,6 +12,7 @@ use display::Display;
 use instruction::{Instruction, RunInstr, CC, R16, R16EXT, R16LD, R8, TGT3};
 use memory::Memory;
 use registers::Registers;
+use sdl2::pixels::Color;
 use sdl2::Sdl;
 use std::thread;
 
@@ -46,11 +47,18 @@ pub struct Machine<'a, 'b> {
 
 impl<'a, 'b> Machine<'a, 'b> {
     /// Create a new instance of the Game Boy.
-    pub fn new(cart: &'a mut Cartridge, sdl: &'b Sdl, scale: u8, debug: bool, fps: bool) -> Self {
+    pub fn new(
+        cart: &'a mut Cartridge,
+        sdl: &'b Sdl,
+        ttf: &'b sdl2::ttf::Sdl2TtfContext,
+        scale: u8,
+        debug: bool,
+        fps: bool,
+    ) -> Self {
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
-            display: Display::new("PlayKid emulator", scale, sdl, debug),
+            display: Display::new("PlayKid emulator", scale, sdl, ttf, debug),
             ime: false,
             ei: 0,
             di: 0,
@@ -117,10 +125,19 @@ impl<'a, 'b> Machine<'a, 'b> {
 
             frame_count += 1;
 
-            // Log FPS every second
+            // FPS counter.
+            let joy_fps = self.memory.joypad.read_fps_flag();
+            if joy_fps {
+                // Switch state.
+                self.fps = !self.fps;
+                if !self.fps {
+                    // Clear text.
+                    self.display.remove_fps();
+                }
+            }
             if self.fps && fps_timer.elapsed() >= FPS_LOG_INTERVAL {
                 let actual_fps = frame_count as f64 / fps_timer.elapsed().as_secs_f64();
-                println!("FPS: {:.2}", actual_fps);
+                self.display.draw_fps(actual_fps, Color::RED);
                 frame_count = 0;
                 fps_timer = std::time::Instant::now();
             }
@@ -267,7 +284,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             pc,
             &run_instr,
             opcode,
-            &self.memory,
+            &mut self.memory,
             &self.registers,
         ) {
             self.reset();

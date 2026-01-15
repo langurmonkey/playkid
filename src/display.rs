@@ -5,7 +5,11 @@ use crate::memory;
 use canvas::Canvas;
 use memory::Memory;
 use sdl2;
+use sdl2::pixels::Color;
 use sdl2::Sdl;
+
+/// ID of the FPS text.
+const ID_FPS: usize = 0;
 
 /// Holds the display objects and renders the image from the PPU data.
 pub struct Display<'a> {
@@ -18,11 +22,17 @@ pub struct Display<'a> {
 }
 
 impl<'a> Display<'a> {
-    pub fn new(window_title: &str, scale: u8, sdl: &'a Sdl, debug: bool) -> Self {
+    pub fn new(
+        window_title: &str,
+        scale: u8,
+        sdl: &'a Sdl,
+        ttf: &'a sdl2::ttf::Sdl2TtfContext,
+        debug: bool,
+    ) -> Self {
         let w = constants::DISPLAY_WIDTH;
         let h = constants::DISPLAY_HEIGHT;
 
-        let canvas = Canvas::new(sdl, window_title, w, h, scale as usize).unwrap();
+        let canvas = Canvas::new(sdl, ttf, window_title, w, h, scale as usize).unwrap();
 
         Display {
             canvas,
@@ -61,5 +71,17 @@ impl<'a> Display<'a> {
                 self.canvas.flush();
             }
         }
+    }
+
+    /// Draws the given FPS value to the canvas.
+    pub fn draw_fps(&mut self, fps: f64, color: Color) {
+        let fps_str = format!("FPS: {:.2}", fps);
+        // Draw at coordinates (10, 10)
+        self.canvas.draw_text(ID_FPS, &fps_str, 10, 10, color);
+    }
+
+    /// Remove the current FPS value.
+    pub fn remove_fps(&mut self) {
+        self.canvas.remove_text(ID_FPS);
     }
 }

@@ -38,6 +38,8 @@ pub struct Joypad {
     pub i_mask: u8,
     /// Debug flag. If this is on, a debug pause is requested.
     pub debug_flag: bool,
+    /// FPS flag: If this is on, FPS display is toggled.
+    pub fps_flag: bool,
     /// Cycle counter,
     cycles: usize,
     /// The event pump.
@@ -65,6 +67,7 @@ impl Joypad {
             request_interrupt: false,
             i_mask: 0,
             debug_flag: false,
+            fps_flag: false,
             cycles: 0,
             event_pump: sdl.event_pump().unwrap(),
             controller_subsystem: sdl.game_controller().unwrap(),
@@ -177,18 +180,19 @@ impl Joypad {
                     return false;
                 }
 
-                // Debug pause (`s` for stop).
-                Event::KeyDown {
-                    keycode: Some(Keycode::S),
+                // Debug pause (`d` for debug).
+                Event::KeyUp {
+                    keycode: Some(Keycode::D),
                     ..
                 } => {
                     self.debug_flag = true;
                 }
+                // FPS flag (`f` for FPS).
                 Event::KeyUp {
-                    keycode: Some(Keycode::S),
+                    keycode: Some(Keycode::F),
                     ..
                 } => {
-                    self.debug_flag = false;
+                    self.fps_flag = true;
                 }
 
                 // Keyboard inputs
@@ -423,5 +427,21 @@ impl Joypad {
         }
 
         self.joyp = res;
+    }
+
+    /// Read and reset debug flag.
+    pub fn read_debug_flag(&mut self) -> bool {
+        let d = self.debug_flag;
+        self.debug_flag = false;
+
+        d
+    }
+
+    /// Read and reset FPS flag.
+    pub fn read_fps_flag(&mut self) -> bool {
+        let d = self.fps_flag;
+        self.fps_flag = false;
+
+        d
     }
 }
