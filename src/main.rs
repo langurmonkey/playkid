@@ -32,7 +32,7 @@ struct Args {
     /// Path to the input ROM file to load.
     input: PathBuf,
     #[arg(short, long, default_value_t = 3, value_parser = clap::value_parser!(u8).range(1..12))]
-    /// Display scale.
+    /// Initial window scale. It can also be resized manually.
     scale: u8,
     /// Activate debug mode.
     #[arg(short, long)]

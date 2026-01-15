@@ -1,3 +1,4 @@
+use sdl2::rect::Rect;
 use sdl2::{pixels::PixelFormatEnum, render::Texture, render::TextureCreator, Sdl};
 use std::cell::RefCell;
 
@@ -23,9 +24,13 @@ impl<'a> Canvas<'a> {
         height: usize,
         scale: usize,
     ) -> Result<Self, Error> {
+        // Nearest filter.
+        sdl2::hint::set("SDL_RENDER_SCALE_QUALITY", "nearest");
+        // Create window.
         let video_subsystem = sdl.video()?;
         let window = video_subsystem
             .window(title, (width * scale) as u32, (height * scale) as u32)
+            .resizable()
             .position_centered()
             .build()?;
         let sdl_canvas = window.into_canvas().build()?;
@@ -56,6 +61,8 @@ impl<'a> Canvas<'a> {
 
     /// Clears the screen.
     pub fn clear(&mut self) {
+        self.sdl_canvas
+            .set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
         self.sdl_canvas.clear();
     }
 
@@ -65,7 +72,31 @@ impl<'a> Canvas<'a> {
         texture
             .update(None, self.data_raw(), (self.width * 4) as usize)
             .unwrap();
-        self.sdl_canvas.copy(&texture, None, None).unwrap();
+
+        // We want to respect the aspect ratio (160:144) when resizing.
+        // Get current window size.
+        let (w, h) = self.sdl_canvas.output_size().unwrap();
+
+        // Aspect ratio scale.
+        let scale = f32::min(w as f32 / self.width as f32, h as f32 / self.height as f32);
+
+        // New width and height.
+        let nw = (self.width as f32 * scale) as u32;
+        let nh = (self.height as f32 * scale) as u32;
+
+        // Center the rectangle.
+        let x = (w - nw) / 2;
+        let y = (h - nh) / 2;
+        let target_rect = Rect::new(x as i32, y as i32, nw, nh);
+
+        // Clear screen to black.
+        self.sdl_canvas
+            .set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
+        self.sdl_canvas.clear();
+        // Render.
+        self.sdl_canvas
+            .copy(&texture, None, Some(target_rect))
+            .unwrap();
         self.sdl_canvas.present();
     }
 
