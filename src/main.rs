@@ -73,7 +73,6 @@ fn main() -> io::Result<()> {
         gameboy.start();
     }
 
-    println!("HERE");
     // Save data back to disk after the machine stops running.
     cart.save_sram(rom);
 
