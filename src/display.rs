@@ -76,7 +76,7 @@ impl<'a> Display<'a> {
             self.last_ly = y;
             // Only present when all screen lines are in the buffer (or debugging).
             if y == 143 || self.debug {
-                self.canvas.flush();
+                self.canvas.flush(false);
             }
         }
     }
@@ -85,7 +85,7 @@ impl<'a> Display<'a> {
     pub fn draw_fps(&mut self, fps: f64, color: Color) {
         let fps_str = format!("FPS: {:.2}", fps);
         // Draw at coordinates (10, 10)
-        self.canvas.draw_text(ID_FPS, &fps_str, 0.01, 0.01, color);
+        self.canvas.draw_text(ID_FPS, &fps_str, 10.0, 10.0, color);
     }
 
     /// Remove the current FPS value.

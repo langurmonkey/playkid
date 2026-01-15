@@ -87,14 +87,14 @@ impl<'a> Canvas<'a> {
     /// Add a new text to the text cache with the given ID, string, position, and color.
     /// Only update the texture if the ID doesn't exist.
     /// The text will be rendered to the canvas during the next call to `flush()`.
-    /// X and Y are given in logic coordinates (0.0, 1.0).
+    /// X and Y are given in pixel coordinates.
     pub fn draw_text(&mut self, id: usize, text: &str, x: f32, y: f32, color: Color) {
         self.draw_text_shadow(id, text, x, y, color, false);
     }
 
     /// Variant of `draw_text()` where a shadow is optionally rendered behind the text,
     /// in black.
-    /// X and Y are given in logic coordinates (0.0, 1.0).
+    /// X and Y are given in pixel coordinates.
     pub fn draw_text_shadow(
         &mut self,
         id: usize,
@@ -145,7 +145,7 @@ impl<'a> Canvas<'a> {
     }
 
     /// Flushes the current texture.
-    pub fn flush(&mut self) {
+    pub fn flush(&mut self, debug: bool) {
         let mut texture = self.texture.borrow_mut();
         texture
             .update(None, self.data_raw(), (self.width * 4) as usize)
@@ -155,15 +155,20 @@ impl<'a> Canvas<'a> {
         // Get current window size.
         let (w, h) = self.sdl_canvas.output_size().unwrap();
 
+        let render_width = self.width * if debug { 2 } else { 1 };
+
         // Aspect ratio scale.
-        let scale = f32::min(w as f32 / self.width as f32, h as f32 / self.height as f32);
+        let scale = f32::min(
+            w as f32 / render_width as f32,
+            h as f32 / self.height as f32,
+        );
 
         // New width and height.
         let nw = (self.width as f32 * scale) as u32;
         let nh = (self.height as f32 * scale) as u32;
 
         // Center the rectangle.
-        let x = (w - nw) / 2;
+        let x = if debug { 0 } else { 1 } * (w - nw) / 2;
         let y = (h - nh) / 2;
         let target_rect = Rect::new(x as i32, y as i32, nw, nh);
 
@@ -177,7 +182,6 @@ impl<'a> Canvas<'a> {
             .unwrap();
 
         // Render UI (text elements).
-        let (win_w, win_h) = self.sdl_canvas.output_size().unwrap();
         // Get DPI scale factor of current display.
         let window_display_index = self.sdl_canvas.window().display_index().unwrap_or(0);
         let (ddpi, _, _) = self
@@ -201,8 +205,8 @@ impl<'a> Canvas<'a> {
 
         for (_, (_, layers, (lx, ly))) in &self.text_cache {
             // Calculate the base anchor point in physical pixels
-            let base_x = (lx * win_w as f32) as i32;
-            let base_y = (ly * win_h as f32) as i32;
+            let base_x = target_rect.x() + *lx as i32;
+            let base_y = target_rect.y() + *ly as i32;
 
             // Draw background box (using the last layer, which is always the foreground text).
             if let Some((_, text_info)) = layers.last() {
