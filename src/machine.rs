@@ -288,10 +288,14 @@ impl<'a, 'b> Machine<'a, 'b> {
             &self.registers,
         ) {
             self.reset();
+            // Set display debug flag to render every line.
+            self.display.set_debug(true);
             self.display.clear();
             self.display.present();
             0
         } else {
+            // Set display debug flag to render only at the end of a frame.
+            self.display.set_debug(false);
             // Execute the instruction.
             self.execute(run_instr, opcode)
         }

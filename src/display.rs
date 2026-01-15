@@ -41,11 +41,19 @@ impl<'a> Display<'a> {
         }
     }
 
-    // Present the canvas.
+    /// Set the debug flag of this display.
+    /// When true, the display is rendered at every line,
+    /// not only at the end of the frame.
+    pub fn set_debug(&mut self, debug: bool) {
+        self.debug = debug;
+    }
+
+    /// Present the canvas.
     pub fn present(&mut self) {
         self.canvas.present();
     }
 
+    /// Clear the canvas.
     pub fn clear(&mut self) {
         self.canvas.clear();
     }
@@ -77,7 +85,7 @@ impl<'a> Display<'a> {
     pub fn draw_fps(&mut self, fps: f64, color: Color) {
         let fps_str = format!("FPS: {:.2}", fps);
         // Draw at coordinates (10, 10)
-        self.canvas.draw_text(ID_FPS, &fps_str, 10, 10, color);
+        self.canvas.draw_text(ID_FPS, &fps_str, 0.01, 0.01, color);
     }
 
     /// Remove the current FPS value.
