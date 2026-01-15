@@ -22,7 +22,7 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(
     name = "Play Kid",
-    version = "1.0",
+    version = env!("CARGO_PKG_VERSION"),
     about = "Minimalist Game Boy emulator for the cool kids.",
     author = "Toni Sagristà - tonisagrista.com",
     help_template = "{name} {version}\n{author}\n\n{about}\n\n{usage-heading} {usage}\n\n{all-args}"
