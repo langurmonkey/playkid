@@ -12,7 +12,7 @@ Play Kid is yet another Game Boy emulator, written in Rust. But hey, it is MY Ga
 - Respects 160:144 aspect ratio by letter-boxing.
 - Save RAM to `.sav` files to emulate the battery-backed SRAM.
 - Passes the `dmg-acid2` test.
-- Plays:
+- Tested games:
   - Tetris
   - Pokémon
   - Super Mario Land
@@ -23,7 +23,7 @@ Play Kid is yet another Game Boy emulator, written in Rust. But hey, it is MY Ga
 
 # Useful links
 
-Pandocs: https://gbdev.io/pandocs/
-Complete tech reference: https://gekkio.fi/files/gb-docs/gbctr.pdf
-Game Boy CPU manual: http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf
-Game Boy instruction set: https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
+- Pandocs: https://gbdev.io/pandocs/
+- Complete tech reference: https://gekkio.fi/files/gb-docs/gbctr.pdf
+- Game Boy CPU manual: http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf
+- Game Boy instruction set: https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
