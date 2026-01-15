@@ -1142,7 +1142,3 @@ fn arg1<S: AsRef<str>>(name: S) -> ColoredString {
 fn arg2<S: AsRef<str>>(name: S) -> ColoredString {
     name.as_ref().italic().purple()
 }
-/// Formats the operand data.
-fn dat<S: AsRef<str>>(name: S) -> ColoredString {
-    name.as_ref().italic().truecolor(110, 110, 110)
-}
