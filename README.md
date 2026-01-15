@@ -107,6 +107,8 @@ Here are the key bindings and commands:
 
 Even if you did not start the emulator with the debug flag `-d`, you can always press <kbd>d</kbd> in the emulator window to stop it at the current instruction and enter debug mode. Operation carries on in the terminal window in the usual way.
 
+When debug mode is active, i.e. we are stepping instruction by instruction, the PPU updates the frame buffer every scanline instead of every frame, so you can see exactly when a scanline is drawn.
+
 # Useful links
 
 - Pandocs: https://gbdev.io/pandocs/

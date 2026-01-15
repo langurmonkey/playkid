@@ -49,16 +49,16 @@ impl DebugMonitor {
         reg: &Registers,
     ) -> bool {
         // Debug if needed.
-        let joy_debug = mem.joypad.read_debug_flag();
-        let stop = self.breakpoints.contains(&pc) || joy_debug;
-        if self.debug || self.step || stop {
+        self.debug = self.debug || mem.joypad.read_debug_flag();
+        let breakpoint = self.breakpoints.contains(&pc);
+        if self.debug || self.step || breakpoint {
             return self.debug_step(pc, reg, mem, run_instr, opcode, cycles);
         }
         false
     }
 
     /// Prints debug information for a given instruction.
-    fn debug(
+    fn debug_print(
         &self,
         pc: u16,
         reg: &Registers,
@@ -183,6 +183,7 @@ impl DebugMonitor {
         );
         println!();
     }
+
     /// Prints debug information for a given instruction, and pauses the
     /// execution until user input.
     /// Returns true if the machine must be reset, and false otherwise.
@@ -195,7 +196,7 @@ impl DebugMonitor {
         opcode: u8,
         cycles: u32,
     ) -> bool {
-        self.debug(pc, reg, mem, instr, opcode, cycles);
+        self.debug_print(pc, reg, mem, instr, opcode, cycles);
         self.pause()
     }
 
@@ -266,6 +267,7 @@ impl DebugMonitor {
                                     "c" => {
                                         // Continue.
                                         self.step = false;
+                                        self.debug = false;
                                     }
                                     "b" => {
                                         // Breakpoint.
