@@ -19,7 +19,9 @@ pub enum CartridgeType {
     MBC3(Box<MBC3>),
 }
 
-/// A representation of a cartridge.
+/// A representation of a Game Boy cartridge.
+/// Checks for logo, header checksum, and detects Memory Bank Controller (MBC) type.
+/// MBC1/2/3 implemented in dedicated files.
 pub struct Cartridge {
     pub cart_type: CartridgeType,
     /// Holds the ROM data in an array of bytes.
@@ -42,7 +44,6 @@ impl Cartridge {
         // Check Nintendo logo in ROM file.
         // In 0x104 - 0x133, with contents in LOGO.
         if !skip_checksum {
-            //Cartridge::check_checksum(&buffer);
             let slice = &data[0x104..0x133];
             let mut i: usize = 0;
             for u in slice.iter().cloned() {
@@ -69,10 +70,10 @@ impl Cartridge {
         {
             if data[0x143] == 0x80 {
                 // Color GB.
-                println!(" -> {}", "GB Color cartridge");
+                println!("{}: -> {}", "GB Color cartridge", "OK".green());
             } else {
                 // Not color GB.
-                println!(" -> {}", "Regular GB cartridge");
+                println!("{}: -> {}", "Regular GB cartridge", "OK".green());
             }
         }
 
@@ -80,7 +81,11 @@ impl Cartridge {
         {
             let sgbf = data[0x146];
             if sgbf == 0x03 {
-                println!(" -> {}", "Super Game Boy functions supported");
+                println!(
+                    "{}: -> {}",
+                    "Super Game Boy functions supported",
+                    "OK".green()
+                );
             }
         }
 
@@ -225,6 +230,7 @@ impl Cartridge {
         })
     }
 
+    /// ROM read.
     pub fn read(&self, address: u16) -> u8 {
         match &self.cart_type {
             CartridgeType::RomOnly => {
@@ -240,6 +246,7 @@ impl Cartridge {
         }
     }
 
+    /// ROM write.
     pub fn write(&mut self, address: u16, value: u8) {
         match &mut self.cart_type {
             CartridgeType::RomOnly => {
@@ -251,6 +258,7 @@ impl Cartridge {
         }
     }
 
+    /// Read from the given RAM address.
     pub fn read_ram(&self, address: u16) -> u8 {
         match &self.cart_type {
             CartridgeType::RomOnly => 0xFF, // No RAM for ROM only
@@ -260,6 +268,7 @@ impl Cartridge {
         }
     }
 
+    /// Write value to the given address of RAM.
     pub fn write_ram(&mut self, address: u16, value: u8) {
         match &mut self.cart_type {
             CartridgeType::RomOnly => {} // No RAM for ROM only
@@ -269,6 +278,7 @@ impl Cartridge {
         }
     }
 
+    /// Get cartridge type as a descriptive string.
     pub fn cart_type_str(cart_type: u8) -> String {
         match cart_type {
             0x00 => "ROM ONLY".to_string(),
@@ -303,11 +313,11 @@ impl Cartridge {
         }
     }
 
-    /// Save RAM to `.sav` file.
+    /// Save SRAM of current cartridge to `.sav` file.
     pub fn save_sram(&self, rom_path: &str) {
         let save_path = Path::new(rom_path).with_extension("sav");
 
-        // Only save if the mapper actually has RAM
+        // Only save if the mapper actually has RAM.
         let ram_data = match &self.cart_type {
             CartridgeType::MBC1(mbc) => &mbc.get_ram(),
             CartridgeType::MBC2(mbc) => &mbc.get_ram(),
@@ -327,16 +337,14 @@ impl Cartridge {
         }
     }
 
-    /// Load `.sav` file into RAM.
+    /// Load `.sav` file into SRAM.
     pub fn load_sram(&mut self, rom_path: &str) {
         let save_path = Path::new(rom_path).with_extension("sav");
 
-        // Use a reference here (&save_path) so we don't move the value
         if !save_path.exists() {
             return;
         }
 
-        // Use a reference here as well
         if let Ok(mut file) = File::open(&save_path) {
             let mut buffer = Vec::new();
             if file.read_to_end(&mut buffer).is_ok() {
@@ -359,7 +367,6 @@ impl Cartridge {
                     _ => (),
                 }
 
-                // Now save_path is still available here!
                 println!(
                     "{}: Save data loaded from disk: {}",
                     "OK".green(),

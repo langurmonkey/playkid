@@ -9,6 +9,7 @@ Play Kid is yet another Game Boy emulator, written in Rust. But hey, it is MY Ga
 - All CPU instructions and full memory map.
 - ROM, MBC1, MBC2, MBC3.
 - Audio, with 4 channels, envelopes, sweep, and stereo.
+- Save RAM to `.sav` files to emulate the battery-backed SRAM.
 - Passes the `dmg-acid2` test.
 - Plays:
   - Tetris
