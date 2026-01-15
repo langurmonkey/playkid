@@ -101,7 +101,7 @@ pub struct PPU {
     /// LCD interrupt mask for registers IE and IF.
     pub i_mask: u8,
 
-    /// Whether we are in H-Blank region.
+    /// Whether we are in HBlank region.
     pub hblank: bool,
     /// Flag that goes up when the screen is updated.
     pub data_available: bool,
@@ -217,7 +217,14 @@ impl PPU {
             // LCDC.
             0xFF40 => self.lcdc,
             // STAT - bit 7 is always 1 when STAT is read, hence the OR.
-            0xFF41 => self.stat | 0x80,
+            0xFF41 => {
+                if !self.is_ppu_enabled() {
+                    // When LCD is off, bits 0-2 are 0. Bit 7 is always 1.
+                    0x80
+                } else {
+                    self.stat | 0x80
+                }
+            }
             // SCY.
             0xFF42 => self.scy,
             // SCX.
@@ -317,31 +324,26 @@ impl PPU {
 
         self.fdot += t_cycles;
 
-        while self.fdot >= 456 {
+        // Determine the mode based on the CURRENT scanline (ly) and dots (fdot).
+        let new_mode = if self.ly >= 144 {
+            1 // VBlank.
+        } else {
+            match self.fdot {
+                0..=80 => 2,   // OAM Scan.
+                81..=252 => 3, // Drawing.
+                _ => 0,        // HBlank.
+            }
+        };
+        // Update mode if it changed.
+        if new_mode != self.mode {
+            self.update_mode(new_mode);
+        }
+        // Handle the transition to the NEXT scanline.
+        if self.fdot >= 456 {
             self.fdot -= 456;
             self.ly = (self.ly + 1) % 154;
+
             self.check_interrupt_lyc();
-
-            if self.ly == 144 {
-                self.update_mode(1); // VBlank start.
-            } else if self.ly == 0 {
-                self.update_mode(2); // OAM scan start of new frame.
-            }
-        }
-
-        if self.ly < 144 {
-            // Determine mode by fdot range.
-            let mode = match self.fdot {
-                // OAM scan.
-                0..=80 => 2,
-                // DRAW.
-                81..=252 => 3,
-                // H-blank.
-                _ => 0,
-            };
-            if mode != self.mode {
-                self.update_mode(mode);
-            }
         }
     }
 
@@ -358,13 +360,13 @@ impl PPU {
     }
 
     /// Updates the PPU mode and triggers the necessary actions.
-    /// Rendering happens when entering mode 0 (H-Blank).
+    /// Rendering happens when entering mode 0 (HBlank).
     fn update_mode(&mut self, mode: u8) {
         self.mode = mode;
         self.update_stat_ly_lyc();
 
         if match self.mode {
-            // H-blank.
+            // HBlank.
             0 => {
                 self.render_scanline();
                 // Signal data available.
@@ -373,7 +375,7 @@ impl PPU {
                 self.stat3
             }
 
-            // V-blank.
+            // VBlank.
             1 => {
                 self.wly_flag = false;
                 self.wly = 0;

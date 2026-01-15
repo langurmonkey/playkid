@@ -15,9 +15,8 @@
   - Pokémon
   - Super Mario Land
   - Super Mario Land 2: 6 Golden Coins
+  - Dr. Mario
   - Probably many more
-- Errors:
-  - Dr. Mario -- for some reason hangs after the menu screen
 
 # Run
 
