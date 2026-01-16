@@ -1,12 +1,10 @@
-use crate::constants;
+use crate::eventhandler;
 
 use colored::Colorize;
-use crossterm::{execute, terminal::LeaveAlternateScreen};
 use sdl2::controller::{Axis, Button, GameController};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::{EventPump, Sdl};
-use std::io;
+use sdl2::Sdl;
 
 /// Describes the current state of the Game Boy joypad.
 pub struct Joypad {
@@ -36,18 +34,287 @@ pub struct Joypad {
     request_interrupt: bool,
     /// Interrupt mask.
     pub i_mask: u8,
-    /// Debug flag. If this is on, a debug pause is requested.
-    pub debug_flag: bool,
-    /// FPS flag: If this is on, FPS display is toggled.
-    pub fps_flag: bool,
     /// Cycle counter,
     cycles: usize,
-    /// The event pump.
-    event_pump: EventPump,
-    // Keep controller subsystem alive to handle hotplug events.
+    // Keep controller subsystem alive to handle hot plug events.
     controller_subsystem: sdl2::GameControllerSubsystem,
     /// Connected game controller.
     controller: Option<GameController>,
+}
+
+impl eventhandler::EventHandler for Joypad {
+    fn handle_event(&mut self, event: &Event) -> bool {
+        match event {
+            // Keyboard inputs.
+            Event::KeyDown {
+                keycode: Some(Keycode::Down),
+                ..
+            } => {
+                self.down = true;
+                true
+            }
+            Event::KeyUp {
+                keycode: Some(Keycode::Down),
+                ..
+            } => {
+                self.down = false;
+                true
+            }
+
+            Event::KeyDown {
+                keycode: Some(Keycode::Up),
+                ..
+            } => {
+                self.up = true;
+                true
+            }
+            Event::KeyUp {
+                keycode: Some(Keycode::Up),
+                ..
+            } => {
+                self.up = false;
+                true
+            }
+
+            Event::KeyDown {
+                keycode: Some(Keycode::Left),
+                ..
+            } => {
+                self.left = true;
+                true
+            }
+            Event::KeyUp {
+                keycode: Some(Keycode::Left),
+                ..
+            } => {
+                self.left = false;
+                true
+            }
+
+            Event::KeyDown {
+                keycode: Some(Keycode::Right),
+                ..
+            } => {
+                self.right = true;
+                true
+            }
+            Event::KeyUp {
+                keycode: Some(Keycode::Right),
+                ..
+            } => {
+                self.right = false;
+                true
+            }
+
+            Event::KeyDown {
+                keycode: Some(Keycode::Return),
+                ..
+            } => {
+                self.start = true;
+                true
+            }
+            Event::KeyUp {
+                keycode: Some(Keycode::Return),
+                ..
+            } => {
+                self.start = false;
+                true
+            }
+
+            Event::KeyDown {
+                keycode: Some(Keycode::Space),
+                ..
+            } => {
+                self.select = true;
+                true
+            }
+            Event::KeyUp {
+                keycode: Some(Keycode::Space),
+                ..
+            } => {
+                self.select = false;
+                true
+            }
+
+            Event::KeyDown {
+                keycode: Some(Keycode::B),
+                ..
+            } => {
+                self.b = true;
+                true
+            }
+            Event::KeyUp {
+                keycode: Some(Keycode::B),
+                ..
+            } => {
+                self.b = false;
+                true
+            }
+
+            Event::KeyDown {
+                keycode: Some(Keycode::A),
+                ..
+            } => {
+                self.a = true;
+                true
+            }
+            Event::KeyUp {
+                keycode: Some(Keycode::A),
+                ..
+            } => {
+                self.a = false;
+                true
+            }
+
+            // Controller button events.
+            Event::ControllerButtonDown { button, .. } => match button {
+                Button::A | Button::B => {
+                    self.a = true;
+                    true
+                }
+                Button::X | Button::Y => {
+                    self.b = true;
+                    true
+                }
+                Button::Start => {
+                    self.start = true;
+                    true
+                }
+                Button::Back => {
+                    self.select = true;
+                    true
+                }
+                Button::DPadUp => {
+                    self.up = true;
+                    true
+                }
+                Button::DPadDown => {
+                    self.down = true;
+                    true
+                }
+                Button::DPadLeft => {
+                    self.left = true;
+                    true
+                }
+                Button::DPadRight => {
+                    self.right = true;
+                    true
+                }
+                _ => false,
+            },
+            Event::ControllerButtonUp { button, .. } => match button {
+                Button::A | Button::B => {
+                    self.a = false;
+                    true
+                }
+                Button::X | Button::Y => {
+                    self.b = false;
+                    true
+                }
+                Button::Start => {
+                    self.start = false;
+                    true
+                }
+                Button::Back => {
+                    self.select = false;
+                    true
+                }
+                Button::DPadUp => {
+                    self.up = false;
+                    true
+                }
+                Button::DPadDown => {
+                    self.down = false;
+                    true
+                }
+                Button::DPadLeft => {
+                    self.left = false;
+                    true
+                }
+                Button::DPadRight => {
+                    self.right = false;
+                    true
+                }
+                _ => false,
+            },
+
+            // Controller D-pad via axis (for controllers that use axes for D-pad).
+            Event::ControllerAxisMotion { axis, value, .. } => {
+                const DEADZONE: i16 = 10000;
+                match axis {
+                    Axis::LeftX => {
+                        if value < &-DEADZONE {
+                            self.left = true;
+                            self.right = false;
+                        } else if value > &DEADZONE {
+                            self.right = true;
+                            self.left = false;
+                        } else {
+                            self.left = false;
+                            self.right = false;
+                        }
+                        true
+                    }
+                    Axis::LeftY => {
+                        if value < &-DEADZONE {
+                            self.up = true;
+                            self.down = false;
+                        } else if value > &DEADZONE {
+                            self.down = true;
+                            self.up = false;
+                        } else {
+                            self.up = false;
+                            self.down = false;
+                        }
+                        true
+                    }
+                    _ => false,
+                }
+            }
+
+            // Controller connected.
+            Event::ControllerDeviceAdded { which, .. } => {
+                if self.controller.is_none() {
+                    // For 'Added' events, 'which' is the device index.
+                    if self.controller_subsystem.is_game_controller(*which) {
+                        match self.controller_subsystem.open(*which) {
+                            Ok(c) => {
+                                println!("{}: Controller connected: {}", "OK".green(), c.name());
+                                self.controller = Some(c);
+                            }
+                            Err(e) => {
+                                println!("{}: Failed to open controller: {}", "ERR".red(), e)
+                            }
+                        }
+                        return true;
+                    }
+                }
+                false
+            }
+
+            // Controller disconnected.
+            Event::ControllerDeviceRemoved { which, .. } => {
+                // For 'Removed' events, 'which' is the Instance ID.
+                let is_current = self
+                    .controller
+                    .as_ref()
+                    .map_or(false, |c| c.instance_id() == *which);
+
+                if is_current {
+                    println!(
+                        "{}: Controller disconnected: {}",
+                        "OK".green(),
+                        self.controller.as_ref().unwrap().name()
+                    );
+                    self.controller = None;
+                    return true;
+                }
+                false
+            }
+
+            _ => false,
+        }
+    }
 }
 
 impl Joypad {
@@ -66,10 +333,7 @@ impl Joypad {
             right: false,
             request_interrupt: false,
             i_mask: 0,
-            debug_flag: false,
-            fps_flag: false,
             cycles: 0,
-            event_pump: sdl.event_pump().unwrap(),
             controller_subsystem: sdl.game_controller().unwrap(),
             controller: None,
         };
@@ -127,7 +391,6 @@ impl Joypad {
         self.joyp = 0xFF;
         self.select_buttons = false;
         self.select_dpad = false;
-        self.debug_flag = false;
         self.cycles = 0;
     }
 
@@ -149,225 +412,10 @@ impl Joypad {
         }
     }
 
+    /// Implements a Joypad cycle.
+    /// Assumes `handle_event()` has been called previously and the state
+    /// of the joypad is up to date.
     pub fn cycle(&mut self) -> bool {
-        // Poll events twice per frame.
-        // Polling once per frame results in too much latency.
-        self.cycles += 1;
-        if self.cycles * 2 < constants::CYCLES_PER_FRAME {
-            return true;
-        }
-        // Reset cycles.
-        self.cycles = 0;
-
-        // Poll events.
-        for event in self.event_pump.poll_iter() {
-            match event {
-                // Quit.
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                }
-                | Event::KeyDown {
-                    keycode: Some(Keycode::CapsLock),
-                    ..
-                } => {
-                    match execute!(io::stdout(), LeaveAlternateScreen) {
-                        Err(error) => println!("{:?}", error),
-                        _ => {}
-                    }
-                    println!("{}: Bye bye!", "OK".green());
-                    return false;
-                }
-
-                // Debug pause (`d` for debug).
-                Event::KeyUp {
-                    keycode: Some(Keycode::D),
-                    ..
-                } => {
-                    self.debug_flag = true;
-                }
-                // FPS flag (`f` for FPS).
-                Event::KeyUp {
-                    keycode: Some(Keycode::F),
-                    ..
-                } => {
-                    self.fps_flag = true;
-                }
-
-                // Keyboard inputs
-                Event::KeyDown {
-                    keycode: Some(Keycode::Down),
-                    ..
-                } => self.down = true,
-                Event::KeyUp {
-                    keycode: Some(Keycode::Down),
-                    ..
-                } => self.down = false,
-
-                Event::KeyDown {
-                    keycode: Some(Keycode::Up),
-                    ..
-                } => self.up = true,
-                Event::KeyUp {
-                    keycode: Some(Keycode::Up),
-                    ..
-                } => self.up = false,
-
-                Event::KeyDown {
-                    keycode: Some(Keycode::Left),
-                    ..
-                } => self.left = true,
-                Event::KeyUp {
-                    keycode: Some(Keycode::Left),
-                    ..
-                } => self.left = false,
-
-                Event::KeyDown {
-                    keycode: Some(Keycode::Right),
-                    ..
-                } => self.right = true,
-                Event::KeyUp {
-                    keycode: Some(Keycode::Right),
-                    ..
-                } => self.right = false,
-
-                Event::KeyDown {
-                    keycode: Some(Keycode::Return),
-                    ..
-                } => self.start = true,
-                Event::KeyUp {
-                    keycode: Some(Keycode::Return),
-                    ..
-                } => self.start = false,
-
-                Event::KeyDown {
-                    keycode: Some(Keycode::Space),
-                    ..
-                } => self.select = true,
-                Event::KeyUp {
-                    keycode: Some(Keycode::Space),
-                    ..
-                } => self.select = false,
-
-                Event::KeyDown {
-                    keycode: Some(Keycode::B),
-                    ..
-                } => self.b = true,
-                Event::KeyUp {
-                    keycode: Some(Keycode::B),
-                    ..
-                } => self.b = false,
-
-                Event::KeyDown {
-                    keycode: Some(Keycode::A),
-                    ..
-                } => self.a = true,
-                Event::KeyUp {
-                    keycode: Some(Keycode::A),
-                    ..
-                } => self.a = false,
-
-                // Controller button events
-                Event::ControllerButtonDown { button, .. } => match button {
-                    Button::A | Button::B => self.a = true,
-                    Button::X | Button::Y => self.b = true,
-                    Button::Start => self.start = true,
-                    Button::Back => self.select = true,
-                    Button::DPadUp => self.up = true,
-                    Button::DPadDown => self.down = true,
-                    Button::DPadLeft => self.left = true,
-                    Button::DPadRight => self.right = true,
-                    _ => {}
-                },
-                Event::ControllerButtonUp { button, .. } => match button {
-                    Button::A | Button::B => self.a = false,
-                    Button::X | Button::Y => self.b = false,
-                    Button::Start => self.start = false,
-                    Button::Back => self.select = false,
-                    Button::DPadUp => self.up = false,
-                    Button::DPadDown => self.down = false,
-                    Button::DPadLeft => self.left = false,
-                    Button::DPadRight => self.right = false,
-                    _ => {}
-                },
-
-                // Controller D-pad via axis (for controllers that use axes for D-pad)
-                Event::ControllerAxisMotion { axis, value, .. } => {
-                    const DEADZONE: i16 = 10000;
-                    match axis {
-                        Axis::LeftX => {
-                            if value < -DEADZONE {
-                                self.left = true;
-                                self.right = false;
-                            } else if value > DEADZONE {
-                                self.right = true;
-                                self.left = false;
-                            } else {
-                                self.left = false;
-                                self.right = false;
-                            }
-                        }
-                        Axis::LeftY => {
-                            if value < -DEADZONE {
-                                self.up = true;
-                                self.down = false;
-                            } else if value > DEADZONE {
-                                self.down = true;
-                                self.up = false;
-                            } else {
-                                self.up = false;
-                                self.down = false;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-
-                // Controller connected.
-                Event::ControllerDeviceAdded { which, .. } => {
-                    if self.controller.is_none() {
-                        // For 'Added' events, 'which' is the device index.
-                        if self.controller_subsystem.is_game_controller(which) {
-                            match self.controller_subsystem.open(which) {
-                                Ok(c) => {
-                                    println!(
-                                        "{}: Controller connected: {}",
-                                        "OK".green(),
-                                        c.name()
-                                    );
-                                    self.controller = Some(c);
-                                }
-                                Err(e) => {
-                                    println!("{}: Failed to open controller: {}", "ERR".red(), e)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Controller disconnected.
-                Event::ControllerDeviceRemoved { which, .. } => {
-                    // For 'Removed' events, 'which' is the Instance ID.
-                    let is_current = self
-                        .controller
-                        .as_ref()
-                        .map_or(false, |c| c.instance_id() == which);
-
-                    if is_current {
-                        println!(
-                            "{}: Controller disconnected: {}",
-                            "OK".green(),
-                            self.controller.as_ref().unwrap().name()
-                        );
-                        self.controller = None;
-                    }
-                }
-
-                _ => {}
-            }
-        }
-
         // Update state and raise interrupt if necessary.
         self.update_state();
 
@@ -427,21 +475,5 @@ impl Joypad {
         }
 
         self.joyp = res;
-    }
-
-    /// Read and reset debug flag.
-    pub fn read_debug_flag(&mut self) -> bool {
-        let d = self.debug_flag;
-        self.debug_flag = false;
-
-        d
-    }
-
-    /// Read and reset FPS flag.
-    pub fn read_fps_flag(&mut self) -> bool {
-        let d = self.fps_flag;
-        self.fps_flag = false;
-
-        d
     }
 }

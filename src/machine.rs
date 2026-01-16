@@ -2,18 +2,23 @@ use crate::cartridge;
 use crate::constants;
 use crate::debug;
 use crate::display;
+use crate::eventhandler;
 use crate::instruction;
 use crate::memory;
 use crate::registers;
 
 use cartridge::Cartridge;
+use colored::Colorize;
 use debug::DebugMonitor;
 use display::Display;
+use eventhandler::EventHandler;
 use instruction::{Instruction, RunInstr, CC, R16, R16EXT, R16LD, R8, TGT3};
 use memory::Memory;
 use registers::Registers;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
-use sdl2::Sdl;
+use sdl2::{EventPump, Sdl};
 use std::thread;
 
 /// This is our machine, which contains the registers and the memory, and
@@ -43,6 +48,10 @@ pub struct Machine<'a, 'b> {
     debug: DebugMonitor,
     /// Print FPS every second.
     fps: bool,
+    /// The event pump.
+    event_pump: EventPump,
+    /// Event cycles.
+    event_cycles: usize,
 }
 
 impl<'a, 'b> Machine<'a, 'b> {
@@ -68,6 +77,8 @@ impl<'a, 'b> Machine<'a, 'b> {
             m_cycles: 0,
             debug: DebugMonitor::new(debug),
             fps,
+            event_pump: sdl.event_pump().unwrap(),
+            event_cycles: 0,
         }
     }
 
@@ -81,6 +92,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.running = true;
         self.t_cycles = 324;
         self.m_cycles = 0;
+        self.event_cycles = 0;
     }
 
     /// Initialize the Game Boy.
@@ -99,7 +111,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             println!("Target FPS: {}", constants::TARGET_FPS);
         }
 
-        // FPS tracking
+        // FPS tracking.
         let mut frame_count = 0u32;
         let mut fps_timer = std::time::Instant::now();
         const FPS_LOG_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
@@ -108,7 +120,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             let frame_start_time = std::time::Instant::now();
             let mut cycles_this_frame: usize = 0;
 
-            // Execute cycles for one full frame
+            // Execute cycles for one full frame.
             while cycles_this_frame < constants::CYCLES_PER_FRAME {
                 let (t, m, r) = self.machine_cycle();
                 if !r {
@@ -126,14 +138,9 @@ impl<'a, 'b> Machine<'a, 'b> {
             frame_count += 1;
 
             // FPS counter.
-            let joy_fps = self.memory.joypad.read_fps_flag();
-            if joy_fps {
-                // Switch state.
-                self.fps = !self.fps;
-                if !self.fps {
-                    // Clear text.
-                    self.display.remove_fps();
-                }
+            if !self.fps && self.display.has_fps() {
+                // Clear text.
+                self.display.remove_fps();
             }
             if self.fps && fps_timer.elapsed() >= FPS_LOG_INTERVAL {
                 let actual_fps = frame_count as f64 / fps_timer.elapsed().as_secs_f64();
@@ -242,9 +249,12 @@ impl<'a, 'b> Machine<'a, 'b> {
             // NOOP instruction.
             1
         };
+        let mut t_cycles = m_cycles * 4;
+
+        // Event handling.
+        self.handle_events();
 
         // Memory cycle.
-        let mut t_cycles = m_cycles * 4;
         if m_cycles > 0 {
             // Memory cycle.
             let (_, r) = self.memory.cycle(t_cycles);
@@ -269,6 +279,59 @@ impl<'a, 'b> Machine<'a, 'b> {
             (interrupt_m_cycles * 4, interrupt_m_cycles, true)
         } else {
             (t_cycles, m_cycles, true)
+        }
+    }
+
+    /// Polls the events in the queue of the event pump and redirects them to the
+    /// interested partners ;).
+    fn handle_events(&mut self) {
+        self.event_cycles += 1;
+        if self.event_cycles * 2 >= constants::CYCLES_PER_FRAME {
+            // Reset cycles.
+            self.event_cycles = 0;
+            for event in self.event_pump.poll_iter() {
+                let mut handled = false;
+                // Handle quit events here.
+                if !handled {
+                    handled = match event {
+                        // Quit with `Esc` or `CapsLock`.
+                        Event::Quit { .. }
+                        | Event::KeyDown {
+                            keycode: Some(Keycode::Escape),
+                            ..
+                        }
+                        | Event::KeyDown {
+                            keycode: Some(Keycode::CapsLock),
+                            ..
+                        } => {
+                            self.running = false;
+                            println!("{}: Bye bye!", "OK".green());
+                            true
+                        }
+                        // FPS flag (`f` for FPS).
+                        Event::KeyUp {
+                            keycode: Some(Keycode::F),
+                            ..
+                        } => {
+                            self.fps = !self.fps;
+                            true
+                        }
+                        _ => false,
+                    }
+                }
+                // Handle general emulator events.
+                if !handled {
+                    handled = self.memory.joypad.handle_event(&event)
+                }
+                // Debug monitor.
+                if !handled {
+                    handled = self.debug.handle_event(&event);
+                }
+                // Forward to display/UI.
+                if !handled {
+                    self.display.handle_event(&event);
+                }
+            }
         }
     }
 

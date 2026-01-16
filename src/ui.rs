@@ -1,3 +1,4 @@
+/// User interface manager. Holds the widgets and renders them.
 pub struct UIManager<'a> {
     widgets: Vec<Box<dyn Widget + 'a>>,
 }

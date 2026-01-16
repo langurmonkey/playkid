@@ -1,10 +1,12 @@
 use crate::canvas;
 use crate::constants;
+use crate::eventhandler;
 use crate::memory;
 
 use canvas::Canvas;
 use memory::Memory;
 use sdl2;
+use sdl2::event::Event;
 use sdl2::pixels::Color;
 use sdl2::Sdl;
 
@@ -19,6 +21,15 @@ pub struct Display<'a> {
     last_ly: u8,
     /// Run in debug mode (present after every line).
     debug: bool,
+}
+
+impl<'a> eventhandler::EventHandler for Display<'a> {
+    /// Handles a single event.
+    fn handle_event(&mut self, event: &Event) -> bool {
+        match event {
+            _ => false,
+        }
+    }
 }
 
 impl<'a> Display<'a> {
@@ -91,5 +102,10 @@ impl<'a> Display<'a> {
     /// Remove the current FPS value.
     pub fn remove_fps(&mut self) {
         self.canvas.remove_text(ID_FPS);
+    }
+
+    /// Checks if FPS is currently on.
+    pub fn has_fps(&self) -> bool {
+        self.canvas.has_text(ID_FPS)
     }
 }

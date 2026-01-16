@@ -1,3 +1,4 @@
+use crate::eventhandler;
 use crate::instruction;
 use crate::memory;
 use crate::registers;
@@ -14,6 +15,8 @@ use crossterm::{
 use instruction::RunInstr;
 use memory::Memory;
 use registers::Registers;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
 use std::io::{stdin, stdout, Write};
 use std::process;
 
@@ -21,6 +24,23 @@ pub struct DebugMonitor {
     debug: bool,
     step: bool,
     breakpoints: Vec<u16>,
+}
+
+impl eventhandler::EventHandler for DebugMonitor {
+    /// Handles a single event.
+    fn handle_event(&mut self, event: &Event) -> bool {
+        match event {
+            // Debug pause (`d` for debug).
+            Event::KeyUp {
+                keycode: Some(Keycode::D),
+                ..
+            } => {
+                self.debug = true;
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 impl DebugMonitor {
@@ -49,7 +69,6 @@ impl DebugMonitor {
         reg: &Registers,
     ) -> bool {
         // Debug if needed.
-        self.debug = self.debug || mem.joypad.read_debug_flag();
         let breakpoint = self.breakpoints.contains(&pc);
         if self.debug || self.step || breakpoint {
             return self.debug_step(pc, reg, mem, run_instr, opcode, cycles);

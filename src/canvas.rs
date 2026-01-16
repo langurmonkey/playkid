@@ -144,6 +144,11 @@ impl<'a> Canvas<'a> {
         self.text_cache.remove(&id);
     }
 
+    /// Checks if the text with the given ID is in the cache.
+    pub fn has_text(&self, id: usize) -> bool {
+        self.text_cache.contains_key(&id)
+    }
+
     /// Flushes the current texture.
     pub fn flush(&mut self, debug: bool) {
         let mut texture = self.texture.borrow_mut();

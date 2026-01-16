@@ -4,6 +4,7 @@ mod cartridge;
 mod constants;
 mod debug;
 mod display;
+mod eventhandler;
 mod instruction;
 mod joypad;
 mod machine;
