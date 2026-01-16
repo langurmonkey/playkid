@@ -13,6 +13,8 @@ pub struct Label {
     visible: bool,
     /// Label text.
     text: String,
+    /// Font size.
+    size: usize,
     /// X position.
     x: f32,
     /// Y position.
@@ -113,11 +115,16 @@ impl Widget for Label {
         self.x = x;
         self.y = y;
     }
+
+    fn get_font_size(&self) -> usize {
+        self.size
+    }
 }
 
 impl Label {
     pub fn new(
         text: &str,
+        size: usize,
         x: f32,
         y: f32,
         color: sdl2::pixels::Color,
@@ -127,6 +134,7 @@ impl Label {
         Label {
             visible: true,
             text: text.to_string(),
+            size,
             x,
             y,
             color,

@@ -43,6 +43,10 @@ impl Widget for TextField {
         self.x = x;
         self.y = y;
     }
+
+    fn get_font_size(&self) -> usize {
+        10
+    }
 }
 
 impl TextField {

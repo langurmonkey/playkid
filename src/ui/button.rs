@@ -42,6 +42,10 @@ impl Widget for Button {
         self.x = x;
         self.y = y;
     }
+
+    fn get_font_size(&self) -> usize {
+        10
+    }
 }
 
 impl Button {

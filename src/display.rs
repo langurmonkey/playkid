@@ -54,8 +54,13 @@ impl<'a> Display<'a> {
         let w = constants::DISPLAY_WIDTH;
         let h = constants::DISPLAY_HEIGHT;
 
-        // Load font file.
-        let font = ttf
+        // 10pt font.
+        let font10 = ttf
+            .load_font("assets/fnt/PixelatedElegance.ttf", 10)
+            .map_err(|e| format!("Failed to load font: {}", e))?;
+
+        // 14pt font.
+        let font14 = ttf
             .load_font("assets/fnt/PixelatedElegance.ttf", 14)
             .map_err(|e| format!("Failed to load font: {}", e))?;
 
@@ -64,17 +69,17 @@ impl<'a> Display<'a> {
             .map_err(|e| format!("Failed to create canvas: {}", e))?;
 
         // Create UI manager.
-        let mut ui = UIManager::new(font);
+        let mut ui = UIManager::new(font10, font14);
 
         // FPS label.
-        let fps = Label::new("FPS: 0.0", 10.0, 10.0, Color::RED, Some(BG), true);
+        let fps = Label::new("FPS: 0.0", 10, 10.0, 10.0, Color::RED, Some(BG), true);
         let fps = Rc::new(RefCell::new(fps));
         fps.borrow_mut().visible(false);
         // Add to UI manager.
         ui.add_widget(Rc::clone(&fps));
 
         // Debug title.
-        let debug_title = Label::new("Debug interface", 0.0, 0.0, Color::WHITE, None, false);
+        let debug_title = Label::new("Debug interface", 14, 0.0, 0.0, Color::WHITE, None, false);
         let debug_title = Rc::new(RefCell::new(debug_title));
         debug_title.borrow_mut().visible(debug);
         // Add to UI manager.

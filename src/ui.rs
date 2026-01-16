@@ -14,14 +14,16 @@ use std::sync::Arc;
 /// User interface manager. Holds the widgets and renders them.
 pub struct UIManager<'ttf> {
     widgets: Vec<Rc<RefCell<dyn Widget + 'ttf>>>,
-    pub font: Arc<Font<'ttf, 'ttf>>,
+    pub font10: Arc<Font<'ttf, 'ttf>>,
+    pub font14: Arc<Font<'ttf, 'ttf>>,
 }
 
 impl<'ttf> UIManager<'ttf> {
-    pub fn new(font: Font<'ttf, 'ttf>) -> Self {
+    pub fn new(font10: Font<'ttf, 'ttf>, font14: Font<'ttf, 'ttf>) -> Self {
         UIManager {
             widgets: vec![],
-            font: Arc::new(font),
+            font10: Arc::new(font10),
+            font14: Arc::new(font14),
         }
     }
 
@@ -34,7 +36,16 @@ impl<'ttf> UIManager<'ttf> {
             .sdl_canvas
             .set_blend_mode(sdl2::render::BlendMode::Blend);
         for widget in &self.widgets {
-            widget.borrow().render(canvas, &self.font);
+            widget
+                .borrow()
+                .render(canvas, self.font(widget.borrow().get_font_size()));
+        }
+    }
+
+    fn font(&self, size: usize) -> &Arc<Font<'ttf, 'ttf>> {
+        match size {
+            10 => &self.font10,
+            _ => &self.font14,
         }
     }
 
@@ -52,4 +63,5 @@ pub trait Widget {
     fn render(&self, canvas: &mut Canvas, font: &Arc<Font>);
     fn visible(&mut self, visible: bool);
     fn set_position(&mut self, x: f32, y: f32);
+    fn get_font_size(&self) -> usize;
 }
