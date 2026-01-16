@@ -1,3 +1,12 @@
+use crate::canvas;
+use crate::eventhandler;
+use crate::ui;
+
+use canvas::Canvas;
+use sdl2::event::Event;
+use sdl2::rect::Rect;
+use ui::Widget;
+
 pub struct Label {
     id: usize,
     text: String,
@@ -9,30 +18,9 @@ pub struct Label {
     shadow_offset: (i32, i32),
 }
 
-impl Label {
-    pub fn new(
-        id: usize,
-        text: &str,
-        x: f32,
-        y: f32,
-        color: sdl2::pixels::Color,
-        background_color: Option<sdl2::pixels::Color>,
-        shadow: bool,
-    ) -> Self {
-        Label {
-            id,
-            text: text.to_string(),
-            x,
-            y,
-            color,
-            background_color,
-            shadow,
-            shadow_offset: (2, 2), // Default shadow offset
-        }
-    }
-
+impl Widget for Label {
     /// Renders the label to the canvas.
-    pub fn render(&self, canvas: &mut Canvas) {
+    fn render(&self, canvas: &mut Canvas) {
         // If background color is provided, draw the background.
         if let Some(bg_color) = self.background_color {
             // Render the background rectangle around the text
@@ -67,6 +55,33 @@ impl Label {
         canvas.draw_text(self.id, &self.text, self.x, self.y, self.color);
     }
 
+    fn handle_event(&mut self, event: &sdl2::event::Event) -> bool {
+        false
+    }
+}
+
+impl Label {
+    pub fn new(
+        id: usize,
+        text: &str,
+        x: f32,
+        y: f32,
+        color: sdl2::pixels::Color,
+        background_color: Option<sdl2::pixels::Color>,
+        shadow: bool,
+    ) -> Self {
+        Label {
+            id,
+            text: text.to_string(),
+            x,
+            y,
+            color,
+            background_color,
+            shadow,
+            shadow_offset: (2, 2), // Default shadow offset
+        }
+    }
+
     /// Creates a surface for the text to measure its size.
     fn create_text_surface(&self, canvas: &Canvas) -> sdl2::surface::Surface<'static> {
         let font = &canvas.font;
@@ -75,4 +90,3 @@ impl Label {
             .expect("Failed to render text")
     }
 }
-

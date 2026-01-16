@@ -1,3 +1,12 @@
+use crate::canvas;
+use crate::eventhandler;
+use crate::ui;
+
+use canvas::Canvas;
+use sdl2::event::Event;
+use sdl2::rect::Rect;
+use ui::Widget;
+
 /// Represents a basic button widget.
 pub struct Button {
     id: usize,
@@ -9,29 +18,9 @@ pub struct Button {
     callback: Option<Box<dyn Fn()>>,
 }
 
-impl Button {
-    pub fn new(
-        id: usize,
-        label: &str,
-        x: f32,
-        y: f32,
-        width: u32,
-        height: u32,
-        callback: Option<Box<dyn Fn()>>,
-    ) -> Self {
-        Button {
-            id,
-            label: label.to_string(),
-            x,
-            y,
-            width,
-            height,
-            callback,
-        }
-    }
-
+impl Widget for Button {
     /// Renders the button to the canvas.
-    pub fn render(&self, canvas: &mut Canvas) {
+    fn render(&self, canvas: &mut Canvas) {
         // Draw button background
         canvas
             .sdl_canvas
@@ -68,6 +57,33 @@ impl Button {
                 self.height,
             ))
             .unwrap();
+    }
+
+    fn handle_event(&mut self, event: &sdl2::event::Event) -> bool {
+        //self.handle_click()
+        false
+    }
+}
+
+impl Button {
+    pub fn new(
+        id: usize,
+        label: &str,
+        x: f32,
+        y: f32,
+        width: u32,
+        height: u32,
+        callback: Option<Box<dyn Fn()>>,
+    ) -> Self {
+        Button {
+            id,
+            label: label.to_string(),
+            x,
+            y,
+            width,
+            height,
+            callback,
+        }
     }
 
     /// Handles click events on the button.

@@ -12,6 +12,7 @@ mod memory;
 mod ppu;
 mod registers;
 mod timer;
+mod ui;
 
 use cartridge::Cartridge;
 use clap::Parser;

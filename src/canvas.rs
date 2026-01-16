@@ -12,14 +12,14 @@ type Error = Box<dyn std::error::Error>;
 #[allow(dead_code)]
 pub struct Canvas<'a> {
     sdl: &'a Sdl,
-    sdl_canvas: sdl2::render::Canvas<sdl2::video::Window>,
+    pub sdl_canvas: sdl2::render::Canvas<sdl2::video::Window>,
     creator: TextureCreator<sdl2::video::WindowContext>,
     texture: RefCell<Texture<'static>>,
     data: Vec<u8>,
     width: usize,
     height: usize,
     /// The font to render text.
-    font: Font<'a, 'static>,
+    pub font: Font<'a, 'static>,
     /// Map text ID to the string and layers (Texture, Rect).
     text_cache: HashMap<usize, (String, Vec<(Texture<'static>, Rect)>, (f32, f32))>,
 }
