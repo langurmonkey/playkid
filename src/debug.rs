@@ -76,6 +76,11 @@ impl DebugMonitor {
         false
     }
 
+    /// Are we debugging now?
+    pub fn debugging(&self) -> bool {
+        return self.debug;
+    }
+
     /// Prints debug information for a given instruction.
     fn debug_print(
         &self,
@@ -215,8 +220,9 @@ impl DebugMonitor {
         opcode: u8,
         cycles: u32,
     ) -> bool {
-        self.debug_print(pc, reg, mem, instr, opcode, cycles);
-        self.pause()
+        // self.debug_print(pc, reg, mem, instr, opcode, cycles);
+        // self.pause()
+        false
     }
 
     /// Pauses until there is a new command.

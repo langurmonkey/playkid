@@ -17,9 +17,11 @@ use memory::Memory;
 use registers::Registers;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::Color;
 use sdl2::{EventPump, Sdl};
 use std::thread;
+
+/// Spin threshold in milliseconds. Minimum time to sleep until next frame.
+const SPIN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(2);
 
 /// This is our machine, which contains the registers and the memory, and
 /// executes the operations.
@@ -50,8 +52,6 @@ pub struct Machine<'a, 'b> {
     fps: bool,
     /// The event pump.
     event_pump: EventPump,
-    /// Event cycles.
-    event_cycles: usize,
 }
 
 impl<'a, 'b> Machine<'a, 'b> {
@@ -67,7 +67,8 @@ impl<'a, 'b> Machine<'a, 'b> {
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
-            display: Display::new("PlayKid emulator", scale, sdl, ttf, debug),
+            display: Display::new("PlayKid emulator", scale, sdl, ttf, debug)
+                .expect("Error creating display"),
             ime: false,
             ei: 0,
             di: 0,
@@ -78,7 +79,6 @@ impl<'a, 'b> Machine<'a, 'b> {
             debug: DebugMonitor::new(debug),
             fps,
             event_pump: sdl.event_pump().unwrap(),
-            event_cycles: 0,
         }
     }
 
@@ -92,7 +92,6 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.running = true;
         self.t_cycles = 324;
         self.m_cycles = 0;
-        self.event_cycles = 0;
     }
 
     /// Initialize the Game Boy.
@@ -106,7 +105,6 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.display.clear();
         self.display.present();
 
-        const SPIN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(2);
         if self.fps {
             println!("Target FPS: {}", constants::TARGET_FPS);
         }
@@ -118,47 +116,59 @@ impl<'a, 'b> Machine<'a, 'b> {
 
         while self.running {
             let frame_start_time = std::time::Instant::now();
-            let mut cycles_this_frame: usize = 0;
+
+            // Handle events.
+            self.handle_events();
 
             // Execute cycles for one full frame.
-            while cycles_this_frame < constants::CYCLES_PER_FRAME {
-                let (t, m, r) = self.machine_cycle();
-                if !r {
-                    // Early exit due to joypad.
-                    break;
-                }
-                self.m_cycles += m;
-                self.t_cycles += t;
-                cycles_this_frame += t as usize;
+            if !self.debug.debugging() {
+                let mut cycles_this_frame: usize = 0;
+                while cycles_this_frame < constants::CYCLES_PER_FRAME {
+                    let (t, m, r) = self.machine_cycle();
+                    if !r {
+                        // Early exit due to joypad.
+                        break;
+                    }
+                    self.m_cycles += m;
+                    self.t_cycles += t;
+                    cycles_this_frame += t as usize;
 
-                // Render if we have pixels.
-                self.display.render(&self.memory);
+                    self.display.render_lcd(&self.memory);
+                }
             }
+
+            self.display.canvas.flush(self.debug.debugging());
+
+            self.display.render_ui();
+            self.display.present();
 
             frame_count += 1;
 
             // FPS counter.
-            if !self.fps && self.display.has_fps() {
-                // Clear text.
-                self.display.remove_fps();
-            }
+            self.display.visible_fps(self.fps);
             if self.fps && fps_timer.elapsed() >= FPS_LOG_INTERVAL {
                 let actual_fps = frame_count as f64 / fps_timer.elapsed().as_secs_f64();
-                self.display.draw_fps(actual_fps, Color::RED);
+                self.display.update_fps(actual_fps);
                 frame_count = 0;
                 fps_timer = std::time::Instant::now();
             }
 
             // Now, sleep for the remaining time in the frame.
-            let elapsed = frame_start_time.elapsed();
-            if elapsed < constants::TARGET_FRAME_DURATION {
-                let remaining = constants::TARGET_FRAME_DURATION - elapsed;
-                if remaining > SPIN_THRESHOLD {
-                    thread::sleep(remaining - SPIN_THRESHOLD);
-                }
-                // Busy spin for remaining small amount
-                while frame_start_time.elapsed() < constants::TARGET_FRAME_DURATION {}
+            self.sleep_next_frame(frame_start_time);
+        }
+    }
+
+    /// Sleeps until next frame, given a start time.
+    fn sleep_next_frame(&self, frame_start_time: std::time::Instant) {
+        // Now, sleep for the remaining time in the frame.
+        let elapsed = frame_start_time.elapsed();
+        if elapsed < constants::TARGET_FRAME_DURATION {
+            let remaining = constants::TARGET_FRAME_DURATION - elapsed;
+            if remaining > SPIN_THRESHOLD {
+                thread::sleep(remaining - SPIN_THRESHOLD);
             }
+            // Busy spin for remaining small amount.
+            while frame_start_time.elapsed() < constants::TARGET_FRAME_DURATION {}
         }
     }
 
@@ -252,7 +262,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         let mut t_cycles = m_cycles * 4;
 
         // Event handling.
-        self.handle_events();
+        // self.handle_events();
 
         // Memory cycle.
         if m_cycles > 0 {
@@ -285,52 +295,49 @@ impl<'a, 'b> Machine<'a, 'b> {
     /// Polls the events in the queue of the event pump and redirects them to the
     /// interested partners ;).
     fn handle_events(&mut self) {
-        self.event_cycles += 1;
-        if self.event_cycles * 2 >= constants::CYCLES_PER_FRAME {
-            // Reset cycles.
-            self.event_cycles = 0;
-            for event in self.event_pump.poll_iter() {
-                let mut handled = false;
-                // Handle quit events here.
-                if !handled {
-                    handled = match event {
-                        // Quit with `Esc` or `CapsLock`.
-                        Event::Quit { .. }
-                        | Event::KeyDown {
-                            keycode: Some(Keycode::Escape),
-                            ..
-                        }
-                        | Event::KeyDown {
-                            keycode: Some(Keycode::CapsLock),
-                            ..
-                        } => {
-                            self.running = false;
-                            println!("{}: Bye bye!", "OK".green());
-                            true
-                        }
-                        // FPS flag (`f` for FPS).
-                        Event::KeyUp {
-                            keycode: Some(Keycode::F),
-                            ..
-                        } => {
-                            self.fps = !self.fps;
-                            true
-                        }
-                        _ => false,
+        // Reset cycles.
+        for event in self.event_pump.poll_iter() {
+            let mut handled = false;
+            // Handle quit events here.
+            if !handled {
+                handled = match event {
+                    // Quit with `Esc` or `CapsLock`.
+                    Event::Quit { .. }
+                    | Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
                     }
+                    | Event::KeyDown {
+                        keycode: Some(Keycode::CapsLock),
+                        ..
+                    } => {
+                        self.running = false;
+                        println!("{}: Bye bye!", "OK".green());
+                        true
+                    }
+                    // FPS flag (`f` for FPS).
+                    Event::KeyUp {
+                        keycode: Some(Keycode::F),
+                        ..
+                    } => {
+                        self.fps = !self.fps;
+                        true
+                    }
+                    _ => false,
                 }
-                // Handle general emulator events.
-                if !handled {
-                    handled = self.memory.joypad.handle_event(&event)
-                }
-                // Debug monitor.
-                if !handled {
-                    handled = self.debug.handle_event(&event);
-                }
-                // Forward to display/UI.
-                if !handled {
-                    self.display.handle_event(&event);
-                }
+            }
+            // Handle general emulator events.
+            if !handled {
+                handled = self.memory.joypad.handle_event(&event)
+            }
+            // Debug monitor.
+            if !handled {
+                handled = self.debug.handle_event(&event);
+                self.display.set_debug(self.debug.debugging());
+            }
+            // Forward to display/UI.
+            if !handled {
+                self.display.handle_event(&event);
             }
         }
     }
@@ -350,15 +357,12 @@ impl<'a, 'b> Machine<'a, 'b> {
             &mut self.memory,
             &self.registers,
         ) {
+            // Reset issued.
             self.reset();
-            // Set display debug flag to render every line.
-            self.display.set_debug(true);
             self.display.clear();
             self.display.present();
             0
         } else {
-            // Set display debug flag to render only at the end of a frame.
-            self.display.set_debug(false);
             // Execute the instruction.
             self.execute(run_instr, opcode)
         }

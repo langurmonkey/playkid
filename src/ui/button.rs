@@ -5,11 +5,13 @@ use crate::ui;
 use canvas::Canvas;
 use sdl2::event::Event;
 use sdl2::rect::Rect;
+use sdl2::ttf::Font;
+use std::sync::Arc;
 use ui::Widget;
 
-/// Represents a basic button widget.
+/// Button widget.
 pub struct Button {
-    id: usize,
+    visible: bool,
     label: String,
     x: f32,
     y: f32,
@@ -20,54 +22,30 @@ pub struct Button {
 
 impl Widget for Button {
     /// Renders the button to the canvas.
-    fn render(&self, canvas: &mut Canvas) {
-        // Draw button background
-        canvas
-            .sdl_canvas
-            .set_draw_color(sdl2::pixels::Color::RGB(0, 0, 255));
-        canvas
-            .sdl_canvas
-            .fill_rect(Rect::new(
-                self.x as i32,
-                self.y as i32,
-                self.width,
-                self.height,
-            ))
-            .unwrap();
-
-        // Draw label text
-        canvas.draw_text(
-            self.id,
-            &self.label,
-            self.x + 5.0,
-            self.y + 5.0,
-            sdl2::pixels::Color::RGB(255, 255, 255),
-        );
-
-        // Draw button border
-        canvas
-            .sdl_canvas
-            .set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
-        canvas
-            .sdl_canvas
-            .draw_rect(Rect::new(
-                self.x as i32,
-                self.y as i32,
-                self.width,
-                self.height,
-            ))
-            .unwrap();
+    fn render(&self, canvas: &mut Canvas, font: &Arc<Font>) {
+        if !self.visible {
+            return;
+        }
+        let scale_factor = canvas.get_scale_factor();
     }
 
     fn handle_event(&mut self, event: &sdl2::event::Event) -> bool {
         //self.handle_click()
         false
     }
+
+    fn visible(&mut self, visible: bool) {
+        self.visible = visible;
+    }
+
+    fn set_position(&mut self, x: f32, y: f32) {
+        self.x = x;
+        self.y = y;
+    }
 }
 
 impl Button {
     pub fn new(
-        id: usize,
         label: &str,
         x: f32,
         y: f32,
@@ -76,7 +54,7 @@ impl Button {
         callback: Option<Box<dyn Fn()>>,
     ) -> Self {
         Button {
-            id,
+            visible: true,
             label: label.to_string(),
             x,
             y,

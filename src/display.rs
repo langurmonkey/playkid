@@ -2,6 +2,7 @@ use crate::canvas;
 use crate::constants;
 use crate::eventhandler;
 use crate::memory;
+use crate::ui;
 
 use canvas::Canvas;
 use memory::Memory;
@@ -9,14 +10,25 @@ use sdl2;
 use sdl2::event::Event;
 use sdl2::pixels::Color;
 use sdl2::Sdl;
+use std::cell::RefCell;
+use std::rc::Rc;
+use ui::label::Label;
+use ui::UIManager;
+use ui::Widget;
 
-/// ID of the FPS text.
-const ID_FPS: usize = 0;
+/// Background color.
+const BG: Color = Color::RGBA(0, 0, 0, 180);
 
 /// Holds the display objects and renders the image from the PPU data.
 pub struct Display<'a> {
     /// The canvas itself.
     pub canvas: Canvas<'a>,
+    /// User interface manager.
+    pub ui: UIManager<'a>,
+    /// FPS counter.
+    fps: Rc<RefCell<Label>>,
+    /// Debug title.
+    debug_title: Rc<RefCell<Label>>,
     /// Holds the last rendered LY.
     last_ly: u8,
     /// Run in debug mode (present after every line).
@@ -26,9 +38,8 @@ pub struct Display<'a> {
 impl<'a> eventhandler::EventHandler for Display<'a> {
     /// Handles a single event.
     fn handle_event(&mut self, event: &Event) -> bool {
-        match event {
-            _ => false,
-        }
+        self.ui.handle_event(event);
+        true
     }
 }
 
@@ -39,17 +50,54 @@ impl<'a> Display<'a> {
         sdl: &'a Sdl,
         ttf: &'a sdl2::ttf::Sdl2TtfContext,
         debug: bool,
-    ) -> Self {
+    ) -> Result<Self, String> {
         let w = constants::DISPLAY_WIDTH;
         let h = constants::DISPLAY_HEIGHT;
 
-        let canvas = Canvas::new(sdl, ttf, window_title, w, h, scale as usize).unwrap();
+        // Load font file.
+        let font = ttf
+            .load_font("assets/fnt/PixelatedElegance.ttf", 14)
+            .map_err(|e| format!("Failed to load font: {}", e))?;
 
-        Display {
+        // Create canvas.
+        let canvas = Canvas::new(sdl, window_title, w, h, scale as usize)
+            .map_err(|e| format!("Failed to create canvas: {}", e))?;
+
+        // Create UI manager.
+        let mut ui = UIManager::new(font);
+
+        // FPS label.
+        let fps = Label::new("FPS: 0.0", 10.0, 10.0, Color::RED, Some(BG), true);
+        let fps = Rc::new(RefCell::new(fps));
+        fps.borrow_mut().visible(false);
+        // Add to UI manager.
+        ui.add_widget(Rc::clone(&fps));
+
+        // Debug title.
+        let debug_title = Label::new("Debug interface", 0.0, 0.0, Color::WHITE, None, false);
+        let debug_title = Rc::new(RefCell::new(debug_title));
+        debug_title.borrow_mut().visible(debug);
+        // Add to UI manager.
+        ui.add_widget(Rc::clone(&debug_title));
+
+        Ok(Display {
             canvas,
+            ui,
+            fps,
+            debug_title,
             debug,
             last_ly: 255,
-        }
+        })
+    }
+
+    pub fn update_fps(&mut self, fps_value: f64) {
+        self.fps
+            .borrow_mut()
+            .set_text(&format!("FPS: {:.1}", fps_value));
+    }
+
+    pub fn visible_fps(&mut self, visible: bool) {
+        self.fps.borrow_mut().visible(visible);
     }
 
     /// Set the debug flag of this display.
@@ -57,6 +105,7 @@ impl<'a> Display<'a> {
     /// not only at the end of the frame.
     pub fn set_debug(&mut self, debug: bool) {
         self.debug = debug;
+        self.debug_title.borrow_mut().visible(debug);
     }
 
     /// Present the canvas.
@@ -69,11 +118,11 @@ impl<'a> Display<'a> {
         self.canvas.clear();
     }
 
-    // Renders the given buffer to the display.
-    pub fn render(&mut self, mem: &Memory) {
+    /// Renders the given buffer to the display.
+    pub fn render_lcd(&mut self, mem: &Memory) {
         let ppu = mem.ppu();
-
         let y = ppu.ly % constants::DISPLAY_HEIGHT as u8;
+
         if ppu.data_available && self.last_ly != y {
             let pixels = &ppu.fb;
 
@@ -85,27 +134,26 @@ impl<'a> Display<'a> {
                 self.canvas.draw_line_rgba(y, slice);
             }
             self.last_ly = y;
-            // Only present when all screen lines are in the buffer (or debugging).
-            if y == 143 || self.debug {
-                self.canvas.flush(false);
-            }
         }
     }
 
-    /// Draws the given FPS value to the canvas.
-    pub fn draw_fps(&mut self, fps: f64, color: Color) {
-        let fps_str = format!("FPS: {:.2}", fps);
-        // Draw at coordinates (10, 10)
-        self.canvas.draw_text(ID_FPS, &fps_str, 10.0, 10.0, color);
+    /// Renders the user interface.
+    pub fn render_ui(&mut self) {
+        // Render UI at 60 FPS.
+        self.update_debug_widget_posiitons();
+        self.ui.render(&mut self.canvas);
     }
 
-    /// Remove the current FPS value.
-    pub fn remove_fps(&mut self) {
-        self.canvas.remove_text(ID_FPS);
-    }
+    /// The widgets that are part of the debug interface must float beside the LCD
+    /// screen, so we need to update their positions.
+    fn update_debug_widget_posiitons(&mut self) {
+        let (x, y, w, _) = self.canvas.get_lcd_rect();
+        let dx = x as f32 + w as f32;
+        let dy = y as f32;
 
-    /// Checks if FPS is currently on.
-    pub fn has_fps(&self) -> bool {
-        self.canvas.has_text(ID_FPS)
+        // Title.
+        self.debug_title
+            .borrow_mut()
+            .set_position(dx + 10.0, dy + 10.0);
     }
 }

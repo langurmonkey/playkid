@@ -1,68 +1,122 @@
 use crate::canvas;
-use crate::eventhandler;
 use crate::ui;
 
 use canvas::Canvas;
-use sdl2::event::Event;
 use sdl2::rect::Rect;
+use sdl2::ttf::Font;
+use std::sync::Arc;
 use ui::Widget;
 
+/// A label widget.
 pub struct Label {
-    id: usize,
+    /// Is this label visible?
+    visible: bool,
+    /// Label text.
     text: String,
+    /// X position.
     x: f32,
+    /// Y position.
     y: f32,
+    /// Main color.
     color: sdl2::pixels::Color,
+    /// Background color, if any.
     background_color: Option<sdl2::pixels::Color>,
+    /// Cast shadow.
     shadow: bool,
+    /// Shadow offset.
     shadow_offset: (i32, i32),
 }
 
 impl Widget for Label {
-    /// Renders the label to the canvas.
-    fn render(&self, canvas: &mut Canvas) {
-        // If background color is provided, draw the background.
+    fn render(&self, canvas: &mut Canvas, font: &Arc<Font>) {
+        if !self.visible {
+            return;
+        }
+        let scale_factor = canvas.get_scale_factor();
+
+        // Render background color if set.
         if let Some(bg_color) = self.background_color {
-            // Render the background rectangle around the text
-            let text_surface = self.create_text_surface(canvas);
+            let text_surface = font
+                .render(&self.text)
+                .blended(self.color)
+                .expect("Failed to render text");
             let text_width = text_surface.width();
             let text_height = text_surface.height();
-            let padding = 5;
+            let padding = (5.0 * scale_factor) as u32;
 
             let bg_rect = Rect::new(
-                (self.x - padding as f32) as i32,
-                (self.y - padding as f32) as i32,
-                (text_width + padding * 2) as u32,
-                (text_height + padding * 2) as u32,
+                ((self.x * scale_factor) - padding as f32) as i32,
+                ((self.y * scale_factor) - padding as f32) as i32,
+                (text_width * scale_factor as u32) + (padding * 2),
+                (text_height * scale_factor as u32) + (padding * 2),
             );
             canvas.sdl_canvas.set_draw_color(bg_color);
             canvas.sdl_canvas.fill_rect(bg_rect).unwrap();
         }
 
-        // Draw text with optional shadow
+        // Draw text with shadow if enabled
         if self.shadow {
-            canvas.draw_text_shadow(
-                self.id,
-                &self.text,
-                self.x + self.shadow_offset.0 as f32,
-                self.y + self.shadow_offset.1 as f32,
-                sdl2::pixels::Color::RGB(0, 0, 0), // Shadow color
-                true,
-            );
+            let text_surface = font
+                .render(&self.text)
+                .blended(sdl2::pixels::Color::RGB(0, 0, 0)) // Shadow color
+                .expect("Failed to render shadow text");
+            canvas
+                .sdl_canvas
+                .copy(
+                    &canvas
+                        .creator
+                        .create_texture_from_surface(&text_surface)
+                        .unwrap(),
+                    None,
+                    Some(Rect::new(
+                        ((self.x + self.shadow_offset.0 as f32) * scale_factor) as i32,
+                        ((self.y + self.shadow_offset.1 as f32) * scale_factor) as i32,
+                        (text_surface.width() as f32 * scale_factor) as u32,
+                        (text_surface.height() as f32 * scale_factor) as u32,
+                    )),
+                )
+                .unwrap();
         }
 
-        // Draw the main text layer
-        canvas.draw_text(self.id, &self.text, self.x, self.y, self.color);
+        // Render the actual text
+        let text_surface = font
+            .render(&self.text)
+            .blended(self.color)
+            .expect("Failed to render text");
+        canvas
+            .sdl_canvas
+            .copy(
+                &canvas
+                    .creator
+                    .create_texture_from_surface(&text_surface)
+                    .unwrap(),
+                None,
+                Some(Rect::new(
+                    (self.x * scale_factor) as i32,
+                    (self.y * scale_factor) as i32,
+                    (text_surface.width() as f32 * scale_factor) as u32,
+                    (text_surface.height() as f32 * scale_factor) as u32,
+                )),
+            )
+            .unwrap();
     }
 
     fn handle_event(&mut self, event: &sdl2::event::Event) -> bool {
         false
     }
+
+    fn visible(&mut self, visible: bool) {
+        self.visible = visible;
+    }
+
+    fn set_position(&mut self, x: f32, y: f32) {
+        self.x = x;
+        self.y = y;
+    }
 }
 
 impl Label {
     pub fn new(
-        id: usize,
         text: &str,
         x: f32,
         y: f32,
@@ -71,7 +125,7 @@ impl Label {
         shadow: bool,
     ) -> Self {
         Label {
-            id,
+            visible: true,
             text: text.to_string(),
             x,
             y,
@@ -82,11 +136,8 @@ impl Label {
         }
     }
 
-    /// Creates a surface for the text to measure its size.
-    fn create_text_surface(&self, canvas: &Canvas) -> sdl2::surface::Surface<'static> {
-        let font = &canvas.font;
-        font.render(&self.text)
-            .blended(self.color)
-            .expect("Failed to render text")
+    /// Sets the text of this label.
+    pub fn set_text(&mut self, text: &str) {
+        self.text = text.to_string();
     }
 }
