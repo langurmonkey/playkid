@@ -14,6 +14,7 @@ pub struct DebugUI {
     pub bindings: Rc<RefCell<Label>>,
     pub pc: Rc<RefCell<Label>>,
     pub instr: Rc<RefCell<Label>>,
+    pub halt: Rc<RefCell<Label>>,
     pub regs: Rc<RefCell<Label>>,
 }
 
@@ -62,6 +63,17 @@ impl DebugUI {
             false,
         )));
 
+        // Halted.
+        let halt = Rc::new(RefCell::new(Label::new(
+            "HALT",
+            22,
+            0.0,
+            0.0,
+            Color::RED,
+            None,
+            false,
+        )));
+
         // Registers.
         let regs = Rc::new(RefCell::new(Label::new(
             "AF: 0000 BC: 0000",
@@ -78,6 +90,7 @@ impl DebugUI {
         ui.add_widget(Rc::clone(&step_i));
         ui.add_widget(Rc::clone(&pc));
         ui.add_widget(Rc::clone(&instr));
+        ui.add_widget(Rc::clone(&halt));
         ui.add_widget(Rc::clone(&regs));
 
         Self {
@@ -85,6 +98,7 @@ impl DebugUI {
             bindings: step_i,
             pc,
             instr,
+            halt,
             regs,
         }
     }
@@ -98,11 +112,15 @@ impl DebugUI {
         run_instr: &RunInstr,
         opcode: u8,
         cycles: u32,
+        halted: bool,
     ) {
         // PC.
         self.pc.borrow_mut().set_text(&format!("${:04x}", pc));
         // Instruction.
         self.instr.borrow_mut().set_text(&run_instr.to_string());
+
+        // Halted.
+        self.halt.borrow_mut().visible(halted);
 
         // Registers.
         self.regs.borrow_mut().set_text(&format!(
@@ -116,6 +134,7 @@ impl DebugUI {
         self.bindings.borrow_mut().visible(visible);
         self.pc.borrow_mut().visible(visible);
         self.instr.borrow_mut().visible(visible);
+        self.halt.borrow_mut().visible(visible);
         self.regs.borrow_mut().visible(visible);
     }
 
@@ -136,6 +155,9 @@ impl DebugUI {
         // PC, instr.
         self.pc.borrow_mut().set_pos(dx + 10.0, dy + 80.0);
         self.instr.borrow_mut().set_pos(dx + 120.0, dy + 80.0);
+
+        // HALT.
+        self.halt.borrow_mut().set_pos(dx + 340.0, dy + 75.0);
 
         // Regs.
         self.regs.borrow_mut().set_pos(dx + 10.0, dy + 120.0);

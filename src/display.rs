@@ -108,9 +108,10 @@ impl<'a> Display<'a> {
         run_instr: &RunInstr,
         opcode: u8,
         cycles: u32,
+        halted: bool,
     ) {
         self.debug_widgets
-            .machine_state_update(pc, reg, mem, run_instr, opcode, cycles);
+            .machine_state_update(pc, reg, mem, run_instr, opcode, cycles, halted);
     }
 
     /// Set the debug flag of this display.
