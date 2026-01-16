@@ -1,6 +1,6 @@
 use crate::cartridge;
 use crate::constants;
-use crate::debug2;
+use crate::debugmanager;
 use crate::display;
 use crate::eventhandler;
 use crate::instruction;
@@ -9,7 +9,7 @@ use crate::registers;
 
 use cartridge::Cartridge;
 use colored::Colorize;
-use debug2::DebugManager;
+use debugmanager::DebugManager;
 use display::Display;
 use eventhandler::EventHandler;
 use instruction::{Instruction, RunInstr, CC, R16, R16EXT, R16LD, R8, TGT3};
@@ -127,16 +127,14 @@ impl<'a, 'b> Machine<'a, 'b> {
 
             // Execute cycles for one full frame.
             if self.debug.debugging() {
-                // Handle single instruction step.
                 if self.debug.take_step_instruction() {
+                    // Handle single instruction step.
                     let (t, m, _) = self.machine_cycle();
                     self.m_cycles += m;
                     self.t_cycles += t;
                     self.display.render_lcd(&self.memory);
-                }
-
-                // Handle single scanline step.
-                if self.debug.take_step_line() {
+                } else if self.debug.take_step_line() {
+                    // Handle single scanline step.
                     let current_ly = self.memory.ppu().ly;
                     // Loop until LY changes (or wraps around)
                     while self.memory.ppu().ly == current_ly {
@@ -146,6 +144,18 @@ impl<'a, 'b> Machine<'a, 'b> {
                         self.display.render_lcd(&self.memory);
                     }
                 }
+                // Update debug UI.
+                let pc = self.registers.pc;
+                let opcode = self.memory.read8(pc);
+                let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
+                self.display.machine_state_update(
+                    pc,
+                    &self.registers,
+                    &self.memory,
+                    &run_instr,
+                    opcode,
+                    self.t_cycles,
+                );
             } else {
                 // Normal full-speed execution.
                 let mut cycles_this_frame: usize = 0;

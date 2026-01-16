@@ -2,8 +2,7 @@ mod apu;
 mod canvas;
 mod cartridge;
 mod constants;
-mod debug;
-mod debug2;
+mod debugmanager;
 mod display;
 mod eventhandler;
 mod instruction;
@@ -13,7 +12,13 @@ mod memory;
 mod ppu;
 mod registers;
 mod timer;
-mod ui;
+mod ui {
+    pub mod button;
+    pub mod debugui;
+    pub mod label;
+    pub mod textfield;
+    pub mod uimanager;
+}
 
 use cartridge::Cartridge;
 use clap::Parser;

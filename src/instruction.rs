@@ -1131,14 +1131,14 @@ impl fmt::Display for RunInstr {
 }
 
 /// Formats the operation name.
-fn op<S: AsRef<str>>(name: S) -> ColoredString {
-    name.as_ref().bold().blue()
+fn op<S: AsRef<str>>(name: S) -> String {
+    name.as_ref().to_string()
 }
 /// Formats the first operand.
-fn arg1<S: AsRef<str>>(name: S) -> ColoredString {
-    name.as_ref().italic().magenta()
+fn arg1<S: AsRef<str>>(name: S) -> String {
+    name.as_ref().to_string()
 }
 /// Formats the second operand.
-fn arg2<S: AsRef<str>>(name: S) -> ColoredString {
-    name.as_ref().italic().purple()
+fn arg2<S: AsRef<str>>(name: S) -> String {
+    name.as_ref().to_string()
 }

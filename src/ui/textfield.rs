@@ -7,12 +7,14 @@ use sdl2::event::Event;
 use sdl2::rect::Rect;
 use sdl2::ttf::Font;
 use std::sync::Arc;
-use ui::Widget;
+use ui::uimanager::Widget;
 
 /// Text field widget.
 pub struct TextField {
     visible: bool,
     text: String,
+    /// Font size.
+    size: usize,
     x: f32,
     y: f32,
     width: u32,
@@ -39,13 +41,35 @@ impl Widget for TextField {
         self.visible = visible;
     }
 
-    fn set_position(&mut self, x: f32, y: f32) {
+    fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    fn set_pos(&mut self, x: f32, y: f32) {
         self.x = x;
         self.y = y;
     }
 
+    fn get_pos(&self) -> (f32, f32) {
+        (self.x, self.y)
+    }
+
     fn get_font_size(&self) -> usize {
         10
+    }
+
+    fn get_size(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+
+    fn has_size(&self) -> bool {
+        self.width <= 0 || self.height <= 0
+    }
+
+    fn update_size(&mut self, font: &Font) {
+        let (w, h) = font.size_of(&self.text).unwrap_or((0, 0));
+        self.width = w;
+        self.height = h;
     }
 }
 
@@ -54,6 +78,7 @@ impl TextField {
         TextField {
             visible: true,
             text: String::new(),
+            size: 12,
             x,
             y,
             width,

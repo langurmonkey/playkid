@@ -3,6 +3,7 @@ use crate::eventhandler;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
+/// Manager for debug input events.
 pub struct DebugManager {
     debugging: bool,
     step_instruction: bool,

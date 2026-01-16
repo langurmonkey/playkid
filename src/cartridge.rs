@@ -330,7 +330,7 @@ impl Cartridge {
                 let _ = file.write_all(ram_data);
                 println!(
                     "{}: Save data written to disk: {}",
-                    "OK".green(),
+                    "WR".magenta(),
                     save_path.display()
                 );
             }
@@ -353,7 +353,7 @@ impl Cartridge {
                         if mbc.get_ram().len() == buffer.len() {
                             mbc.set_ram(buffer);
                         } else {
-                            println!("{}: Save file size mismatch!", "Warning".yellow());
+                            println!("{}: Save file size mismatch!", "WARN".yellow());
                         }
                     }
                     CartridgeType::MBC2(mbc) => mbc.set_ram(&buffer),
@@ -361,7 +361,7 @@ impl Cartridge {
                         if mbc.get_ram().len() == buffer.len() {
                             mbc.set_ram(buffer);
                         } else {
-                            println!("{}: Save file size mismatch!", "Warning".yellow());
+                            println!("{}: Save file size mismatch!", "WARN".yellow());
                         }
                     }
                     _ => (),
@@ -369,7 +369,7 @@ impl Cartridge {
 
                 println!(
                     "{}: Save data loaded from disk: {}",
-                    "OK".green(),
+                    "LD".magenta(),
                     save_path.display()
                 );
             }

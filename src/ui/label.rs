@@ -5,7 +5,7 @@ use canvas::Canvas;
 use sdl2::rect::Rect;
 use sdl2::ttf::Font;
 use std::sync::Arc;
-use ui::Widget;
+use ui::uimanager::Widget;
 
 /// A label widget.
 pub struct Label {
@@ -19,6 +19,10 @@ pub struct Label {
     x: f32,
     /// Y position.
     y: f32,
+    /// Width.
+    width: u32,
+    /// Height.
+    height: u32,
     /// Main color.
     color: sdl2::pixels::Color,
     /// Background color, if any.
@@ -111,13 +115,35 @@ impl Widget for Label {
         self.visible = visible;
     }
 
-    fn set_position(&mut self, x: f32, y: f32) {
+    fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    fn set_pos(&mut self, x: f32, y: f32) {
         self.x = x;
         self.y = y;
     }
 
+    fn get_pos(&self) -> (f32, f32) {
+        (self.x, self.y)
+    }
+
     fn get_font_size(&self) -> usize {
         self.size
+    }
+
+    fn get_size(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+
+    fn has_size(&self) -> bool {
+        self.width > 0 && self.height > 0
+    }
+
+    fn update_size(&mut self, font: &Font) {
+        let (w, h) = font.size_of(&self.text).unwrap_or((0, 0));
+        self.width = w;
+        self.height = h;
     }
 }
 
@@ -137,6 +163,8 @@ impl Label {
             size,
             x,
             y,
+            width: 0,
+            height: 0,
             color,
             background_color,
             shadow,

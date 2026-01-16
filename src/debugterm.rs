@@ -20,6 +20,8 @@ use sdl2::keyboard::Keycode;
 use std::io::{stdin, stdout, Write};
 use std::process;
 
+/// This is now unused. It used to handle the
+/// CLI debug interface which appeared in the terminal.
 pub struct DebugMonitor {
     debug: bool,
     step: bool,

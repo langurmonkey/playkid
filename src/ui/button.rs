@@ -7,12 +7,13 @@ use sdl2::event::Event;
 use sdl2::rect::Rect;
 use sdl2::ttf::Font;
 use std::sync::Arc;
-use ui::Widget;
+use ui::uimanager::Widget;
 
 /// Button widget.
 pub struct Button {
     visible: bool,
     label: String,
+    size: usize,
     x: f32,
     y: f32,
     width: u32,
@@ -38,13 +39,35 @@ impl Widget for Button {
         self.visible = visible;
     }
 
-    fn set_position(&mut self, x: f32, y: f32) {
+    fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    fn set_pos(&mut self, x: f32, y: f32) {
         self.x = x;
         self.y = y;
     }
 
+    fn get_pos(&self) -> (f32, f32) {
+        (self.x, self.y)
+    }
+
     fn get_font_size(&self) -> usize {
         10
+    }
+
+    fn get_size(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+
+    fn has_size(&self) -> bool {
+        self.width <= 0 || self.height <= 0
+    }
+
+    fn update_size(&mut self, font: &Font) {
+        let (w, h) = font.size_of(&self.label).unwrap_or((0, 0));
+        self.width = w;
+        self.height = h;
     }
 }
 
@@ -60,6 +83,7 @@ impl Button {
         Button {
             visible: true,
             label: label.to_string(),
+            size: 12,
             x,
             y,
             width,
