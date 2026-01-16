@@ -99,7 +99,6 @@ impl DebugUI {
         opcode: u8,
         cycles: u32,
     ) {
-        println!("update pc {}", pc);
         // PC.
         self.pc.borrow_mut().set_text(&format!("${:04x}", pc));
         // Instruction.
