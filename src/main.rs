@@ -3,6 +3,7 @@ mod canvas;
 mod cartridge;
 mod constants;
 mod debug;
+mod debug2;
 mod display;
 mod eventhandler;
 mod instruction;

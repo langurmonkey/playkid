@@ -1,6 +1,6 @@
 use crate::cartridge;
 use crate::constants;
-use crate::debug;
+use crate::debug2;
 use crate::display;
 use crate::eventhandler;
 use crate::instruction;
@@ -9,7 +9,7 @@ use crate::registers;
 
 use cartridge::Cartridge;
 use colored::Colorize;
-use debug::DebugMonitor;
+use debug2::DebugManager;
 use display::Display;
 use eventhandler::EventHandler;
 use instruction::{Instruction, RunInstr, CC, R16, R16EXT, R16LD, R8, TGT3};
@@ -46,8 +46,8 @@ pub struct Machine<'a, 'b> {
     t_cycles: u32,
     /// M-cycles, base unit for CPU instructions, and 1:4 with the clock.
     m_cycles: u32,
-    /// The debug monitor.
-    debug: DebugMonitor,
+    /// The debug manager.
+    debug: DebugManager,
     /// Print FPS every second.
     fps: bool,
     /// The event pump.
@@ -76,7 +76,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             halted: false,
             t_cycles: 324,
             m_cycles: 0,
-            debug: DebugMonitor::new(debug),
+            debug: DebugManager::new(debug),
             fps,
             event_pump: sdl.event_pump().unwrap(),
         }
@@ -84,6 +84,7 @@ impl<'a, 'b> Machine<'a, 'b> {
 
     /// Resets the state of the machine and all its components.
     pub fn reset(&mut self) {
+        // reset the internal state
         self.registers.reset();
         self.memory.reset();
         self.ime = false;
@@ -92,6 +93,10 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.running = true;
         self.t_cycles = 324;
         self.m_cycles = 0;
+
+        // Clear the display
+        self.display.clear();
+        self.display.present();
     }
 
     /// Initialize the Game Boy.
@@ -121,7 +126,28 @@ impl<'a, 'b> Machine<'a, 'b> {
             self.handle_events();
 
             // Execute cycles for one full frame.
-            if !self.debug.debugging() {
+            if self.debug.debugging() {
+                // Handle single instruction step.
+                if self.debug.take_step_instruction() {
+                    let (t, m, _) = self.machine_cycle();
+                    self.m_cycles += m;
+                    self.t_cycles += t;
+                    self.display.render_lcd(&self.memory);
+                }
+
+                // Handle single scanline step.
+                if self.debug.take_step_line() {
+                    let current_ly = self.memory.ppu().ly;
+                    // Loop until LY changes (or wraps around)
+                    while self.memory.ppu().ly == current_ly {
+                        let (t, m, _) = self.machine_cycle();
+                        self.m_cycles += m;
+                        self.t_cycles += t;
+                        self.display.render_lcd(&self.memory);
+                    }
+                }
+            } else {
+                // Normal full-speed execution.
                 let mut cycles_this_frame: usize = 0;
                 while cycles_this_frame < constants::CYCLES_PER_FRAME {
                     let (t, m, r) = self.machine_cycle();
@@ -261,9 +287,6 @@ impl<'a, 'b> Machine<'a, 'b> {
         };
         let mut t_cycles = m_cycles * 4;
 
-        // Event handling.
-        // self.handle_events();
-
         // Memory cycle.
         if m_cycles > 0 {
             // Memory cycle.
@@ -316,7 +339,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                         true
                     }
                     // FPS flag (`f` for FPS).
-                    Event::KeyUp {
+                    Event::KeyDown {
                         keycode: Some(Keycode::F),
                         ..
                     } => {
@@ -345,27 +368,10 @@ impl<'a, 'b> Machine<'a, 'b> {
     /// Main loop of the machine.
     fn cycle(&mut self) -> u8 {
         // Fetch next instruction, and parse it.
-        let pc = self.registers.pc;
         let opcode = self.read8();
-
         let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
-        if self.debug.cycle(
-            self.t_cycles,
-            pc,
-            &run_instr,
-            opcode,
-            &mut self.memory,
-            &self.registers,
-        ) {
-            // Reset issued.
-            self.reset();
-            self.display.clear();
-            self.display.present();
-            0
-        } else {
-            // Execute the instruction.
-            self.execute(run_instr, opcode)
-        }
+        // Execute the instruction.
+        self.execute(run_instr, opcode)
     }
 
     /// Execute a single instruction, and returns the number of cycles it takes.
