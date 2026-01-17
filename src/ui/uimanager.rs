@@ -19,7 +19,7 @@ pub struct UIManager<'ttf> {
 
 impl<'ttf> UIManager<'ttf> {
     pub fn new(ttf: &'ttf sdl2::ttf::Sdl2TtfContext) -> Result<Self, String> {
-        let mut fonts = HashMap::new();
+        let fonts = HashMap::new();
         Ok(UIManager {
             widgets: vec![],
             ttf,
@@ -116,10 +116,8 @@ pub trait Widget {
     fn set_visible(&mut self, visible: bool);
     fn set_color(&mut self, color: sdl2::pixels::Color);
     fn set_pos(&mut self, x: f32, y: f32);
-    fn get_pos(&self) -> (f32, f32);
     fn get_font_size(&self) -> usize;
     fn get_size(&self) -> (u32, u32);
-    fn has_size(&self) -> bool;
     fn update_size(&mut self, font: &Font);
     fn layout(&mut self, ui: &UIManager, start_x: f32, start_y: f32);
 }

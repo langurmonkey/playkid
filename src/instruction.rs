@@ -1,8 +1,6 @@
 use crate::memory;
 use crate::registers;
 
-use colored::ColoredString;
-use colored::Colorize;
 use memory::Memory;
 use registers::Registers;
 use std::fmt;

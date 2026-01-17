@@ -152,19 +152,12 @@ impl Widget for Button {
         self.x = x;
         self.y = y;
     }
-    fn get_pos(&self) -> (f32, f32) {
-        (self.x, self.y)
-    }
     fn get_font_size(&self) -> usize {
         self.font_size
     }
 
     fn get_size(&self) -> (u32, u32) {
         (self.width, self.height)
-    }
-
-    fn has_size(&self) -> bool {
-        self.width > 0 && self.height > 0
     }
 
     fn layout(&mut self, _ui: &UIManager, _sx: f32, _sy: f32) {}

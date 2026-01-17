@@ -98,24 +98,18 @@ impl<'ttf> Widget for LayoutGroup<'ttf> {
         }
     }
 
-    fn update_size(&mut self, font: &Font) {
+    fn update_size(&mut self, _: &Font) {
         // Not used for groups, as they use the `layout()` method instead.
     }
 
     fn get_size(&self) -> (u32, u32) {
         (self.width, self.height)
     }
-    fn has_size(&self) -> bool {
-        true
-    }
     fn set_pos(&mut self, x: f32, y: f32) {
         self.x = x;
         self.y = y;
     }
-    fn get_pos(&self) -> (f32, f32) {
-        (self.x, self.y)
-    }
-    fn set_color(&mut self, color: sdl2::pixels::Color) {}
+    fn set_color(&mut self, _: sdl2::pixels::Color) {}
     fn is_visible(&self) -> bool {
         self.visible
     }

@@ -129,10 +129,10 @@ impl Widget for TextField {
         }
     }
 
-    fn set_color(&mut self, color: sdl2::pixels::Color) {}
+    fn set_color(&mut self, _: sdl2::pixels::Color) {}
 
     fn update_size(&mut self, font: &Font) {
-        let (w, h) = font.size_of("A").unwrap_or((0, 20)); // Base height on a char
+        let (_, h) = font.size_of("A").unwrap_or((0, 20)); // Base height on a char
         let text_w = font.size_of(&self.text).unwrap_or((0, 0)).0;
         self.width = text_w.max(100); // Give it a base width
         self.height = h;
@@ -150,17 +150,11 @@ impl Widget for TextField {
         self.x = x;
         self.y = y;
     }
-    fn get_pos(&self) -> (f32, f32) {
-        (self.x, self.y)
-    }
     fn get_font_size(&self) -> usize {
         self.font_size
     }
     fn get_size(&self) -> (u32, u32) {
         (self.width, self.height)
-    }
-    fn has_size(&self) -> bool {
-        true
     }
     fn layout(&mut self, _ui: &UIManager, _sx: f32, _sy: f32) {}
 }

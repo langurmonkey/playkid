@@ -108,7 +108,7 @@ impl Widget for Label {
             .unwrap();
     }
 
-    fn handle_event(&mut self, event: &sdl2::event::Event) -> bool {
+    fn handle_event(&mut self, _: &sdl2::event::Event) -> bool {
         false
     }
 
@@ -129,10 +129,6 @@ impl Widget for Label {
         self.y = y;
     }
 
-    fn get_pos(&self) -> (f32, f32) {
-        (self.x, self.y)
-    }
-
     fn get_font_size(&self) -> usize {
         self.font_size
     }
@@ -141,13 +137,9 @@ impl Widget for Label {
         (self.width, self.height)
     }
 
-    fn has_size(&self) -> bool {
-        self.width > 0 && self.height > 0
-    }
-
     fn update_size(&mut self, font: &Font) {
         let t = if self.text.trim().is_empty() {
-            // Enxure size can be computed.
+            // Ensure size can be computed.
             "D"
         } else {
             &self.text
@@ -157,7 +149,7 @@ impl Widget for Label {
         self.height = h;
     }
 
-    fn layout(&mut self, ui: &UIManager, start_x: f32, start_y: f32) {}
+    fn layout(&mut self, _: &UIManager, _: f32, _: f32) {}
 }
 
 impl Label {

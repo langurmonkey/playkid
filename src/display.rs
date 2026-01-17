@@ -35,9 +35,6 @@ pub struct Display<'a> {
     pub debug_ui: DebugUI<'a>,
     /// FPS counter.
     pub fps: Rc<RefCell<Label>>,
-
-    /// The UI state.
-    ui_state: Rc<RefCell<UIState>>,
 }
 
 impl<'a> EventHandler for Display<'a> {
@@ -45,7 +42,7 @@ impl<'a> EventHandler for Display<'a> {
     fn handle_event(&mut self, event: &Event) -> bool {
         match event {
             Event::Window {
-                win_event: sdl2::event::WindowEvent::Resized(w, h),
+                win_event: sdl2::event::WindowEvent::Resized(_, _),
                 ..
             } => {
                 // Update window constraints on resize.
@@ -80,7 +77,8 @@ impl<'a> Display<'a> {
             .map_err(|e| format!("{}: Failed to create UI manager: {}", "ERR".red(), e))?;
 
         // Debug UI.
-        let debug_ui = DebugUI::new(&mut ui, Rc::clone(&ui_state));
+        let mut debug_ui = DebugUI::new(&mut ui, Rc::clone(&ui_state));
+        debug_ui.set_debug_visibility(debug);
 
         // FPS counter.
         let fps = Rc::new(RefCell::new(Label::new(
@@ -101,7 +99,6 @@ impl<'a> Display<'a> {
             debug,
             fps,
             last_ly: 255,
-            ui_state,
         };
 
         display.canvas.update_window_constraints(debug);
@@ -118,13 +115,6 @@ impl<'a> Display<'a> {
     /// Set FPS visibility.
     pub fn visible_fps(&mut self, visible: bool) {
         self.fps.borrow_mut().set_visible(visible);
-    }
-
-    /// Toggle FPS visibility.
-    pub fn toggle_fps(&mut self) {
-        self.fps
-            .borrow_mut()
-            .set_visible(!self.fps.borrow().is_visible());
     }
 
     /// Update the debug UI.
