@@ -1114,6 +1114,22 @@ impl RunInstr {
         };
         RunInstr { instr, data }
     }
+
+    pub fn instruction_str(&self) -> String {
+        format!("{}", self.instr)
+    }
+
+    pub fn operand_str(&self) -> String {
+        match self.data {
+            OperandData::Op8(u8) => {
+                format!("{:#04x}", u8)
+            }
+            OperandData::Op16(u16) => {
+                format!("{:#06x}", u16)
+            }
+            _ => format!("{}", " "),
+        }
+    }
 }
 
 impl fmt::Display for RunInstr {

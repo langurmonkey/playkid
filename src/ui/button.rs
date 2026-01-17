@@ -171,7 +171,14 @@ impl Widget for Button {
 }
 
 impl Button {
-    pub fn new<F>(text: &str, size: usize, bg: Color, pressed: Color, on_click: F) -> Self
+    pub fn new<F>(
+        text: &str,
+        size: usize,
+        col: Color,
+        bg: Color,
+        pressed: Color,
+        on_click: F,
+    ) -> Self
     where
         F: FnMut() + 'static,
     {
@@ -183,7 +190,7 @@ impl Button {
             y: 0.0,
             width: 0,
             height: 0,
-            color: Color::WHITE,
+            color: col,
             bg_color: bg,
             pressed_color: pressed,
             is_pressed: false,

@@ -115,9 +115,16 @@ impl<'a> Display<'a> {
             .set_text(&format!("FPS: {:.1}", fps_value));
     }
 
-    /// Special method to set FPS visibility.
+    /// Set FPS visibility.
     pub fn visible_fps(&mut self, visible: bool) {
         self.fps.borrow_mut().set_visible(visible);
+    }
+
+    /// Toggle FPS visibility.
+    pub fn toggle_fps(&mut self) {
+        self.fps
+            .borrow_mut()
+            .set_visible(!self.fps.borrow().is_visible());
     }
 
     /// Update the debug UI.

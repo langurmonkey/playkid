@@ -27,9 +27,7 @@ impl eventhandler::EventHandler for DebugManager {
                 keycode: Some(Keycode::F6),
                 ..
             } => {
-                if self.debugging {
-                    self.step_instruction = true;
-                }
+                self.request_step_instruction();
                 true
             }
             // Step a scan line.
@@ -37,9 +35,7 @@ impl eventhandler::EventHandler for DebugManager {
                 keycode: Some(Keycode::F8),
                 ..
             } => {
-                if self.debugging {
-                    self.step_line = true;
-                }
+                self.request_step_scanline();
                 true
             }
             _ => false,
@@ -58,6 +54,18 @@ impl DebugManager {
 
     pub fn debugging(&self) -> bool {
         self.debugging
+    }
+
+    pub fn request_step_instruction(&mut self) {
+        if self.debugging {
+            self.step_instruction = true;
+        }
+    }
+
+    pub fn request_step_scanline(&mut self) {
+        if self.debugging {
+            self.step_line = true;
+        }
     }
 
     /// Check if a single instruction step was requested and reset the flag.

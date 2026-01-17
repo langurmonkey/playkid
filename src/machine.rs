@@ -349,7 +349,46 @@ impl<'a, 'b> Machine<'a, 'b> {
 
     /// Checks for commands sent from the UI widgets.
     pub fn handle_ui_commands(&mut self) {
-        // Reset.
+        // Step instruction.
+        let step_needed = {
+            let mut state = self.ui_state.borrow_mut();
+            if state.step_requested {
+                state.step_requested = false;
+                true
+            } else {
+                false
+            }
+        };
+        if step_needed {
+            self.debug.request_step_instruction();
+        }
+        // Step line.
+        let line_needed = {
+            let mut state = self.ui_state.borrow_mut();
+            if state.scanline_requested {
+                state.scanline_requested = false;
+                true
+            } else {
+                false
+            }
+        };
+        if line_needed {
+            self.debug.request_step_scanline();
+        }
+        // FPS.
+        let fps_needed = {
+            let mut state = self.ui_state.borrow_mut();
+            if state.fps_requested {
+                state.fps_requested = false;
+                true
+            } else {
+                false
+            }
+        };
+        if fps_needed {
+            self.fps = !self.fps;
+        }
+        // Reset CPU.
         let reset_needed = {
             let mut state = self.ui_state.borrow_mut();
             if state.reset_requested {
@@ -359,9 +398,22 @@ impl<'a, 'b> Machine<'a, 'b> {
                 false
             }
         };
-
         if reset_needed {
             self.reset();
+        }
+        // Quit.
+        let exit_needed = {
+            let mut state = self.ui_state.borrow_mut();
+            if state.exit_requested {
+                state.exit_requested = false;
+                true
+            } else {
+                false
+            }
+        };
+        if exit_needed {
+            self.running = false;
+            println!("{}: Bye bye!", "OK".green());
         }
     }
 

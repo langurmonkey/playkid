@@ -90,12 +90,20 @@ impl<'ttf> UIManager<'ttf> {
 /// UI action queue.
 pub struct UIState {
     pub reset_requested: bool,
+    pub step_requested: bool,
+    pub scanline_requested: bool,
+    pub fps_requested: bool,
+    pub exit_requested: bool,
 }
 
 impl UIState {
     pub fn new() -> Self {
         Self {
             reset_requested: false,
+            step_requested: false,
+            scanline_requested: false,
+            fps_requested: false,
+            exit_requested: false,
         }
     }
 }

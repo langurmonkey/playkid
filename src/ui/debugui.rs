@@ -27,6 +27,7 @@ pub struct DebugUI<'ttf> {
     // Status and Instructions
     pub pc_addr: Rc<RefCell<Label>>,
     pub instr_text: Rc<RefCell<Label>>,
+    pub instr_operand: Rc<RefCell<Label>>,
     pub status: Rc<RefCell<Label>>,
     // Values (Right Column)
     pub t_cycles: Rc<RefCell<Label>>,
@@ -51,7 +52,7 @@ pub struct DebugUI<'ttf> {
 impl<'ttf> DebugUI<'ttf> {
     pub fn new(ui: &mut UIManager<'ttf>, ui_state: Rc<RefCell<UIState>>) -> Self {
         // Main font size.
-        let base_font_size = 12;
+        let base_font_size = 10;
 
         // Title.
         let debug_title = Rc::new(RefCell::new(Label::new(
@@ -70,17 +71,28 @@ impl<'ttf> DebugUI<'ttf> {
             ("Step [F6]", YELLOW),
             ("Scanline [F8]", YELLOW),
             ("FPS [F]", YELLOW),
-            ("Close [D]", YELLOW),
+            ("Quit [Esc]", YELLOW),
         ];
         for (txt, clr) in bindings {
-            b_row.add(Rc::new(RefCell::new(Label::new(
+            let label = txt.to_string();
+            let ui_state_b = Rc::clone(&ui_state);
+            b_row.add(Rc::new(RefCell::new(Button::new(
                 txt,
                 base_font_size,
-                0.0,
-                0.0,
                 clr,
-                Some(DARKGRAY),
-                false,
+                DARKGRAY, // Normal color.
+                RED,      // Pressed color.
+                move || {
+                    let mut state = ui_state_b.borrow_mut();
+                    // Match against the label to decide what to do
+                    match label.as_str() {
+                        "Step [F6]" => state.step_requested = true,
+                        "Scanline [F8]" => state.scanline_requested = true,
+                        "FPS [F]" => state.fps_requested = true,
+                        "Quit [Esc]" => state.exit_requested = true,
+                        _ => println!("Unknown button: {}", label),
+                    }
+                },
             ))));
         }
         let b_row_rc = Rc::new(RefCell::new(b_row));
@@ -88,28 +100,28 @@ impl<'ttf> DebugUI<'ttf> {
         // Instruction row.
         let pc_addr = Rc::new(RefCell::new(Label::new(
             "$0000:",
-            base_font_size,
+            base_font_size + 4,
             0.0,
             0.0,
-            GRAY,
+            ORANGE,
             None,
             false,
         )));
         let instr_text = Rc::new(RefCell::new(Label::new(
             "NOP",
-            base_font_size,
+            base_font_size + 4,
             0.0,
             0.0,
             CYAN,
             None,
             false,
         )));
-        let status = Rc::new(RefCell::new(Label::new(
-            "RUN",
-            base_font_size,
+        let instr_operand = Rc::new(RefCell::new(Label::new(
+            "NOP",
+            base_font_size + 4,
             0.0,
             0.0,
-            GREEN,
+            GRAY,
             None,
             false,
         )));
@@ -117,20 +129,12 @@ impl<'ttf> DebugUI<'ttf> {
         let mut instr_row = LayoutGroup::new(Orientation::Horizontal, 15.0);
         instr_row.add(Rc::clone(&pc_addr) as Rc<RefCell<dyn Widget>>);
         instr_row.add(Rc::clone(&instr_text) as Rc<RefCell<dyn Widget>>);
-        instr_row.add(Rc::new(RefCell::new(Label::new(
-            "|",
-            base_font_size,
-            0.0,
-            0.0,
-            GRAY,
-            None,
-            false,
-        ))));
-        instr_row.add(Rc::clone(&status) as Rc<RefCell<dyn Widget>>);
+        instr_row.add(Rc::clone(&instr_operand) as Rc<RefCell<dyn Widget>>);
 
         // Data table.
         let mut left_col = LayoutGroup::new(Orientation::Vertical, 8.0);
         let labels = [
+            "CPU status:",
             "T-cycles:",
             "M-cycles:",
             "Reg:",
@@ -162,6 +166,15 @@ impl<'ttf> DebugUI<'ttf> {
         }
 
         let mut right_col = LayoutGroup::new(Orientation::Vertical, 8.0);
+        let status = Rc::new(RefCell::new(Label::new(
+            "RUN",
+            base_font_size,
+            0.0,
+            0.0,
+            GREEN,
+            None,
+            false,
+        )));
         let t_cycles = Rc::new(RefCell::new(Label::new(
             "0",
             base_font_size,
@@ -317,8 +330,8 @@ impl<'ttf> DebugUI<'ttf> {
         )));
 
         let val_refs = [
-            &t_cycles, &m_cycles, &af, &bc, &de, &hl, &flags, &sp, &div, &next_bw, &lcdc, &stat,
-            &lyc, &ly, &lx, &opcode, &joypad,
+            &status, &t_cycles, &m_cycles, &af, &bc, &de, &hl, &flags, &sp, &div, &next_bw, &lcdc,
+            &stat, &lyc, &ly, &lx, &opcode, &joypad,
         ];
         for v in val_refs {
             right_col.add(Rc::clone(v) as Rc<RefCell<dyn Widget>>);
@@ -329,14 +342,15 @@ impl<'ttf> DebugUI<'ttf> {
         data_table.add(Rc::new(RefCell::new(right_col)) as Rc<RefCell<dyn Widget>>);
 
         // Reset button.
+        let ui_state_reset = Rc::clone(&ui_state);
         let reset_button = Rc::new(RefCell::new(Button::new(
             "Reset CPU",
             base_font_size,
-            Color::RGB(100, 100, 100), // Normal color
-            Color::RGB(150, 50, 50),   // Pressed color
+            WHITE,
+            DARKGRAY, // Normal color.
+            RED,      // Pressed color.
             move || {
-                println!("CPU Reset button clicked!");
-                ui_state.borrow_mut().reset_requested = true;
+                ui_state_reset.borrow_mut().reset_requested = true;
             },
         )));
 
@@ -344,7 +358,7 @@ impl<'ttf> DebugUI<'ttf> {
         let jump_input = Rc::new(RefCell::new(TextField::new(base_font_size)));
 
         // Main assembly
-        let mut root = LayoutGroup::new(Orientation::Vertical, 25.0);
+        let mut root = LayoutGroup::new(Orientation::Vertical, 30.0);
         root.add(Rc::clone(&debug_title) as Rc<RefCell<dyn Widget>>);
         root.add(b_row_rc as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(instr_row)) as Rc<RefCell<dyn Widget>>);
@@ -359,6 +373,7 @@ impl<'ttf> DebugUI<'ttf> {
             main_layout: root_rc,
             pc_addr,
             instr_text,
+            instr_operand,
             status,
             t_cycles,
             m_cycles,
@@ -394,7 +409,10 @@ impl<'ttf> DebugUI<'ttf> {
         self.pc_addr.borrow_mut().set_text(&format!("${:04x}:", pc));
         self.instr_text
             .borrow_mut()
-            .set_text(&run_instr.to_string());
+            .set_text(&run_instr.instruction_str());
+        self.instr_operand
+            .borrow_mut()
+            .set_text(&run_instr.operand_str());
 
         // Update CPU Status
         if halted {
