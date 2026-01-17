@@ -35,10 +35,10 @@ pub struct Label {
 
 impl Widget for Label {
     fn render(&self, canvas: &mut Canvas, ui: &UIManager) {
-        let font = ui.font(self.get_font_size());
         if !self.visible {
             return;
         }
+        let font = ui.font(self.get_font_size());
         let scale_factor = canvas.get_scale_factor();
 
         // Render background color if set.
@@ -146,7 +146,13 @@ impl Widget for Label {
     }
 
     fn update_size(&mut self, font: &Font) {
-        let (w, h) = font.size_of(&self.text).unwrap_or((0, 0));
+        let t = if self.text.trim().is_empty() {
+            // Enxure size can be computed.
+            "D"
+        } else {
+            &self.text
+        };
+        let (w, h) = font.size_of(t).unwrap_or((0, 0));
         self.width = w;
         self.height = h;
     }

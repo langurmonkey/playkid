@@ -1,5 +1,4 @@
 use crate::constants;
-use colored::Colorize;
 use sdl2::rect::Rect;
 use sdl2::{pixels::PixelFormatEnum, render::Texture, render::TextureCreator, Sdl};
 use std::cell::RefCell;
@@ -172,7 +171,7 @@ impl<'a> Canvas<'a> {
 
         let min_scale = 4;
         let min_w = if debug {
-            (base_w * min_scale) * 2
+            ((base_w * min_scale) as f32 * 1.3) as u32
         } else {
             base_w * min_scale
         };
