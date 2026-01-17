@@ -39,6 +39,17 @@ pub struct Display<'a> {
 impl<'a> EventHandler for Display<'a> {
     /// Handles a single event.
     fn handle_event(&mut self, event: &Event) -> bool {
+        match event {
+            Event::Window {
+                win_event: sdl2::event::WindowEvent::Resized(w, h),
+                ..
+            } => {
+                // Update window constraints on resize.
+                self.canvas.update_window_constraints(self.debug);
+            }
+            _ => {}
+        }
+
         self.ui.handle_event(event);
         true
     }
@@ -47,9 +58,9 @@ impl<'a> EventHandler for Display<'a> {
 impl<'a> Display<'a> {
     pub fn new(
         window_title: &str,
-        scale: u8,
         sdl: &'a Sdl,
         ttf: &'a sdl2::ttf::Sdl2TtfContext,
+        scale: u8,
         debug: bool,
     ) -> Result<Self, String> {
         let w = constants::DISPLAY_WIDTH;
@@ -78,14 +89,18 @@ impl<'a> Display<'a> {
         )));
         ui.add_widget(Rc::clone(&fps));
 
-        Ok(Display {
+        let mut display = Display {
             canvas,
             ui,
             debug_widgets,
             debug,
             fps,
             last_ly: 255,
-        })
+        };
+
+        display.canvas.update_window_constraints(debug);
+
+        Ok(display)
     }
 
     pub fn update_fps(&mut self, fps_value: f64) {
@@ -120,6 +135,9 @@ impl<'a> Display<'a> {
     pub fn set_debug(&mut self, debug: bool) {
         self.debug = debug;
         self.debug_widgets.set_debug_visibility(debug);
+
+        // Force the window to respect the new minimum bounds.
+        self.canvas.update_window_constraints(debug);
     }
 
     /// Present the canvas.

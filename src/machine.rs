@@ -67,7 +67,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
-            display: Display::new("PlayKid emulator", scale, sdl, ttf, debug)
+            display: Display::new("PlayKid emulator", sdl, ttf, scale, debug)
                 .expect("Error creating display"),
             ime: false,
             ei: 0,
@@ -366,8 +366,11 @@ impl<'a, 'b> Machine<'a, 'b> {
             }
             // Debug monitor.
             if !handled {
+                let d = self.debug.debugging();
                 handled = self.debug.handle_event(&event);
-                self.display.set_debug(self.debug.debugging());
+                if d != self.debug.debugging() {
+                    self.display.set_debug(self.debug.debugging());
+                }
             }
             // Forward to display/UI.
             if !handled {

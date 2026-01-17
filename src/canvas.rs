@@ -1,4 +1,5 @@
 use crate::constants;
+use colored::Colorize;
 use sdl2::rect::Rect;
 use sdl2::{pixels::PixelFormatEnum, render::Texture, render::TextureCreator, Sdl};
 use std::cell::RefCell;
@@ -161,5 +162,30 @@ impl<'a> Canvas<'a> {
     /// Converts the internal data vector to a `u8` array.
     fn data_raw(&self) -> &[u8] {
         unsafe { std::slice::from_raw_parts(self.data.as_ptr(), self.data.len()) }
+    }
+
+    /// Update window minimum size, which depends on debug mode.
+    /// In debug mode, the width is larger to accommodate the debug UI.
+    pub fn update_window_constraints(&mut self, debug: bool) {
+        let base_w = constants::DISPLAY_WIDTH as u32;
+        let base_h = constants::DISPLAY_HEIGHT as u32;
+
+        let min_scale = 4;
+        let min_w = if debug {
+            (base_w * min_scale) * 2
+        } else {
+            base_w * min_scale
+        };
+        let min_h = base_h * min_scale;
+
+        let (curr_w, curr_h) = self.sdl_canvas.window().size();
+
+        // Set the hint.
+        if curr_w < min_w || curr_h < min_h {
+            self.sdl_canvas
+                .window_mut()
+                .set_minimum_size(min_w, min_h)
+                .ok();
+        }
     }
 }
