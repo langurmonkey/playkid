@@ -7,6 +7,7 @@ use crate::instruction;
 use crate::memory;
 use crate::registers;
 
+use crate::ui::uimanager::UIState;
 use cartridge::Cartridge;
 use colored::Colorize;
 use debugmanager::DebugManager;
@@ -18,6 +19,8 @@ use registers::Registers;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::{EventPump, Sdl};
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::thread;
 
 /// Spin threshold in milliseconds. Minimum time to sleep until next frame.
@@ -32,6 +35,8 @@ pub struct Machine<'a, 'b> {
     pub memory: Memory<'a>,
     /// The display.
     display: Display<'b>,
+    /// The UI state.
+    ui_state: Rc<RefCell<UIState>>,
     /// Interrupt master enable flag.
     ime: bool,
     /// EI operation is delayed by one instruction, so we use this counter.
@@ -64,11 +69,22 @@ impl<'a, 'b> Machine<'a, 'b> {
         debug: bool,
         fps: bool,
     ) -> Self {
+        // UI state object.
+        let ui_state = Rc::new(RefCell::new(UIState::new()));
+
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
-            display: Display::new("PlayKid emulator", sdl, ttf, scale, debug)
-                .expect("Error creating display"),
+            display: Display::new(
+                "PlayKid emulator",
+                sdl,
+                ttf,
+                scale,
+                debug,
+                Rc::clone(&ui_state),
+            )
+            .expect("Error creating display"),
+            ui_state: Rc::clone(&ui_state),
             ime: false,
             ei: 0,
             di: 0,
@@ -124,6 +140,13 @@ impl<'a, 'b> Machine<'a, 'b> {
 
             // Handle events.
             self.handle_events();
+
+            // Check UI state.
+            if self.ui_state.borrow().reset_requested {
+                self.reset();
+                // Reset the flag so we don't reset forever!
+                self.ui_state.borrow_mut().reset_requested = false;
+            }
 
             // Execute cycles for one full frame.
             if self.debug.debugging() {

@@ -2,7 +2,8 @@ use crate::instruction::RunInstr;
 use crate::memory::Memory;
 use crate::registers::Registers;
 use crate::ui::{
-    label::Label, layout::LayoutGroup, layout::Orientation, uimanager::UIManager, uimanager::Widget,
+    button::Button, label::Label, layout::LayoutGroup, layout::Orientation, uimanager::UIManager,
+    uimanager::UIState, uimanager::Widget,
 };
 use sdl2::pixels::Color;
 use std::cell::RefCell;
@@ -21,6 +22,7 @@ const ORANGE: Color = Color::RGB(255, 152, 0);
 const DARKGRAY: Color = Color::RGB(30, 30, 30);
 
 pub struct DebugUI<'ttf> {
+    // Main layout.
     pub main_layout: Rc<RefCell<LayoutGroup<'ttf>>>,
     // Status and Instructions
     pub pc_addr: Rc<RefCell<Label>>,
@@ -47,9 +49,9 @@ pub struct DebugUI<'ttf> {
 }
 
 impl<'ttf> DebugUI<'ttf> {
-    pub fn new(ui: &mut UIManager<'ttf>) -> Self {
+    pub fn new(ui: &mut UIManager<'ttf>, ui_state: Rc<RefCell<UIState>>) -> Self {
         // Main font size.
-        let fsize = 12;
+        let base_font_size = 12;
 
         // Title.
         let debug_title = Rc::new(RefCell::new(Label::new(
@@ -73,7 +75,7 @@ impl<'ttf> DebugUI<'ttf> {
         for (txt, clr) in bindings {
             b_row.add(Rc::new(RefCell::new(Label::new(
                 txt,
-                fsize,
+                base_font_size,
                 0.0,
                 0.0,
                 clr,
@@ -85,20 +87,44 @@ impl<'ttf> DebugUI<'ttf> {
 
         // Instruction row.
         let pc_addr = Rc::new(RefCell::new(Label::new(
-            "$0000:", fsize, 0.0, 0.0, GRAY, None, false,
+            "$0000:",
+            base_font_size,
+            0.0,
+            0.0,
+            GRAY,
+            None,
+            false,
         )));
         let instr_text = Rc::new(RefCell::new(Label::new(
-            "NOP", fsize, 0.0, 0.0, CYAN, None, false,
+            "NOP",
+            base_font_size,
+            0.0,
+            0.0,
+            CYAN,
+            None,
+            false,
         )));
         let status = Rc::new(RefCell::new(Label::new(
-            "RUN", fsize, 0.0, 0.0, GREEN, None, false,
+            "RUN",
+            base_font_size,
+            0.0,
+            0.0,
+            GREEN,
+            None,
+            false,
         )));
 
         let mut instr_row = LayoutGroup::new(Orientation::Horizontal, 15.0);
         instr_row.add(Rc::clone(&pc_addr) as Rc<RefCell<dyn Widget>>);
         instr_row.add(Rc::clone(&instr_text) as Rc<RefCell<dyn Widget>>);
         instr_row.add(Rc::new(RefCell::new(Label::new(
-            "|", fsize, 0.0, 0.0, GRAY, None, false,
+            "|",
+            base_font_size,
+            0.0,
+            0.0,
+            GRAY,
+            None,
+            false,
         ))));
         instr_row.add(Rc::clone(&status) as Rc<RefCell<dyn Widget>>);
 
@@ -125,20 +151,38 @@ impl<'ttf> DebugUI<'ttf> {
         ];
         for text in labels {
             left_col.add(Rc::new(RefCell::new(Label::new(
-                text, fsize, 0.0, 0.0, GRAY, None, false,
+                text,
+                base_font_size,
+                0.0,
+                0.0,
+                GRAY,
+                None,
+                false,
             ))));
         }
 
         let mut right_col = LayoutGroup::new(Orientation::Vertical, 8.0);
         let t_cycles = Rc::new(RefCell::new(Label::new(
-            "0", fsize, 0.0, 0.0, WHITE, None, false,
+            "0",
+            base_font_size,
+            0.0,
+            0.0,
+            WHITE,
+            None,
+            false,
         )));
         let m_cycles = Rc::new(RefCell::new(Label::new(
-            "0", fsize, 0.0, 0.0, WHITE, None, false,
+            "0",
+            base_font_size,
+            0.0,
+            0.0,
+            WHITE,
+            None,
+            false,
         )));
         let af = Rc::new(RefCell::new(Label::new(
             "AF: 00 00",
-            fsize,
+            base_font_size,
             0.0,
             0.0,
             MAGENTA,
@@ -147,7 +191,7 @@ impl<'ttf> DebugUI<'ttf> {
         )));
         let bc = Rc::new(RefCell::new(Label::new(
             "BC: 00 00",
-            fsize,
+            base_font_size,
             0.0,
             0.0,
             MAGENTA,
@@ -156,7 +200,7 @@ impl<'ttf> DebugUI<'ttf> {
         )));
         let de = Rc::new(RefCell::new(Label::new(
             "DE: 00 00",
-            fsize,
+            base_font_size,
             0.0,
             0.0,
             MAGENTA,
@@ -165,7 +209,7 @@ impl<'ttf> DebugUI<'ttf> {
         )));
         let hl = Rc::new(RefCell::new(Label::new(
             "HL: 00 00",
-            fsize,
+            base_font_size,
             0.0,
             0.0,
             MAGENTA,
@@ -173,14 +217,26 @@ impl<'ttf> DebugUI<'ttf> {
             false,
         )));
         let flags = Rc::new(RefCell::new(Label::new(
-            "_ _ _ _", fsize, 0.0, 0.0, YELLOW, None, false,
+            "_ _ _ _",
+            base_font_size,
+            0.0,
+            0.0,
+            YELLOW,
+            None,
+            false,
         )));
         let sp = Rc::new(RefCell::new(Label::new(
-            "0x0000", fsize, 0.0, 0.0, WHITE, None, false,
+            "0x0000",
+            base_font_size,
+            0.0,
+            0.0,
+            WHITE,
+            None,
+            false,
         )));
         let div = Rc::new(RefCell::new(Label::new(
             "0x0000/00",
-            fsize,
+            base_font_size,
             0.0,
             0.0,
             WHITE,
@@ -189,7 +245,7 @@ impl<'ttf> DebugUI<'ttf> {
         )));
         let next_bw = Rc::new(RefCell::new(Label::new(
             "0x00 / 0000",
-            fsize,
+            base_font_size,
             0.0,
             0.0,
             WHITE,
@@ -197,26 +253,62 @@ impl<'ttf> DebugUI<'ttf> {
             false,
         )));
         let lcdc = Rc::new(RefCell::new(Label::new(
-            "0x00", fsize, 0.0, 0.0, GREEN, None, false,
+            "0x00",
+            base_font_size,
+            0.0,
+            0.0,
+            GREEN,
+            None,
+            false,
         )));
         let stat = Rc::new(RefCell::new(Label::new(
-            "0x00", fsize, 0.0, 0.0, GREEN, None, false,
+            "0x00",
+            base_font_size,
+            0.0,
+            0.0,
+            GREEN,
+            None,
+            false,
         )));
         let lyc = Rc::new(RefCell::new(Label::new(
-            "0x00", fsize, 0.0, 0.0, GREEN, None, false,
+            "0x00",
+            base_font_size,
+            0.0,
+            0.0,
+            GREEN,
+            None,
+            false,
         )));
         let ly = Rc::new(RefCell::new(Label::new(
-            "0x00", fsize, 0.0, 0.0, GREEN, None, false,
+            "0x00",
+            base_font_size,
+            0.0,
+            0.0,
+            GREEN,
+            None,
+            false,
         )));
         let lx = Rc::new(RefCell::new(Label::new(
-            "0x00", fsize, 0.0, 0.0, GREEN, None, false,
+            "0x00",
+            base_font_size,
+            0.0,
+            0.0,
+            GREEN,
+            None,
+            false,
         )));
         let opcode = Rc::new(RefCell::new(Label::new(
-            "0x00", fsize, 0.0, 0.0, WHITE, None, false,
+            "0x00",
+            base_font_size,
+            0.0,
+            0.0,
+            WHITE,
+            None,
+            false,
         )));
         let joypad = Rc::new(RefCell::new(Label::new(
             "_ _ _ _ _ _ _ _",
-            fsize,
+            base_font_size,
             0.0,
             0.0,
             ORANGE,
@@ -236,12 +328,25 @@ impl<'ttf> DebugUI<'ttf> {
         data_table.add(Rc::new(RefCell::new(left_col)) as Rc<RefCell<dyn Widget>>);
         data_table.add(Rc::new(RefCell::new(right_col)) as Rc<RefCell<dyn Widget>>);
 
+        // Test button.
+        let my_button = Rc::new(RefCell::new(Button::new(
+            "Reset CPU",
+            base_font_size,
+            Color::RGB(100, 100, 100), // Normal color
+            Color::RGB(150, 50, 50),   // Pressed color
+            move || {
+                println!("CPU Reset button clicked!");
+                ui_state.borrow_mut().reset_requested = true;
+            },
+        )));
+
         // Main assembly
         let mut root = LayoutGroup::new(Orientation::Vertical, 25.0);
         root.add(Rc::clone(&debug_title) as Rc<RefCell<dyn Widget>>);
         root.add(b_row_rc as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(instr_row)) as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(data_table)) as Rc<RefCell<dyn Widget>>);
+        root.add(my_button as Rc<RefCell<dyn Widget>>);
 
         let root_rc = Rc::new(RefCell::new(root));
         ui.add_widget(Rc::clone(&root_rc));
@@ -371,6 +476,20 @@ impl<'ttf> DebugUI<'ttf> {
             if mem.joypad.start { "S" } else { "_" },
             if mem.joypad.select { "s" } else { "_" }
         ));
+
+        // Connect DIV.
+        self.div.borrow_mut().set_text(&format!(
+            "{:#06x} / {:#04x}",
+            mem.timer.div16(),
+            mem.timer.div()
+        ));
+
+        // Connect next byte/word.
+        let next_byte = mem.read8(reg.pc);
+        let next_word = mem.read16(reg.pc);
+        self.next_bw
+            .borrow_mut()
+            .set_text(&format!("{:#04x} / {:#06x}", next_byte, next_word));
     }
 
     pub fn update_positions(&mut self, ui: &UIManager, dx: f32, dy: f32) {

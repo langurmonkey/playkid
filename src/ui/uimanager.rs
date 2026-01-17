@@ -87,6 +87,19 @@ impl<'ttf> UIManager<'ttf> {
     }
 }
 
+/// UI action queue.
+pub struct UIState {
+    pub reset_requested: bool,
+}
+
+impl UIState {
+    pub fn new() -> Self {
+        Self {
+            reset_requested: false,
+        }
+    }
+}
+
 /// Widget trait.
 pub trait Widget {
     fn handle_event(&mut self, event: &sdl2::event::Event) -> bool;

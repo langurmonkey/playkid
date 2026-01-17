@@ -14,7 +14,7 @@ pub struct Label {
     /// Label text.
     text: String,
     /// Font size.
-    size: usize,
+    font_size: usize,
     /// X position.
     x: f32,
     /// Y position.
@@ -134,7 +134,7 @@ impl Widget for Label {
     }
 
     fn get_font_size(&self) -> usize {
-        self.size
+        self.font_size
     }
 
     fn get_size(&self) -> (u32, u32) {
@@ -173,7 +173,7 @@ impl Label {
         Label {
             visible: true,
             text: text.to_string(),
-            size,
+            font_size: size,
             x,
             y,
             width: 0,

@@ -7,6 +7,7 @@ use crate::registers::Registers;
 use crate::ui::debugui::DebugUI;
 use crate::ui::label::Label;
 use crate::ui::uimanager::UIManager;
+use crate::ui::uimanager::UIState;
 use crate::ui::uimanager::Widget;
 use colored::Colorize;
 use sdl2;
@@ -31,9 +32,12 @@ pub struct Display<'a> {
     /// User interface manager.
     pub ui: UIManager<'a>,
     /// Debug UI.
-    pub debug_widgets: DebugUI<'a>,
+    pub debug_ui: DebugUI<'a>,
     /// FPS counter.
     pub fps: Rc<RefCell<Label>>,
+
+    /// The UI state.
+    ui_state: Rc<RefCell<UIState>>,
 }
 
 impl<'a> EventHandler for Display<'a> {
@@ -62,6 +66,7 @@ impl<'a> Display<'a> {
         ttf: &'a sdl2::ttf::Sdl2TtfContext,
         scale: u8,
         debug: bool,
+        ui_state: Rc<RefCell<UIState>>,
     ) -> Result<Self, String> {
         let w = constants::DISPLAY_WIDTH;
         let h = constants::DISPLAY_HEIGHT;
@@ -75,7 +80,7 @@ impl<'a> Display<'a> {
             .map_err(|e| format!("{}: Failed to create UI manager: {}", "ERR".red(), e))?;
 
         // Debug UI.
-        let debug_widgets = DebugUI::new(&mut ui);
+        let debug_ui = DebugUI::new(&mut ui, Rc::clone(&ui_state));
 
         // FPS counter.
         let fps = Rc::new(RefCell::new(Label::new(
@@ -92,10 +97,11 @@ impl<'a> Display<'a> {
         let mut display = Display {
             canvas,
             ui,
-            debug_widgets,
+            debug_ui,
             debug,
             fps,
             last_ly: 255,
+            ui_state,
         };
 
         display.canvas.update_window_constraints(debug);
@@ -126,7 +132,7 @@ impl<'a> Display<'a> {
         m_cycles: u32,
         halted: bool,
     ) {
-        self.debug_widgets
+        self.debug_ui
             .machine_state_update(pc, reg, mem, run_instr, opcode, t_cycles, m_cycles, halted);
     }
 
@@ -135,7 +141,7 @@ impl<'a> Display<'a> {
     /// not only at the end of the frame.
     pub fn set_debug(&mut self, debug: bool) {
         self.debug = debug;
-        self.debug_widgets.set_debug_visibility(debug);
+        self.debug_ui.set_debug_visibility(debug);
 
         // Force the window to respect the new minimum bounds.
         self.canvas.update_window_constraints(debug);
@@ -176,7 +182,7 @@ impl<'a> Display<'a> {
         let (x, y, w, _) = self.canvas.get_lcd_rect();
         let dx = x as f32 + w as f32;
         let dy = y as f32;
-        self.debug_widgets.update_positions(&self.ui, dx, dy);
+        self.debug_ui.update_positions(&self.ui, dx, dy);
 
         // Actual render operation.
         self.ui.render(&mut self.canvas);
