@@ -30,6 +30,7 @@ impl<'a> Canvas<'a> {
         sdl2::hint::set("SDL_RENDER_SCALE_QUALITY", "nearest");
         // Create window.
         let video_subsystem = sdl.video()?;
+        video_subsystem.text_input().start();
         let window = video_subsystem
             .window(title, (width * scale) as u32, (height * scale) as u32)
             .resizable()

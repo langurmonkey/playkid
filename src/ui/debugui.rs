@@ -2,8 +2,8 @@ use crate::instruction::RunInstr;
 use crate::memory::Memory;
 use crate::registers::Registers;
 use crate::ui::{
-    button::Button, label::Label, layout::LayoutGroup, layout::Orientation, uimanager::UIManager,
-    uimanager::UIState, uimanager::Widget,
+    button::Button, label::Label, layout::LayoutGroup, layout::Orientation, textfield::TextField,
+    uimanager::UIManager, uimanager::UIState, uimanager::Widget,
 };
 use sdl2::pixels::Color;
 use std::cell::RefCell;
@@ -328,8 +328,8 @@ impl<'ttf> DebugUI<'ttf> {
         data_table.add(Rc::new(RefCell::new(left_col)) as Rc<RefCell<dyn Widget>>);
         data_table.add(Rc::new(RefCell::new(right_col)) as Rc<RefCell<dyn Widget>>);
 
-        // Test button.
-        let my_button = Rc::new(RefCell::new(Button::new(
+        // Reset button.
+        let reset_button = Rc::new(RefCell::new(Button::new(
             "Reset CPU",
             base_font_size,
             Color::RGB(100, 100, 100), // Normal color
@@ -340,13 +340,17 @@ impl<'ttf> DebugUI<'ttf> {
             },
         )));
 
+        // Text field.
+        let jump_input = Rc::new(RefCell::new(TextField::new(base_font_size)));
+
         // Main assembly
         let mut root = LayoutGroup::new(Orientation::Vertical, 25.0);
         root.add(Rc::clone(&debug_title) as Rc<RefCell<dyn Widget>>);
         root.add(b_row_rc as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(instr_row)) as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(data_table)) as Rc<RefCell<dyn Widget>>);
-        root.add(my_button as Rc<RefCell<dyn Widget>>);
+        root.add(reset_button as Rc<RefCell<dyn Widget>>);
+        root.add(jump_input as Rc<RefCell<dyn Widget>>);
 
         let root_rc = Rc::new(RefCell::new(root));
         ui.add_widget(Rc::clone(&root_rc));

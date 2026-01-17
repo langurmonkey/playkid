@@ -143,11 +143,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             self.handle_events();
 
             // Check UI state.
-            if self.ui_state.borrow().reset_requested {
-                self.reset();
-                // Reset the flag so we don't reset forever!
-                self.ui_state.borrow_mut().reset_requested = false;
-            }
+            self.handle_ui_commands();
 
             // Execute cycles for one full frame.
             if self.debug.debugging() {
@@ -348,6 +344,24 @@ impl<'a, 'b> Machine<'a, 'b> {
             (interrupt_m_cycles * 4, interrupt_m_cycles, true)
         } else {
             (t_cycles, m_cycles, true)
+        }
+    }
+
+    /// Checks for commands sent from the UI widgets.
+    pub fn handle_ui_commands(&mut self) {
+        // Reset.
+        let reset_needed = {
+            let mut state = self.ui_state.borrow_mut();
+            if state.reset_requested {
+                state.reset_requested = false;
+                true
+            } else {
+                false
+            }
+        };
+
+        if reset_needed {
+            self.reset();
         }
     }
 

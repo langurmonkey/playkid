@@ -55,17 +55,17 @@ impl<'ttf> LayoutGroup<'ttf> {
         for widget_rc in &self.widgets {
             let mut w = widget_rc.borrow_mut();
 
-            // 1. RECURSION: Tell child to layout its own internal children first
+            // RECURSION: Tell child to layout its own internal children first.
             w.layout(ui, curr_x, curr_y);
 
-            // 2. SIZE: Update size based on text/font before we calculate the next gap
+            // SIZE: Update size based on text/font before we calculate the next gap.
             let font = ui.font(w.get_font_size());
             w.update_size(&font);
 
-            // 3. POSITION: Apply the current coordinates to the widget
+            // POSITION: Apply the current coordinates to the widget.
             w.set_pos(curr_x, curr_y);
 
-            // 4. OFFSET: Advance the cursor for the next widget in the group
+            // OFFSET: Advance the cursor for the next widget in the group.
             let (w_sz, h_sz) = w.get_size();
             match self.orientation {
                 Orientation::Horizontal => {
