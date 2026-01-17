@@ -275,7 +275,7 @@ impl<'ttf> DebugUI<'ttf> {
         &mut self,
         pc: u16,
         reg: &Registers,
-        _mem: &Memory,
+        mem: &Memory,
         run_instr: &RunInstr,
         opcode: u8,
         t_cycles: u32,
@@ -296,6 +296,7 @@ impl<'ttf> DebugUI<'ttf> {
             self.status.borrow_mut().set_color(GREEN);
         }
 
+        // Connect T- and M-cycles.
         self.t_cycles
             .borrow_mut()
             .set_text(&format!("{}", t_cycles));
@@ -303,6 +304,7 @@ impl<'ttf> DebugUI<'ttf> {
             .borrow_mut()
             .set_text(&format!("{}", m_cycles));
 
+        // Connect registers.
         self.af
             .borrow_mut()
             .set_text(&format!("AF: {:02X} {:02X}", reg.a, reg.f));
@@ -316,6 +318,7 @@ impl<'ttf> DebugUI<'ttf> {
             .borrow_mut()
             .set_text(&format!("HL: {:02X} {:02X}", reg.h, reg.l));
 
+        // Connect flags.
         let z = if reg.f & 0x80 != 0 { "Z" } else { "_" };
         let n = if reg.f & 0x40 != 0 { "N" } else { "_" };
         let h = if reg.f & 0x20 != 0 { "H" } else { "_" };
@@ -324,10 +327,50 @@ impl<'ttf> DebugUI<'ttf> {
             .borrow_mut()
             .set_text(&format!("{} {} {} {}", z, n, h, c));
 
+        // Connect SP.
         self.sp.borrow_mut().set_text(&format!("0x{:04x}", reg.sp));
+        // Connect Opcode.
         self.opcode
             .borrow_mut()
             .set_text(&format!("0x{:02x}", opcode));
+
+        // Connect LCDC.
+        self.lcdc
+            .borrow_mut()
+            .set_text(&format!("{:#04x}", mem.ppu.lcdc));
+
+        // Connect STAT.
+        self.stat
+            .borrow_mut()
+            .set_text(&format!("{:#04x}", mem.ppu.stat));
+
+        // Connect LYC.
+        self.lyc
+            .borrow_mut()
+            .set_text(&format!("{:#04x}", mem.ppu.lyc));
+
+        // Connect LY.
+        self.ly
+            .borrow_mut()
+            .set_text(&format!("{:#04x}", mem.ppu.ly));
+
+        // Connect LX.
+        self.lx
+            .borrow_mut()
+            .set_text(&format!("{:#04x}", mem.ppu.lx));
+
+        // Connect joypad.
+        self.joypad.borrow_mut().set_text(&format!(
+            "{} {} {} {} {} {} {} {}",
+            if mem.joypad.up { "↑" } else { "_" },
+            if mem.joypad.down { "↓" } else { "_" },
+            if mem.joypad.left { "←" } else { "_" },
+            if mem.joypad.right { "→" } else { "_" },
+            if mem.joypad.a { "A" } else { "_" },
+            if mem.joypad.b { "B" } else { "_" },
+            if mem.joypad.start { "S" } else { "_" },
+            if mem.joypad.select { "s" } else { "_" }
+        ));
     }
 
     pub fn update_positions(&mut self, ui: &UIManager, dx: f32, dy: f32) {
