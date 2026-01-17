@@ -25,7 +25,7 @@ pub struct TextField {
 
 impl Widget for TextField {
     /// Renders the text field to the canvas.
-    fn render(&self, canvas: &mut Canvas, font: &Arc<Font>) {
+    fn render(&self, canvas: &mut Canvas, ui: &UIManager) {
         if !self.visible {
             return;
         }
@@ -38,7 +38,9 @@ impl Widget for TextField {
         false
     }
 
-    fn visible(&mut self, visible: bool) {
+    fn set_color(&mut self, color: sdl2::pixels::Color) {}
+
+    fn set_visible(&mut self, visible: bool) {
         self.visible = visible;
     }
 

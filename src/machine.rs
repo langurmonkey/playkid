@@ -155,6 +155,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                     &run_instr,
                     opcode,
                     self.t_cycles,
+                    self.m_cycles,
                     self.halted,
                 );
             } else {

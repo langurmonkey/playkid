@@ -5,7 +5,6 @@ use crate::ui::uimanager::Widget;
 use sdl2::ttf::Font;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
 
 pub enum Orientation {
     Horizontal,
@@ -87,13 +86,16 @@ impl<'ttf> LayoutGroup<'ttf> {
 }
 
 impl<'ttf> Widget for LayoutGroup<'ttf> {
-    fn render(&self, canvas: &mut Canvas, font: &Arc<Font>) {
+    fn render(&self, canvas: &mut Canvas, ui: &UIManager) {
         if !self.visible {
             return;
         }
-        // The UIManager will call render on all widgets in its flat list anyway,
-        // so we don't need to trigger children's render here unless you
-        // stop adding children to the UIManager's main list.
+        for widget_rc in &self.widgets {
+            let w = widget_rc.borrow();
+            if w.is_visible() {
+                w.render(canvas, ui);
+            }
+        }
     }
 
     fn update_size(&mut self, font: &Font) {
@@ -113,19 +115,30 @@ impl<'ttf> Widget for LayoutGroup<'ttf> {
     fn get_pos(&self) -> (f32, f32) {
         (self.x, self.y)
     }
+    fn set_color(&mut self, color: sdl2::pixels::Color) {}
     fn is_visible(&self) -> bool {
         self.visible
     }
-    fn visible(&mut self, v: bool) {
+    fn set_visible(&mut self, v: bool) {
         self.visible = v;
+        for widget_rc in &self.widgets {
+            widget_rc.borrow_mut().set_visible(v);
+        }
     }
     fn get_font_size(&self) -> usize {
         10
     }
-    fn handle_event(&mut self, _e: &sdl2::event::Event) -> bool {
-        false
+    fn handle_event(&mut self, event: &sdl2::event::Event) -> bool {
+        if !self.visible {
+            return false;
+        }
+        let mut consumed = false;
+        for widget_rc in &self.widgets {
+            consumed = consumed || widget_rc.borrow_mut().handle_event(event);
+        }
+        consumed
     }
     fn layout(&mut self, ui: &UIManager, start_x: f32, start_y: f32) {
-        self.layout(ui, start_x, start_y); // Call the struct's layout method
+        self.layout(ui, start_x, start_y);
     }
 }

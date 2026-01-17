@@ -20,10 +20,6 @@ pub struct UIManager<'ttf> {
 impl<'ttf> UIManager<'ttf> {
     pub fn new(ttf: &'ttf sdl2::ttf::Sdl2TtfContext) -> Result<Self, String> {
         let mut fonts = HashMap::new();
-        // Pre-load 10pt font..
-        let default_font = ttf.load_font("assets/fnt/PixelatedElegance.ttf", 10)?;
-        fonts.insert(10, Arc::new(default_font));
-
         Ok(UIManager {
             widgets: vec![],
             ttf,
@@ -31,8 +27,11 @@ impl<'ttf> UIManager<'ttf> {
         })
     }
 
-    pub fn add_widget<W: Widget + 'ttf>(&mut self, widget: Rc<RefCell<W>>) {
-        self.widgets.push(widget as Rc<RefCell<dyn Widget + 'ttf>>);
+    pub fn add_widget<'a, W>(&mut self, widget: W)
+    where
+        W: IntoWidgetPtr<'ttf>,
+    {
+        self.widgets.push(widget.into_widget_ptr());
     }
 
     pub fn render(&self, canvas: &mut Canvas) {
@@ -42,8 +41,7 @@ impl<'ttf> UIManager<'ttf> {
         for widget in &self.widgets {
             let w = widget.borrow();
             if w.is_visible() {
-                let font = self.font(w.get_font_size());
-                w.render(canvas, &font);
+                w.render(canvas, &self);
             }
         }
     }
@@ -64,10 +62,11 @@ impl<'ttf> UIManager<'ttf> {
             "LD".magenta(),
             size
         );
-        let new_font = self
+        let mut new_font = self
             .ttf
-            .load_font("assets/fnt/PixelatedElegance.ttf", size as u16)
+            .load_font("assets/fnt/PressStart2P.ttf", size as u16)
             .expect("Failed to load font size at runtime");
+        new_font.set_hinting(sdl2::ttf::Hinting::None);
 
         let shared_font = Arc::new(new_font);
 
@@ -88,11 +87,13 @@ impl<'ttf> UIManager<'ttf> {
     }
 }
 
+/// Widget trait.
 pub trait Widget {
     fn handle_event(&mut self, event: &sdl2::event::Event) -> bool;
-    fn render(&self, canvas: &mut Canvas, font: &Arc<Font>);
+    fn render(&self, canvas: &mut Canvas, ui: &UIManager);
     fn is_visible(&self) -> bool;
-    fn visible(&mut self, visible: bool);
+    fn set_visible(&mut self, visible: bool);
+    fn set_color(&mut self, color: sdl2::pixels::Color);
     fn set_pos(&mut self, x: f32, y: f32);
     fn get_pos(&self) -> (f32, f32);
     fn get_font_size(&self) -> usize;
@@ -100,4 +101,14 @@ pub trait Widget {
     fn has_size(&self) -> bool;
     fn update_size(&mut self, font: &Font);
     fn layout(&mut self, ui: &UIManager, start_x: f32, start_y: f32);
+}
+
+// Helper trait for easy coercion.
+pub trait IntoWidgetPtr<'ttf> {
+    fn into_widget_ptr(self) -> Rc<RefCell<dyn Widget + 'ttf>>;
+}
+impl<'ttf, T: Widget + 'ttf> IntoWidgetPtr<'ttf> for Rc<RefCell<T>> {
+    fn into_widget_ptr(self) -> Rc<RefCell<dyn Widget + 'ttf>> {
+        self as Rc<RefCell<dyn Widget + 'ttf>>
+    }
 }

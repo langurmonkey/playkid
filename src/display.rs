@@ -111,7 +111,7 @@ impl<'a> Display<'a> {
 
     /// Special method to set FPS visibility.
     pub fn visible_fps(&mut self, visible: bool) {
-        self.fps.borrow_mut().visible(visible);
+        self.fps.borrow_mut().set_visible(visible);
     }
 
     /// Update the debug UI.
@@ -122,11 +122,12 @@ impl<'a> Display<'a> {
         mem: &Memory,
         run_instr: &RunInstr,
         opcode: u8,
-        cycles: u32,
+        t_cycles: u32,
+        m_cycles: u32,
         halted: bool,
     ) {
         self.debug_widgets
-            .machine_state_update(pc, reg, mem, run_instr, opcode, cycles, halted);
+            .machine_state_update(pc, reg, mem, run_instr, opcode, t_cycles, m_cycles, halted);
     }
 
     /// Set the debug flag of this display.

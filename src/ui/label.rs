@@ -4,7 +4,6 @@ use crate::ui;
 use canvas::Canvas;
 use sdl2::rect::Rect;
 use sdl2::ttf::Font;
-use std::sync::Arc;
 use ui::uimanager::UIManager;
 use ui::uimanager::Widget;
 
@@ -35,7 +34,8 @@ pub struct Label {
 }
 
 impl Widget for Label {
-    fn render(&self, canvas: &mut Canvas, font: &Arc<Font>) {
+    fn render(&self, canvas: &mut Canvas, ui: &UIManager) {
+        let font = ui.font(self.get_font_size());
         if !self.visible {
             return;
         }
@@ -112,7 +112,11 @@ impl Widget for Label {
         false
     }
 
-    fn visible(&mut self, visible: bool) {
+    fn set_color(&mut self, color: sdl2::pixels::Color) {
+        self.color = color;
+    }
+
+    fn set_visible(&mut self, visible: bool) {
         self.visible = visible;
     }
 
