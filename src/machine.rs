@@ -107,6 +107,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.ei = 0;
         self.di = 0;
         self.running = true;
+        self.halted = false;
         self.t_cycles = 324;
         self.m_cycles = 0;
 
