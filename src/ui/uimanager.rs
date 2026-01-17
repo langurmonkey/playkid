@@ -1,6 +1,4 @@
-use crate::canvas;
-
-use canvas::Canvas;
+use crate::canvas::Canvas;
 use colored::Colorize;
 use sdl2::event::Event;
 use sdl2::ttf::Font;
@@ -101,4 +99,5 @@ pub trait Widget {
     fn get_size(&self) -> (u32, u32);
     fn has_size(&self) -> bool;
     fn update_size(&mut self, font: &Font);
+    fn layout(&mut self, ui: &UIManager, start_x: f32, start_y: f32);
 }

@@ -1,3 +1,4 @@
+use crate::constants;
 use sdl2::rect::Rect;
 use sdl2::{pixels::PixelFormatEnum, render::Texture, render::TextureCreator, Sdl};
 use std::cell::RefCell;
@@ -84,6 +85,7 @@ impl<'a> Canvas<'a> {
         // Get current window size.
         let (w, h) = self.sdl_canvas.output_size().unwrap();
 
+        // In debug mode, we have a 2:1 ratio for the debug UI.
         let render_width = self.width * if debug { 2 } else { 1 };
 
         // Aspect ratio scale.
@@ -93,12 +95,25 @@ impl<'a> Canvas<'a> {
         );
 
         // New width and height.
-        let nw = (self.width as f32 * scale) as u32;
-        let nh = (self.height as f32 * scale) as u32;
+        // In debug mode, LCD size is fixed.
+        let (nw, nh) = if debug {
+            // Fixed.
+            (
+                (constants::DISPLAY_WIDTH as f32 * 1.5) as u32,
+                (constants::DISPLAY_HEIGHT as f32 * 1.5) as u32,
+            )
+        } else {
+            // Compute from scale.
+            (
+                (self.width as f32 * scale) as u32,
+                (self.height as f32 * scale) as u32,
+            )
+        };
 
         // Center the rectangle.
-        let x = if debug { 0 } else { 1 } * (w - nw) / 2;
-        let y = (h - nh) / 2;
+        // In debug mode, fixed position at [10,10].
+        let x = if debug { 10 } else { (w - nw) / 2 };
+        let y = if debug { 10 } else { (h - nh) / 2 };
         self.lcd_rect.set_x(x as i32);
         self.lcd_rect.set_y(y as i32);
         self.lcd_rect.set_width(nw);

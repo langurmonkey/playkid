@@ -1,7 +1,9 @@
 use crate::instruction::RunInstr;
 use crate::memory::Memory;
 use crate::registers::Registers;
-use crate::ui::{label::Label, uimanager::UIManager, uimanager::Widget};
+use crate::ui::{
+    label::Label, layout::LayoutGroup, layout::Orientation, uimanager::UIManager, uimanager::Widget,
+};
 use sdl2::pixels::Color;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -9,7 +11,9 @@ use std::rc::Rc;
 const DARKGRAY: Color = Color::RGB(30, 30, 30);
 const LIGHTBLUE: Color = Color::RGB(130, 130, 255);
 
-pub struct DebugUI {
+pub struct DebugUI<'ttf> {
+    /// Main layout group.
+    pub main_layout: LayoutGroup<'ttf>,
     pub debug_title: Rc<RefCell<Label>>,
     pub bindings: Rc<RefCell<Label>>,
     pub pc: Rc<RefCell<Label>>,
@@ -18,7 +22,7 @@ pub struct DebugUI {
     pub regs: Rc<RefCell<Label>>,
 }
 
-impl DebugUI {
+impl<'ttf> DebugUI<'ttf> {
     pub fn new(ui: &mut UIManager) -> Self {
         // Debug title.
         let debug_title = Rc::new(RefCell::new(Label::new(
@@ -32,7 +36,7 @@ impl DebugUI {
         )));
 
         // Bindings.
-        let step_i = Rc::new(RefCell::new(Label::new(
+        let bindings = Rc::new(RefCell::new(Label::new(
             "Step insr [F6]   Step scanline [F8]   Exit debug [D]   FPS [F]   Quit [ESC]",
             14,
             0.0,
@@ -85,17 +89,38 @@ impl DebugUI {
             false,
         )));
 
-        // Register widgets with UI manager.
+        // Layout.
+        let mut root = LayoutGroup::new(Orientation::Vertical, 30.0);
+
+        // PC, Instruction, CPU status.
+        let mut pc_row = LayoutGroup::new(Orientation::Horizontal, 50.0);
+        pc_row.add(Rc::clone(&pc) as Rc<RefCell<dyn Widget>>);
+        pc_row.add(Rc::clone(&instr) as Rc<RefCell<dyn Widget>>);
+        pc_row.add(Rc::clone(&halt) as Rc<RefCell<dyn Widget>>);
+        let pc_row_rc = Rc::new(RefCell::new(pc_row));
+
+        // Registers.
+        let mut reg_row = LayoutGroup::new(Orientation::Horizontal, 45.0);
+        reg_row.add(Rc::clone(&regs) as Rc<RefCell<dyn Widget>>);
+        let reg_row_rc = Rc::new(RefCell::new(reg_row));
+
+        root.add(Rc::clone(&debug_title) as Rc<RefCell<dyn Widget>>);
+        root.add(Rc::clone(&bindings) as Rc<RefCell<dyn Widget>>);
+        root.add(pc_row_rc);
+        root.add(reg_row_rc);
+
+        // Add all to UI manager.
         ui.add_widget(Rc::clone(&debug_title));
-        ui.add_widget(Rc::clone(&step_i));
+        ui.add_widget(Rc::clone(&bindings));
         ui.add_widget(Rc::clone(&pc));
         ui.add_widget(Rc::clone(&instr));
         ui.add_widget(Rc::clone(&halt));
         ui.add_widget(Rc::clone(&regs));
 
         Self {
+            main_layout: root,
             debug_title,
-            bindings: step_i,
+            bindings,
             pc,
             instr,
             halt,
@@ -141,38 +166,7 @@ impl DebugUI {
     /// The debug widgets float beside the LCD
     /// screen, so we need to update their positions.
     pub fn update_positions(&mut self, ui: &UIManager, dx: f32, dy: f32) {
-        // Update sizes.
-        self.check_sizes(ui);
-
-        // Title.
-        let mut t = self.debug_title.borrow_mut();
-        t.set_pos(dx + 10.0, dy + 10.0);
-
-        // Bindings.
-        let mut bindings = self.bindings.borrow_mut();
-        bindings.set_pos(dx + 10.0, dy + 40.0);
-
-        // PC, instr.
-        self.pc.borrow_mut().set_pos(dx + 10.0, dy + 80.0);
-        self.instr.borrow_mut().set_pos(dx + 120.0, dy + 80.0);
-
-        // HALT.
-        self.halt.borrow_mut().set_pos(dx + 340.0, dy + 75.0);
-
-        // Regs.
-        self.regs.borrow_mut().set_pos(dx + 10.0, dy + 120.0);
-    }
-
-    fn check_sizes(&mut self, ui: &UIManager) {
-        let mut title = self.debug_title.borrow_mut();
-        if !title.has_size() {
-            let font = ui.font(title.get_font_size());
-            title.update_size(&font);
-        }
-        let mut bindings = self.bindings.borrow_mut();
-        if !bindings.has_size() {
-            let font = ui.font(bindings.get_font_size());
-            bindings.update_size(&font);
-        }
+        // This one call handles every nested child and row!
+        self.main_layout.layout(ui, dx + 10.0, dy + 10.0);
     }
 }

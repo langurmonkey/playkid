@@ -16,6 +16,7 @@ mod ui {
     pub mod button;
     pub mod debugui;
     pub mod label;
+    pub mod layout;
     pub mod textfield;
     pub mod uimanager;
 }

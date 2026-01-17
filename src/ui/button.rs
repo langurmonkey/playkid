@@ -7,6 +7,7 @@ use sdl2::event::Event;
 use sdl2::rect::Rect;
 use sdl2::ttf::Font;
 use std::sync::Arc;
+use ui::uimanager::UIManager;
 use ui::uimanager::Widget;
 
 /// Button widget.
@@ -69,6 +70,7 @@ impl Widget for Button {
         self.width = w;
         self.height = h;
     }
+    fn layout(&mut self, ui: &UIManager, start_x: f32, start_y: f32) {}
 }
 
 impl Button {

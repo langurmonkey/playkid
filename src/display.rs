@@ -31,7 +31,7 @@ pub struct Display<'a> {
     /// User interface manager.
     pub ui: UIManager<'a>,
     /// Debug UI.
-    pub debug_widgets: DebugUI,
+    pub debug_widgets: DebugUI<'a>,
     /// FPS counter.
     pub fps: Rc<RefCell<Label>>,
 }

@@ -5,6 +5,7 @@ use canvas::Canvas;
 use sdl2::rect::Rect;
 use sdl2::ttf::Font;
 use std::sync::Arc;
+use ui::uimanager::UIManager;
 use ui::uimanager::Widget;
 
 /// A label widget.
@@ -145,6 +146,8 @@ impl Widget for Label {
         self.width = w;
         self.height = h;
     }
+
+    fn layout(&mut self, ui: &UIManager, start_x: f32, start_y: f32) {}
 }
 
 impl Label {
