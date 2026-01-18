@@ -1,5 +1,6 @@
 use crate::canvas::Canvas;
 use crate::constants;
+use crate::debugmanager::DebugManager;
 use crate::eventhandler::EventHandler;
 use crate::instruction::RunInstr;
 use crate::memory::Memory;
@@ -124,13 +125,15 @@ impl<'a> Display<'a> {
         reg: &Registers,
         mem: &Memory,
         run_instr: &RunInstr,
+        debug: &DebugManager,
         opcode: u8,
         t_cycles: u32,
         m_cycles: u32,
         halted: bool,
     ) {
-        self.debug_ui
-            .machine_state_update(pc, reg, mem, run_instr, opcode, t_cycles, m_cycles, halted);
+        self.debug_ui.machine_state_update(
+            pc, reg, mem, run_instr, debug, opcode, t_cycles, m_cycles, halted,
+        );
     }
 
     /// Set the debug flag of this display.

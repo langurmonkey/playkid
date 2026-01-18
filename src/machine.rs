@@ -146,8 +146,10 @@ impl<'a, 'b> Machine<'a, 'b> {
             self.handle_ui_commands();
 
             // Stop at breakpoint?
-            if self.debug.has_breakpoint(self.registers.pc) {
+            if self.debug.has_breakpoint(self.registers.pc) && !self.debug.debugging() {
+                // If hit, enable debugging.
                 self.debug.set_debugging(true);
+                self.display.set_debug(self.debug.debugging());
             }
 
             // Execute cycles for one full frame.
@@ -178,6 +180,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                     &self.registers,
                     &self.memory,
                     &run_instr,
+                    &self.debug,
                     opcode,
                     self.t_cycles,
                     self.m_cycles,
@@ -380,6 +383,20 @@ impl<'a, 'b> Machine<'a, 'b> {
         if line_needed {
             self.debug.request_step_scanline();
         }
+        // Continue.
+        let continue_needed = {
+            let mut state = self.ui_state.borrow_mut();
+            if state.continue_requested {
+                state.continue_requested = false;
+                true
+            } else {
+                false
+            }
+        };
+        if continue_needed {
+            self.debug.toggle_debugging();
+            self.display.set_debug(self.debug.debugging());
+        }
         // Add breakpoint.
         let (br_add_needed, br_addr) = {
             let mut state = self.ui_state.borrow_mut();
@@ -395,19 +412,6 @@ impl<'a, 'b> Machine<'a, 'b> {
         };
         if br_add_needed {
             self.debug.add_breakpoint(br_addr);
-        }
-        // FPS.
-        let fps_needed = {
-            let mut state = self.ui_state.borrow_mut();
-            if state.fps_requested {
-                state.fps_requested = false;
-                true
-            } else {
-                false
-            }
-        };
-        if fps_needed {
-            self.fps = !self.fps;
         }
         // Reset CPU.
         let reset_needed = {

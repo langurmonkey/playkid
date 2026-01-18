@@ -17,14 +17,6 @@ impl eventhandler::EventHandler for DebugManager {
     /// Returns true if the event was handled.
     fn handle_event(&mut self, event: &Event) -> bool {
         match event {
-            // Enable/disable debugging.
-            Event::KeyDown {
-                keycode: Some(Keycode::D),
-                ..
-            } => {
-                self.debugging = !self.debugging;
-                true
-            }
             // Step single instruction.
             Event::KeyDown {
                 keycode: Some(Keycode::F6),
@@ -35,10 +27,18 @@ impl eventhandler::EventHandler for DebugManager {
             }
             // Step a scan line.
             Event::KeyDown {
-                keycode: Some(Keycode::F8),
+                keycode: Some(Keycode::F7),
                 ..
             } => {
                 self.request_step_scanline();
+                true
+            }
+            // Enable/disable debugging.
+            Event::KeyDown {
+                keycode: Some(Keycode::F9),
+                ..
+            } => {
+                self.debugging = !self.debugging;
                 true
             }
             _ => false,
@@ -60,12 +60,26 @@ impl DebugManager {
         self.debugging = d;
     }
 
+    pub fn toggle_debugging(&mut self) {
+        self.debugging = !self.debugging;
+    }
+
     pub fn debugging(&self) -> bool {
         self.debugging
     }
 
-    pub fn get_breakpoints(&self) -> Vec<u16> {
-        self.breakpoints.clone()
+    pub fn get_breakpoints_str(&self) -> String {
+        if self.breakpoints.is_empty() {
+            return "[None]".to_string();
+        }
+
+        let formatted_breakpoints: Vec<String> = self
+            .breakpoints
+            .iter()
+            .map(|&addr| format!("${:04x}", addr))
+            .collect();
+
+        format!("[{}]", formatted_breakpoints.join(","))
     }
 
     pub fn has_breakpoint(&self, addr: u16) -> bool {
@@ -73,13 +87,17 @@ impl DebugManager {
     }
 
     pub fn add_breakpoint(&mut self, addr: u16) {
-        println!("{}: Add breakpoint: {:#04x}", "OK".green(), addr);
-        self.breakpoints.push(addr);
+        if !self.has_breakpoint(addr) {
+            println!("{}: Add breakpoint: {:#04x}", "OK".green(), addr);
+            self.breakpoints.push(addr);
+        }
     }
 
     pub fn delete_breakpoint(&mut self, addr: u16) {
-        println!("{}: Add removed: {:#04x}", "OK".green(), addr);
-        self.breakpoints.retain(|&x| x != addr);
+        if self.has_breakpoint(addr) {
+            println!("{}: Remove breakpoint: {:#04x}", "OK".green(), addr);
+            self.breakpoints.retain(|&x| x != addr);
+        }
     }
 
     pub fn clear_breakpoints(&mut self) {

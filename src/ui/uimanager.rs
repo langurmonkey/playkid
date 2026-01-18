@@ -57,11 +57,7 @@ impl<'ttf> UIManager<'ttf> {
         }
 
         // If not found, load it.
-        println!(
-            "{}: Loading font size {} on the fly...",
-            "LD".magenta(),
-            size
-        );
+        println!("{}: Loading font size {}", "LD".magenta(), size);
         let mut new_font = self
             .ttf
             .load_font("assets/fnt/PressStart2P.ttf", size as u16)
@@ -92,7 +88,7 @@ pub struct UIState {
     pub reset_requested: bool,
     pub step_requested: bool,
     pub scanline_requested: bool,
-    pub fps_requested: bool,
+    pub continue_requested: bool,
     pub br_add_requested: bool,
     pub br_addr: u16,
     pub exit_requested: bool,
@@ -104,7 +100,7 @@ impl UIState {
             reset_requested: false,
             step_requested: false,
             scanline_requested: false,
-            fps_requested: false,
+            continue_requested: false,
             br_add_requested: false,
             br_addr: 0x00,
             exit_requested: false,

@@ -1,3 +1,4 @@
+use crate::debugmanager::DebugManager;
 use crate::instruction::RunInstr;
 use crate::memory::Memory;
 use crate::registers::Registers;
@@ -28,13 +29,13 @@ pub struct DebugUI<'ttf> {
     /// Main layout.
     pub main_layout: Rc<RefCell<LayoutGroup<'ttf>>>,
 
-    /// Status and Instructions
+    /// Status and Instructions.
     pub pc_addr: Rc<RefCell<Label>>,
     pub instr_text: Rc<RefCell<Label>>,
     pub instr_operand: Rc<RefCell<Label>>,
     pub status: Rc<RefCell<Label>>,
 
-    /// Values (Right Column)
+    /// Values (Right Column).
     pub t_cycles: Rc<RefCell<Label>>,
     pub m_cycles: Rc<RefCell<Label>>,
     pub af: Rc<RefCell<Label>>,
@@ -52,6 +53,8 @@ pub struct DebugUI<'ttf> {
     pub lx: Rc<RefCell<Label>>,
     pub opcode: Rc<RefCell<Label>>,
     pub joypad: Rc<RefCell<Label>>,
+    /// Breakpoints.
+    pub br: Rc<RefCell<Label>>,
 }
 
 impl<'ttf> DebugUI<'ttf> {
@@ -70,37 +73,34 @@ impl<'ttf> DebugUI<'ttf> {
             false,
         )));
 
-        // Bindings.
-        let mut b_row = LayoutGroup::new(Orientation::Horizontal, 25.0);
+        // Operations (step, scanline, continue).
+        let mut operations_row = LayoutGroup::new(Orientation::Horizontal, 25.0);
         let bindings = [
-            ("Step [F6]", YELLOW),
-            ("Scanline [F8]", YELLOW),
-            ("FPS [F]", YELLOW),
-            ("Quit [Esc]", YELLOW),
+            ("Step [F6]", GREEN),
+            ("Scanline [F7]", GREEN),
+            ("Continue [F9]", BLUE),
         ];
         for (txt, clr) in bindings {
             let label = txt.to_string();
             let ui_state_b = Rc::clone(&ui_state);
-            b_row.add(Rc::new(RefCell::new(Button::new(
+            operations_row.add(Rc::new(RefCell::new(Button::new(
                 txt,
                 base_font_size,
                 clr,
                 DARKGRAY, // Normal color.
-                RED,      // Pressed color.
+                GRAY,     // Pressed color.
                 move || {
                     let mut state = ui_state_b.borrow_mut();
-                    // Match against the label to decide what to do
+                    // Match against the label to decide what to do.
                     match label.as_str() {
                         "Step [F6]" => state.step_requested = true,
-                        "Scanline [F8]" => state.scanline_requested = true,
-                        "FPS [F]" => state.fps_requested = true,
-                        "Quit [Esc]" => state.exit_requested = true,
+                        "Scanline [F7]" => state.scanline_requested = true,
+                        "Continue [F9]" => state.continue_requested = true,
                         _ => println!("{}: Unknown button: {}", "ERR".red(), label),
                     }
                 },
             ))));
         }
-        let b_row_rc = Rc::new(RefCell::new(b_row));
 
         // Instruction row.
         let pc_addr = Rc::new(RefCell::new(Label::new(
@@ -346,27 +346,25 @@ impl<'ttf> DebugUI<'ttf> {
         data_table.add(Rc::new(RefCell::new(left_col)) as Rc<RefCell<dyn Widget>>);
         data_table.add(Rc::new(RefCell::new(right_col)) as Rc<RefCell<dyn Widget>>);
 
-        // Reset button.
-        let ui_state_reset = Rc::clone(&ui_state);
-        let reset_button = Rc::new(RefCell::new(Button::new(
-            "Reset CPU",
-            base_font_size,
-            WHITE,
-            DARKGRAY,
-            BLUE,
-            move || {
-                ui_state_reset.borrow_mut().reset_requested = true;
-            },
-        )));
-
         // Breakpoints line.
-        let mut br_row = LayoutGroup::new(Orientation::Horizontal, 20.0);
+        let mut br_row1 = LayoutGroup::new(Orientation::Horizontal, 0.0);
+        let mut br_row2 = LayoutGroup::new(Orientation::Horizontal, 20.0);
+        let mut br_col = LayoutGroup::new(Orientation::Vertical, 10.0);
         let br_label = Rc::new(RefCell::new(Label::new(
-            "Breakpoint: ",
+            "Breakpoints: ",
             base_font_size,
             0.0,
             0.0,
             WHITE,
+            None,
+            false,
+        )));
+        let br = Rc::new(RefCell::new(Label::new(
+            "[None]",
+            base_font_size - 2,
+            0.0,
+            0.0,
+            ORANGE,
             None,
             false,
         )));
@@ -412,18 +410,48 @@ impl<'ttf> DebugUI<'ttf> {
             },
         )));
 
-        br_row.add(br_label as Rc<RefCell<dyn Widget>>);
-        br_row.add(br_input as Rc<RefCell<dyn Widget>>);
-        br_row.add(add_button as Rc<RefCell<dyn Widget>>);
+        br_row1.add(br_label as Rc<RefCell<dyn Widget>>);
+        br_row1.add(Rc::clone(&br) as Rc<RefCell<dyn Widget>>);
+        br_row2.add(br_input as Rc<RefCell<dyn Widget>>);
+        br_row2.add(add_button as Rc<RefCell<dyn Widget>>);
+        br_col.add(Rc::new(RefCell::new(br_row1)) as Rc<RefCell<dyn Widget>>);
+        br_col.add(Rc::new(RefCell::new(br_row2)) as Rc<RefCell<dyn Widget>>);
+
+        // Reset button.
+        let mut buttons_row = LayoutGroup::new(Orientation::Horizontal, 25.0);
+        let ui_state_reset = Rc::clone(&ui_state);
+        let reset_button = Rc::new(RefCell::new(Button::new(
+            "Reset CPU",
+            base_font_size,
+            ORANGE,
+            DARKGRAY,
+            BLUE,
+            move || {
+                ui_state_reset.borrow_mut().reset_requested = true;
+            },
+        )));
+        let ui_state_quit = Rc::clone(&ui_state);
+        let quit_button = Rc::new(RefCell::new(Button::new(
+            "Exit Play Kid [Esc]",
+            base_font_size,
+            RED,
+            DARKGRAY,
+            BLUE,
+            move || {
+                ui_state_quit.borrow_mut().exit_requested = true;
+            },
+        )));
+        buttons_row.add(reset_button as Rc<RefCell<dyn Widget>>);
+        buttons_row.add(quit_button as Rc<RefCell<dyn Widget>>);
 
         // Main assembly
         let mut root = LayoutGroup::new(Orientation::Vertical, 30.0);
         root.add(Rc::clone(&debug_title) as Rc<RefCell<dyn Widget>>);
-        root.add(b_row_rc as Rc<RefCell<dyn Widget>>);
+        root.add(Rc::new(RefCell::new(operations_row)) as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(instr_row)) as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(data_table)) as Rc<RefCell<dyn Widget>>);
-        root.add(Rc::new(RefCell::new(br_row)) as Rc<RefCell<dyn Widget>>);
-        root.add(reset_button as Rc<RefCell<dyn Widget>>);
+        root.add(Rc::new(RefCell::new(br_col)) as Rc<RefCell<dyn Widget>>);
+        root.add(Rc::new(RefCell::new(buttons_row)) as Rc<RefCell<dyn Widget>>);
 
         let root_rc = Rc::new(RefCell::new(root));
         ui.add_widget(Rc::clone(&root_rc));
@@ -451,6 +479,7 @@ impl<'ttf> DebugUI<'ttf> {
             lx,
             opcode,
             joypad,
+            br,
         }
     }
 
@@ -460,6 +489,7 @@ impl<'ttf> DebugUI<'ttf> {
         reg: &Registers,
         mem: &Memory,
         run_instr: &RunInstr,
+        debug: &DebugManager,
         opcode: u8,
         t_cycles: u32,
         m_cycles: u32,
@@ -571,6 +601,9 @@ impl<'ttf> DebugUI<'ttf> {
         self.next_bw
             .borrow_mut()
             .set_text(&format!("{:#04x} / {:#06x}", next_byte, next_word));
+
+        // Connect breakpoints.
+        self.br.borrow_mut().set_text(&debug.get_breakpoints_str());
     }
 
     pub fn update_positions(&mut self, ui: &UIManager, dx: f32, dy: f32) {

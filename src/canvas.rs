@@ -72,6 +72,14 @@ impl<'a> Canvas<'a> {
         self.sdl_canvas.clear();
     }
 
+    fn interpolate(&self, w: f32, min_w: f32) -> f32 {
+        let min_y = 1.5;
+        let max_y = 8.0;
+        let max_w = min_w * 3.0;
+
+        min_y + ((w - min_w) * (max_y - min_y)) / (max_w - min_w)
+    }
+
     /// Flushes the current texture.
     /// If debug is false, the Game Boy display is presented letter-boxed.
     /// If debug is on, the Game Boy display is aligned to the left, and the debug
@@ -87,7 +95,7 @@ impl<'a> Canvas<'a> {
         let (w, h) = self.sdl_canvas.output_size().unwrap();
 
         // In debug mode, we have a 2:1 ratio for the debug UI.
-        let render_width = self.width * if debug { 2 } else { 1 };
+        let render_width = self.width as f32 * if debug { 2.0 } else { 1.0 };
 
         // Aspect ratio scale.
         let scale = f32::min(
@@ -96,13 +104,15 @@ impl<'a> Canvas<'a> {
         );
 
         // New width and height.
-        // In debug mode, LCD size is fixed.
+        // In debug mode, LCD size is small and fixed.
         let (nw, nh) = if debug {
-            // Fixed.
-            (
-                (constants::DISPLAY_WIDTH as f32 * 1.5) as u32,
-                (constants::DISPLAY_HEIGHT as f32 * 1.5) as u32,
-            )
+            // Fixed small size.
+            let base_w = constants::DISPLAY_WIDTH as f32;
+            let base_h = constants::DISPLAY_HEIGHT as f32;
+            let min_scale = 4.0;
+            let min_w = (base_w * min_scale) as f32 * 1.3;
+            let s = self.interpolate(w as f32, min_w);
+            ((base_w * s) as u32, (base_h * s) as u32)
         } else {
             // Compute from scale.
             (
@@ -176,7 +186,11 @@ impl<'a> Canvas<'a> {
         } else {
             base_w * min_scale
         };
-        let min_h = base_h * min_scale;
+        let min_h = if debug {
+            ((base_h * min_scale) as f32 * 1.1) as u32
+        } else {
+            base_h * min_scale
+        };
 
         let (curr_w, curr_h) = self.sdl_canvas.window().size();
 
