@@ -1,14 +1,17 @@
 use crate::eventhandler;
 
+use colored::Colorize;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
-/// Manager for debug input events.
+/// Manage the debug status and debug input events.
 pub struct DebugManager {
     debugging: bool,
     step_instruction: bool,
     step_line: bool,
+    breakpoints: Vec<u16>,
 }
+
 impl eventhandler::EventHandler for DebugManager {
     /// Process keyboard inputs specifically for debugging.
     /// Returns true if the event was handled.
@@ -49,11 +52,39 @@ impl DebugManager {
             debugging: active,
             step_instruction: false,
             step_line: false,
+            breakpoints: Vec::new(),
         }
+    }
+
+    pub fn set_debugging(&mut self, d: bool) {
+        self.debugging = d;
     }
 
     pub fn debugging(&self) -> bool {
         self.debugging
+    }
+
+    pub fn get_breakpoints(&self) -> Vec<u16> {
+        self.breakpoints.clone()
+    }
+
+    pub fn has_breakpoint(&self, addr: u16) -> bool {
+        self.breakpoints.contains(&addr)
+    }
+
+    pub fn add_breakpoint(&mut self, addr: u16) {
+        println!("{}: Add breakpoint: {:#04x}", "OK".green(), addr);
+        self.breakpoints.push(addr);
+    }
+
+    pub fn delete_breakpoint(&mut self, addr: u16) {
+        println!("{}: Add removed: {:#04x}", "OK".green(), addr);
+        self.breakpoints.retain(|&x| x != addr);
+    }
+
+    pub fn clear_breakpoints(&mut self) {
+        println!("{}: Breakpoints cleared", "OK".green());
+        self.breakpoints.clear();
     }
 
     pub fn request_step_instruction(&mut self) {

@@ -18,6 +18,7 @@ pub struct TextField {
     width: u32,
     height: u32,
     focused: bool,
+    color: Color,
     bg_color: Color,
     border_color: Color,
     cursor_timer: u32,
@@ -45,17 +46,17 @@ impl Widget for TextField {
         canvas.sdl_canvas.fill_rect(rect).unwrap();
 
         // Draw Border (Highlight if focused).
-        let color = if self.focused {
+        let border_color = if self.focused {
             Color::RGB(66, 133, 244)
         } else {
             self.border_color
         };
-        canvas.sdl_canvas.set_draw_color(color);
+        canvas.sdl_canvas.set_draw_color(border_color);
         canvas.sdl_canvas.draw_rect(rect).unwrap();
 
         // Render Text.
         if !self.text.is_empty() {
-            let text_surface = font.render(&self.text).blended(Color::WHITE).unwrap();
+            let text_surface = font.render(&self.text).blended(self.color).unwrap();
             let texture = canvas
                 .creator
                 .create_texture_from_surface(&text_surface)
@@ -129,7 +130,9 @@ impl Widget for TextField {
         }
     }
 
-    fn set_color(&mut self, _: sdl2::pixels::Color) {}
+    fn set_color(&mut self, color: Color) {
+        self.color = color;
+    }
 
     fn update_size(&mut self, font: &Font) {
         let (_, h) = font.size_of("A").unwrap_or((0, 20)); // Base height on a char
@@ -160,7 +163,7 @@ impl Widget for TextField {
 }
 
 impl TextField {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: usize, color: Color) -> Self {
         TextField {
             visible: true,
             text: String::new(),
@@ -170,6 +173,23 @@ impl TextField {
             width: 0,
             height: 0,
             focused: false,
+            color,
+            bg_color: Color::RGB(30, 30, 30),
+            border_color: Color::RGB(100, 100, 100),
+            cursor_timer: 0,
+        }
+    }
+    pub fn new_text(size: usize, text: String, color: Color) -> Self {
+        TextField {
+            visible: true,
+            text,
+            font_size: size,
+            x: 0.0,
+            y: 0.0,
+            width: 0,
+            height: 0,
+            focused: false,
+            color,
             bg_color: Color::RGB(30, 30, 30),
             border_color: Color::RGB(100, 100, 100),
             cursor_timer: 0,

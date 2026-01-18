@@ -93,6 +93,8 @@ pub struct UIState {
     pub step_requested: bool,
     pub scanline_requested: bool,
     pub fps_requested: bool,
+    pub br_add_requested: bool,
+    pub br_addr: u16,
     pub exit_requested: bool,
 }
 
@@ -103,6 +105,8 @@ impl UIState {
             step_requested: false,
             scanline_requested: false,
             fps_requested: false,
+            br_add_requested: false,
+            br_addr: 0x00,
             exit_requested: false,
         }
     }

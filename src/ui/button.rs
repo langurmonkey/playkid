@@ -36,7 +36,7 @@ impl Widget for Button {
 
         let font = ui.font(self.font_size);
         let scale = canvas.get_scale_factor();
-        let padding = (8.0 * scale) as u32;
+        let padding = (6.0 * scale) as u32;
 
         let rect = Rect::new(
             (self.x * scale) as i32,
@@ -45,7 +45,7 @@ impl Widget for Button {
             (self.height as f32 * scale) as u32 + (padding * 2),
         );
 
-        // 1. Determine Background Color
+        // Determine background color.
         let current_bg = if self.is_pressed {
             self.pressed_color
         } else {
@@ -54,19 +54,19 @@ impl Widget for Button {
         canvas.sdl_canvas.set_draw_color(current_bg);
         canvas.sdl_canvas.fill_rect(rect).unwrap();
 
-        // 2. Determine Border Color (Highlight on hover)
+        // Determine border color (highlight on hover).
         let border_color = if self.is_pressed {
-            Color::RGB(100, 100, 100) // Darker when clicking
+            Color::RGB(100, 100, 100)
         } else if self.is_hovered {
-            Color::RGB(255, 255, 255) // Bright white/gray on hover
+            Color::RGB(255, 255, 255)
         } else {
-            Color::RGB(150, 150, 150) // Standard gray
+            Color::RGB(150, 150, 150)
         };
 
         canvas.sdl_canvas.set_draw_color(border_color);
         canvas.sdl_canvas.draw_rect(rect).unwrap();
 
-        // 3. Render Text
+        // Render Text.
         let text_surface = font.render(&self.text).blended(self.color).unwrap();
         let texture = canvas
             .creator
@@ -202,5 +202,9 @@ impl Button {
             && mx <= (self.x as i32 + full_width as i32)
             && my >= self.y as i32
             && my <= (self.y as i32 + full_height as i32)
+    }
+
+    pub fn set_callback(&mut self, on_click: Box<dyn FnMut()>) {
+        self.on_click = on_click;
     }
 }

@@ -5,11 +5,12 @@ use crate::ui::{
     button::Button, label::Label, layout::LayoutGroup, layout::Orientation, textfield::TextField,
     uimanager::UIManager, uimanager::UIState, uimanager::Widget,
 };
+use colored::Colorize;
 use sdl2::pixels::Color;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-// Google-style Palette
+// Color palette.
 const BLUE: Color = Color::RGB(66, 133, 244);
 const GRAY: Color = Color::RGB(154, 160, 166);
 const WHITE: Color = Color::RGB(255, 255, 255);
@@ -20,16 +21,20 @@ const GREEN: Color = Color::RGB(15, 157, 88);
 const RED: Color = Color::RGB(219, 68, 55);
 const ORANGE: Color = Color::RGB(255, 152, 0);
 const DARKGRAY: Color = Color::RGB(30, 30, 30);
+const BLACK: Color = Color::RGB(10, 10, 10);
 
+/// The debug user interface.
 pub struct DebugUI<'ttf> {
-    // Main layout.
+    /// Main layout.
     pub main_layout: Rc<RefCell<LayoutGroup<'ttf>>>,
-    // Status and Instructions
+
+    /// Status and Instructions
     pub pc_addr: Rc<RefCell<Label>>,
     pub instr_text: Rc<RefCell<Label>>,
     pub instr_operand: Rc<RefCell<Label>>,
     pub status: Rc<RefCell<Label>>,
-    // Values (Right Column)
+
+    /// Values (Right Column)
     pub t_cycles: Rc<RefCell<Label>>,
     pub m_cycles: Rc<RefCell<Label>>,
     pub af: Rc<RefCell<Label>>,
@@ -90,7 +95,7 @@ impl<'ttf> DebugUI<'ttf> {
                         "Scanline [F8]" => state.scanline_requested = true,
                         "FPS [F]" => state.fps_requested = true,
                         "Quit [Esc]" => state.exit_requested = true,
-                        _ => println!("Unknown button: {}", label),
+                        _ => println!("{}: Unknown button: {}", "ERR".red(), label),
                     }
                 },
             ))));
@@ -347,15 +352,69 @@ impl<'ttf> DebugUI<'ttf> {
             "Reset CPU",
             base_font_size,
             WHITE,
-            DARKGRAY, // Normal color.
-            RED,      // Pressed color.
+            DARKGRAY,
+            BLUE,
             move || {
                 ui_state_reset.borrow_mut().reset_requested = true;
             },
         )));
 
-        // Text field.
-        let jump_input = Rc::new(RefCell::new(TextField::new(base_font_size)));
+        // Breakpoints line.
+        let mut br_row = LayoutGroup::new(Orientation::Horizontal, 20.0);
+        let br_label = Rc::new(RefCell::new(Label::new(
+            "Breakpoint: ",
+            base_font_size,
+            0.0,
+            0.0,
+            WHITE,
+            None,
+            false,
+        )));
+        let br_input = Rc::new(RefCell::new(TextField::new_text(
+            base_font_size,
+            "$0000".to_string(),
+            WHITE,
+        )));
+        let br_input_b = Rc::clone(&br_input);
+        let br_input_for_closure = Rc::clone(&br_input);
+        let ui_state_add = Rc::clone(&ui_state);
+        let add_button = Rc::new(RefCell::new(Button::new(
+            "Add",
+            base_font_size,
+            WHITE,
+            DARKGRAY,
+            BLUE,
+            move || {
+                let is_error = {
+                    let text = br_input_b.borrow().get_text();
+                    let value = text.strip_prefix("$").unwrap_or(&text);
+                    u16::from_str_radix(value, 16).is_err()
+                };
+
+                if is_error {
+                    br_input_for_closure.borrow_mut().set_color(RED);
+                    println!(
+                        "{}: Invalid address: {}",
+                        "ERR".red(),
+                        br_input_b.borrow().get_text()
+                    );
+                } else {
+                    br_input_for_closure.borrow_mut().set_color(WHITE);
+
+                    let text = br_input_b.borrow().get_text();
+                    let value = text.strip_prefix("$").unwrap_or(&text);
+                    if let Ok(addr) = u16::from_str_radix(value, 16) {
+                        let mut uist = ui_state_add.borrow_mut();
+                        uist.br_add_requested = true;
+                        uist.br_addr = addr;
+                    }
+                }
+            },
+        )));
+
+        br_row.add(br_label as Rc<RefCell<dyn Widget>>);
+        br_row.add(br_input as Rc<RefCell<dyn Widget>>);
+        br_row.add(add_button as Rc<RefCell<dyn Widget>>);
 
         // Main assembly
         let mut root = LayoutGroup::new(Orientation::Vertical, 30.0);
@@ -363,8 +422,8 @@ impl<'ttf> DebugUI<'ttf> {
         root.add(b_row_rc as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(instr_row)) as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(data_table)) as Rc<RefCell<dyn Widget>>);
+        root.add(Rc::new(RefCell::new(br_row)) as Rc<RefCell<dyn Widget>>);
         root.add(reset_button as Rc<RefCell<dyn Widget>>);
-        root.add(jump_input as Rc<RefCell<dyn Widget>>);
 
         let root_rc = Rc::new(RefCell::new(root));
         ui.add_widget(Rc::clone(&root_rc));

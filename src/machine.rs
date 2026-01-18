@@ -145,6 +145,11 @@ impl<'a, 'b> Machine<'a, 'b> {
             // Check UI state.
             self.handle_ui_commands();
 
+            // Stop at breakpoint?
+            if self.debug.has_breakpoint(self.registers.pc) {
+                self.debug.set_debugging(true);
+            }
+
             // Execute cycles for one full frame.
             if self.debug.debugging() {
                 if self.debug.take_step_instruction() {
@@ -375,6 +380,22 @@ impl<'a, 'b> Machine<'a, 'b> {
         if line_needed {
             self.debug.request_step_scanline();
         }
+        // Add breakpoint.
+        let (br_add_needed, br_addr) = {
+            let mut state = self.ui_state.borrow_mut();
+            (
+                if state.br_add_requested {
+                    state.br_add_requested = false;
+                    true
+                } else {
+                    false
+                },
+                state.br_addr,
+            )
+        };
+        if br_add_needed {
+            self.debug.add_breakpoint(br_addr);
+        }
         // FPS.
         let fps_needed = {
             let mut state = self.ui_state.borrow_mut();
@@ -475,6 +496,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         // Fetch next instruction, and parse it.
         let opcode = self.read8();
         let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
+
         // Execute the instruction.
         self.execute(run_instr, opcode)
     }
