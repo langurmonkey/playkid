@@ -1,4 +1,5 @@
 /// MBC1 Memory Bank Controller.
+#[derive(Debug)]
 pub struct MBC3 {
     rom: Vec<u8>,
     ram: Vec<u8>,

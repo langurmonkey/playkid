@@ -74,7 +74,7 @@ impl<'a> Canvas<'a> {
 
     fn interpolate(&self, w: f32, min_w: f32) -> f32 {
         let min_y = 1.5;
-        let max_y = 8.0;
+        let max_y = 10.0;
         let max_w = min_w * 3.0;
 
         min_y + ((w - min_w) * (max_y - min_y)) / (max_w - min_w)

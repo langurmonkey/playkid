@@ -71,19 +71,11 @@ impl<'a, 'b> Machine<'a, 'b> {
     ) -> Self {
         // UI state object.
         let ui_state = Rc::new(RefCell::new(UIState::new()));
-
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart, sdl),
-            display: Display::new(
-                "PlayKid emulator",
-                sdl,
-                ttf,
-                scale,
-                debug,
-                Rc::clone(&ui_state),
-            )
-            .expect("Error creating display"),
+            display: Display::new("Play Kid", sdl, ttf, scale, debug, Rc::clone(&ui_state))
+                .expect("Error creating display"),
             ui_state: Rc::clone(&ui_state),
             ime: false,
             ei: 0,
@@ -100,7 +92,6 @@ impl<'a, 'b> Machine<'a, 'b> {
 
     /// Resets the state of the machine and all its components.
     pub fn reset(&mut self) {
-        // reset the internal state
         self.registers.reset();
         self.memory.reset();
         self.ime = false;
@@ -465,9 +456,9 @@ impl<'a, 'b> Machine<'a, 'b> {
                         println!("{}: Bye bye!", "OK".green());
                         true
                     }
-                    // FPS flag (`f` for FPS).
+                    // FPS flag (`F5` for FPS).
                     Event::KeyDown {
-                        keycode: Some(Keycode::F),
+                        keycode: Some(Keycode::F5),
                         ..
                     } => {
                         self.fps = !self.fps;

@@ -59,12 +59,10 @@ impl Cartridge {
         }
 
         // Get title.
-        {
-            let slice = &data[0x134..0x142];
-            let title =
-                str::from_utf8(slice).expect(&format!("{}: Error getting ROM title", "ERR".red()));
-            println!("{}: Title: {}", "OK".green(), title.bright_blue());
-        }
+        let slice = &data[0x134..0x142];
+        let title =
+            str::from_utf8(slice).expect(&format!("{}: Error getting ROM title", "ERR".red()));
+        println!("{}: Title: {}", "OK".green(), title.bright_blue());
 
         // Color or not color.
         {

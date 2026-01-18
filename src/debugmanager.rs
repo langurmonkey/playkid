@@ -100,11 +100,6 @@ impl DebugManager {
         }
     }
 
-    pub fn clear_breakpoints(&mut self) {
-        println!("{}: Breakpoints cleared", "OK".green());
-        self.breakpoints.clear();
-    }
-
     pub fn request_step_instruction(&mut self) {
         if self.debugging {
             self.step_instruction = true;

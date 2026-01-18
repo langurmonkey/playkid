@@ -22,7 +22,6 @@ const GREEN: Color = Color::RGB(15, 157, 88);
 const RED: Color = Color::RGB(219, 68, 55);
 const ORANGE: Color = Color::RGB(255, 152, 0);
 const DARKGRAY: Color = Color::RGB(30, 30, 30);
-const BLACK: Color = Color::RGB(10, 10, 10);
 
 /// The debug user interface.
 pub struct DebugUI<'ttf> {
@@ -63,15 +62,11 @@ impl<'ttf> DebugUI<'ttf> {
         let base_font_size = 10;
 
         // Title.
+        let mut title_row = LayoutGroup::new(Orientation::Horizontal, 50.0);
         let debug_title = Rc::new(RefCell::new(Label::new(
-            "PLAY KID - DEBUG INTERFACE",
-            18,
-            0.0,
-            0.0,
-            BLUE,
-            None,
-            false,
+            "PLAY KID", 18, 0.0, 0.0, BLUE, None, false,
         )));
+        title_row.add(debug_title as Rc<RefCell<dyn Widget>>);
 
         // Operations (step, scanline, continue).
         let mut operations_row = LayoutGroup::new(Orientation::Horizontal, 25.0);
@@ -446,7 +441,7 @@ impl<'ttf> DebugUI<'ttf> {
 
         // Main assembly
         let mut root = LayoutGroup::new(Orientation::Vertical, 30.0);
-        root.add(Rc::clone(&debug_title) as Rc<RefCell<dyn Widget>>);
+        root.add(Rc::new(RefCell::new(title_row)) as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(operations_row)) as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(instr_row)) as Rc<RefCell<dyn Widget>>);
         root.add(Rc::new(RefCell::new(data_table)) as Rc<RefCell<dyn Widget>>);
@@ -495,6 +490,7 @@ impl<'ttf> DebugUI<'ttf> {
         m_cycles: u32,
         halted: bool,
     ) {
+        // Instruction.
         self.pc_addr.borrow_mut().set_text(&format!("${:04x}:", pc));
         self.instr_text
             .borrow_mut()
