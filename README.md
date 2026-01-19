@@ -4,6 +4,10 @@
 
 **Play Kid** is yet another Game Boy emulator, written in Rust. But hey, it is MY Game Boy emulator, and I'm proud of it.
 
+<p align="center">
+  <img src="assets/img/grid.avif" />
+</p>
+
 Here are the main features of Play Kid:
 
 - All CPU instructions implemented.
@@ -11,6 +15,8 @@ Here are the main features of Play Kid:
 - Modes: ROM, MBC1, MBC2, MBC3.
 - Audio is implemented, with 4 channels, envelopes, sweep, and stereo.
 - Supports game controllers via SDL.
+- Multiple color palettes.
+- Save screenshot of current frame buffer.
 - Respects 160:144 aspect ratio by letter-boxing.
 - Debug mode:
   - Step instruction.
@@ -66,7 +72,9 @@ Additionally, there are some more actions available:
 
 You can enter the debug mode any time by pressing `d`, or activate it at launch with the `-d`/`--debug` flag.
 
-![Debug mode](assets/img/debug-mode.avif)
+<p align="center">
+  <img src="assets/img/debug-mode.avif" />
+</p>
 
 You can use the provided UI controls to work with debug mode. You can also use the keyboard. These are the key bindings:
 
