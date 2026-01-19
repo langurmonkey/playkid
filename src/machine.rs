@@ -156,7 +156,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                     let (t, m, _) = self.machine_cycle();
                     self.m_cycles += m;
                     self.t_cycles += t;
-                    self.display.render_lcd(&self.memory);
+                    self.display.render_lcd(&mut self.memory);
                 } else if self.debug.take_step_line() {
                     // Handle single scanline step.
                     let current_ly = self.memory.ppu().ly;
@@ -165,7 +165,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                         let (t, m, _) = self.machine_cycle();
                         self.m_cycles += m;
                         self.t_cycles += t;
-                        self.display.render_lcd(&self.memory);
+                        self.display.render_lcd(&mut self.memory);
                     }
                 }
             } else {
@@ -181,7 +181,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                     self.t_cycles += t;
                     cycles_this_frame += t as usize;
 
-                    self.display.render_lcd(&self.memory);
+                    self.display.render_lcd(&mut self.memory);
                 }
             }
             // Update debug UI.

@@ -398,8 +398,6 @@ impl PPU {
             // HBlank.
             0 => {
                 self.render_scanline();
-                // Signal data available.
-                self.data_available = true;
                 self.hblank = true;
                 self.stat3
             }
@@ -409,6 +407,8 @@ impl PPU {
                 self.wly_flag = false;
                 self.wly = 0;
                 self.i_mask |= 0x01;
+                // Signal data available.
+                self.data_available = true;
                 self.stat4
             }
 

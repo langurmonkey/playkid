@@ -155,21 +155,21 @@ impl<'a> Display<'a> {
     }
 
     /// Renders the given buffer to the display.
-    pub fn render_lcd(&mut self, mem: &Memory) {
+    pub fn render_lcd(&mut self, mem: &mut Memory) {
         let ppu = mem.ppu();
-        let y = ppu.ly % constants::DISPLAY_HEIGHT as u8;
 
-        if ppu.data_available && self.last_ly != y {
+        // Only act when the PPU says the FULL frame is ready
+        if ppu.data_available {
             let pixels = &ppu.fb;
 
-            // Render line.
-            {
-                let y = y as usize;
+            // Draw every line in the framebuffer at once
+            for y in 0..constants::DISPLAY_HEIGHT {
                 let offset = y * constants::DISPLAY_WIDTH * 4;
                 let slice = &pixels[offset..offset + constants::DISPLAY_WIDTH * 4];
                 self.canvas.draw_line_rgba(y, slice);
             }
-            self.last_ly = y;
+
+            mem.ppu.data_available = false;
         }
     }
 
