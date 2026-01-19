@@ -74,7 +74,7 @@ impl<'a> Canvas<'a> {
 
     fn interpolate(&self, w: f32, min_w: f32) -> f32 {
         let min_y = 1.5;
-        let max_y = 10.0;
+        let max_y = 10.5;
         let max_w = min_w * 3.0;
 
         min_y + ((w - min_w) * (max_y - min_y)) / (max_w - min_w)
@@ -89,6 +89,8 @@ impl<'a> Canvas<'a> {
         texture
             .update(None, self.data_raw(), (self.width * 4) as usize)
             .unwrap();
+
+        let scale_factor = self.get_scale_factor();
 
         // We want to respect the aspect ratio (160:144) when resizing.
         // Get current window size.
@@ -182,7 +184,7 @@ impl<'a> Canvas<'a> {
 
         let min_scale = 4;
         let min_w = if debug {
-            ((base_w * min_scale) as f32 * 1.3) as u32
+            ((base_w * min_scale) as f32 * 1.45) as u32
         } else {
             base_w * min_scale
         };

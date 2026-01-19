@@ -52,8 +52,7 @@ impl<'a> EventHandler for Display<'a> {
             _ => {}
         }
 
-        self.ui.handle_event(event);
-        true
+        self.ui.handle_event(event)
     }
 }
 

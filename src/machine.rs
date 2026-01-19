@@ -404,6 +404,35 @@ impl<'a, 'b> Machine<'a, 'b> {
         if br_add_needed {
             self.debug.add_breakpoint(br_addr);
         }
+        // Remove breakpoint.
+        let (br_remove_needed, br_addr) = {
+            let mut state = self.ui_state.borrow_mut();
+            (
+                if state.br_remove_requested {
+                    state.br_remove_requested = false;
+                    true
+                } else {
+                    false
+                },
+                state.br_addr,
+            )
+        };
+        if br_remove_needed {
+            self.debug.delete_breakpoint(br_addr);
+        }
+        // Clear breakpoints.
+        let br_clear_needed = {
+            let mut state = self.ui_state.borrow_mut();
+            if state.br_clear_requested {
+                state.br_clear_requested = false;
+                true
+            } else {
+                false
+            }
+        };
+        if br_clear_needed {
+            self.debug.clear_breakpoints();
+        }
         // Reset CPU.
         let reset_needed = {
             let mut state = self.ui_state.borrow_mut();
@@ -431,6 +460,19 @@ impl<'a, 'b> Machine<'a, 'b> {
             self.running = false;
             println!("{}: Bye bye!", "OK".green());
         }
+        // FPS.
+        let fps_needed = {
+            let mut state = self.ui_state.borrow_mut();
+            if state.fps_requested {
+                state.fps_requested = false;
+                true
+            } else {
+                false
+            }
+        };
+        if fps_needed {
+            self.fps = !self.fps;
+        }
     }
 
     /// Polls the events in the queue of the event pump and redirects them to the
@@ -439,6 +481,11 @@ impl<'a, 'b> Machine<'a, 'b> {
         // Reset cycles.
         for event in self.event_pump.poll_iter() {
             let mut handled = false;
+            // Forward to display/UI first.
+            // Generally necessary because text fields capture focus.
+            if !handled {
+                handled = self.display.handle_event(&event);
+            }
             // Handle quit events here.
             if !handled {
                 handled = match event {
@@ -456,9 +503,9 @@ impl<'a, 'b> Machine<'a, 'b> {
                         println!("{}: Bye bye!", "OK".green());
                         true
                     }
-                    // FPS flag (`F5` for FPS).
+                    // FPS flag (`f` for FPS).
                     Event::KeyDown {
-                        keycode: Some(Keycode::F5),
+                        keycode: Some(Keycode::F),
                         ..
                     } => {
                         self.fps = !self.fps;
@@ -471,17 +518,13 @@ impl<'a, 'b> Machine<'a, 'b> {
             if !handled {
                 handled = self.memory.joypad.handle_event(&event)
             }
-            // Debug monitor.
+            // Debug monitor events (step, continue, etc.).
             if !handled {
                 let d = self.debug.debugging();
-                handled = self.debug.handle_event(&event);
+                self.debug.handle_event(&event);
                 if d != self.debug.debugging() {
                     self.display.set_debug(self.debug.debugging());
                 }
-            }
-            // Forward to display/UI.
-            if !handled {
-                self.display.handle_event(&event);
             }
         }
     }

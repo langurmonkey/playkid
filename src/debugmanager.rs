@@ -35,7 +35,7 @@ impl eventhandler::EventHandler for DebugManager {
             }
             // Enable/disable debugging.
             Event::KeyDown {
-                keycode: Some(Keycode::F9),
+                keycode: Some(Keycode::D),
                 ..
             } => {
                 self.debugging = !self.debugging;
@@ -70,7 +70,7 @@ impl DebugManager {
 
     pub fn get_breakpoints_str(&self) -> String {
         if self.breakpoints.is_empty() {
-            return "[None]".to_string();
+            return "-".to_string();
         }
 
         let formatted_breakpoints: Vec<String> = self
@@ -79,7 +79,7 @@ impl DebugManager {
             .map(|&addr| format!("${:04x}", addr))
             .collect();
 
-        format!("[{}]", formatted_breakpoints.join(","))
+        format!("{}", formatted_breakpoints.join(","))
     }
 
     pub fn has_breakpoint(&self, addr: u16) -> bool {
@@ -97,6 +97,13 @@ impl DebugManager {
         if self.has_breakpoint(addr) {
             println!("{}: Remove breakpoint: {:#04x}", "OK".green(), addr);
             self.breakpoints.retain(|&x| x != addr);
+        }
+    }
+
+    pub fn clear_breakpoints(&mut self) {
+        if !self.breakpoints.is_empty() {
+            println!("{}: Clear breakpoints", "OK".green());
+            self.breakpoints.clear();
         }
     }
 

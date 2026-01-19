@@ -11,7 +11,7 @@ use std::sync::Arc;
 pub struct UIManager<'ttf> {
     /// List of widgets.
     widgets: Vec<Rc<RefCell<dyn Widget + 'ttf>>>,
-    //// SDL 2 TTF context to load fonts on the fly..
+    //// SDL 2 TTF context to load fonts on the fly.
     ttf: &'ttf sdl2::ttf::Sdl2TtfContext,
     /// Stores fonts indexed by their point size.
     fonts: RefCell<HashMap<usize, Arc<Font<'ttf, 'ttf>>>>,
@@ -90,8 +90,11 @@ pub struct UIState {
     pub scanline_requested: bool,
     pub continue_requested: bool,
     pub br_add_requested: bool,
+    pub br_remove_requested: bool,
+    pub br_clear_requested: bool,
     pub br_addr: u16,
     pub exit_requested: bool,
+    pub fps_requested: bool,
 }
 
 impl UIState {
@@ -102,8 +105,11 @@ impl UIState {
             scanline_requested: false,
             continue_requested: false,
             br_add_requested: false,
+            br_remove_requested: false,
+            br_clear_requested: false,
             br_addr: 0x00,
             exit_requested: false,
+            fps_requested: false,
         }
     }
 }

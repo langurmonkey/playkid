@@ -43,10 +43,10 @@ struct Args {
     /// Initial window scale. It can also be resized manually.
     #[arg(short, long, default_value_t = 4, value_parser = clap::value_parser!(u8).range(4..15))]
     scale: u8,
-    /// Activate debug mode. Use `F9` to stop program at any point.
+    /// Activate debug mode. Use `d` to stop program at any point.
     #[arg(short, long)]
     debug: bool,
-    /// Show FPS counter. Use `F5` to toggle on and off.
+    /// Show FPS counter. Use `f` to toggle on and off.
     #[arg(short, long)]
     fps: bool,
     /// Skip global checksum, header checksum, and logo sequence check.

@@ -74,6 +74,7 @@ impl<'ttf> DebugUI<'ttf> {
             ("Step [F6]", GREEN),
             ("Scanline [F7]", GREEN),
             ("Continue [F9]", BLUE),
+            ("Exit debug [d]", BLUE),
         ];
         for (txt, clr) in bindings {
             let label = txt.to_string();
@@ -91,6 +92,7 @@ impl<'ttf> DebugUI<'ttf> {
                         "Step [F6]" => state.step_requested = true,
                         "Scanline [F7]" => state.scanline_requested = true,
                         "Continue [F9]" => state.continue_requested = true,
+                        "Exit debug [d]" => state.continue_requested = true,
                         _ => println!("{}: Unknown button: {}", "ERR".red(), label),
                     }
                 },
@@ -368,33 +370,33 @@ impl<'ttf> DebugUI<'ttf> {
             "$0000".to_string(),
             WHITE,
         )));
-        let br_input_b = Rc::clone(&br_input);
-        let br_input_for_closure = Rc::clone(&br_input);
+        let br_input_add = Rc::clone(&br_input);
+        let br_input_add2 = Rc::clone(&br_input);
         let ui_state_add = Rc::clone(&ui_state);
         let add_button = Rc::new(RefCell::new(Button::new(
-            "Add",
+            "Add BR",
             base_font_size,
             WHITE,
             DARKGRAY,
             BLUE,
             move || {
                 let is_error = {
-                    let text = br_input_b.borrow().get_text();
+                    let text = br_input_add.borrow().get_text();
                     let value = text.strip_prefix("$").unwrap_or(&text);
                     u16::from_str_radix(value, 16).is_err()
                 };
 
                 if is_error {
-                    br_input_for_closure.borrow_mut().set_color(RED);
+                    br_input_add.borrow_mut().set_color(RED);
                     println!(
                         "{}: Invalid address: {}",
                         "ERR".red(),
-                        br_input_b.borrow().get_text()
+                        br_input_add.borrow().get_text()
                     );
                 } else {
-                    br_input_for_closure.borrow_mut().set_color(WHITE);
+                    br_input_add.borrow_mut().set_color(WHITE);
 
-                    let text = br_input_b.borrow().get_text();
+                    let text = br_input_add2.borrow().get_text();
                     let value = text.strip_prefix("$").unwrap_or(&text);
                     if let Ok(addr) = u16::from_str_radix(value, 16) {
                         let mut uist = ui_state_add.borrow_mut();
@@ -404,40 +406,92 @@ impl<'ttf> DebugUI<'ttf> {
                 }
             },
         )));
+        let br_input_remove = Rc::clone(&br_input);
+        let br_input_remove2 = Rc::clone(&br_input);
+        let ui_state_remove = Rc::clone(&ui_state);
+        let remove_button = Rc::new(RefCell::new(Button::new(
+            "Remove BR",
+            base_font_size,
+            WHITE,
+            DARKGRAY,
+            BLUE,
+            move || {
+                let is_error = {
+                    let text = br_input_remove.borrow().get_text();
+                    let value = text.strip_prefix("$").unwrap_or(&text);
+                    u16::from_str_radix(value, 16).is_err()
+                };
+
+                if is_error {
+                    br_input_remove.borrow_mut().set_color(RED);
+                    println!(
+                        "{}: Invalid address: {}",
+                        "ERR".red(),
+                        br_input_remove.borrow().get_text()
+                    );
+                } else {
+                    br_input_remove.borrow_mut().set_color(WHITE);
+
+                    let text = br_input_remove2.borrow().get_text();
+                    let value = text.strip_prefix("$").unwrap_or(&text);
+                    if let Ok(addr) = u16::from_str_radix(value, 16) {
+                        let mut uist = ui_state_remove.borrow_mut();
+                        uist.br_remove_requested = true;
+                        uist.br_addr = addr;
+                    }
+                }
+            },
+        )));
+        let ui_state_clear = Rc::clone(&ui_state);
+        let clear_button = Rc::new(RefCell::new(Button::new(
+            "Clear all",
+            base_font_size,
+            WHITE,
+            DARKGRAY,
+            BLUE,
+            move || {
+                let mut uist = ui_state_clear.borrow_mut();
+                uist.br_clear_requested = true;
+            },
+        )));
 
         br_row1.add(br_label as Rc<RefCell<dyn Widget>>);
         br_row1.add(Rc::clone(&br) as Rc<RefCell<dyn Widget>>);
         br_row2.add(br_input as Rc<RefCell<dyn Widget>>);
         br_row2.add(add_button as Rc<RefCell<dyn Widget>>);
+        br_row2.add(remove_button as Rc<RefCell<dyn Widget>>);
+        br_row2.add(clear_button as Rc<RefCell<dyn Widget>>);
         br_col.add(Rc::new(RefCell::new(br_row1)) as Rc<RefCell<dyn Widget>>);
         br_col.add(Rc::new(RefCell::new(br_row2)) as Rc<RefCell<dyn Widget>>);
 
-        // Reset button.
+        // Bottom buttons (FPS, reset, exit).
         let mut buttons_row = LayoutGroup::new(Orientation::Horizontal, 25.0);
-        let ui_state_reset = Rc::clone(&ui_state);
-        let reset_button = Rc::new(RefCell::new(Button::new(
-            "Reset CPU",
-            base_font_size,
-            ORANGE,
-            DARKGRAY,
-            BLUE,
-            move || {
-                ui_state_reset.borrow_mut().reset_requested = true;
-            },
-        )));
-        let ui_state_quit = Rc::clone(&ui_state);
-        let quit_button = Rc::new(RefCell::new(Button::new(
-            "Exit Play Kid [Esc]",
-            base_font_size,
-            RED,
-            DARKGRAY,
-            BLUE,
-            move || {
-                ui_state_quit.borrow_mut().exit_requested = true;
-            },
-        )));
-        buttons_row.add(reset_button as Rc<RefCell<dyn Widget>>);
-        buttons_row.add(quit_button as Rc<RefCell<dyn Widget>>);
+        let bindings = [
+            ("Show FPS [f]", GREEN),
+            ("Reset CPU [r]", ORANGE),
+            ("Exit [Esc]", RED),
+        ];
+        for (txt, clr) in bindings {
+            let label = txt.to_string();
+            let ui_state_b = Rc::clone(&ui_state);
+            buttons_row.add(Rc::new(RefCell::new(Button::new(
+                txt,
+                base_font_size,
+                clr,
+                DARKGRAY, // Normal color.
+                GRAY,     // Pressed color.
+                move || {
+                    let mut state = ui_state_b.borrow_mut();
+                    // Match against the label to decide what to do.
+                    match label.as_str() {
+                        "Show FPS [f]" => state.fps_requested = true,
+                        "Reset CPU [r]" => state.reset_requested = true,
+                        "Exit [Esc]" => state.exit_requested = true,
+                        _ => println!("{}: Unknown button: {}", "ERR".red(), label),
+                    }
+                },
+            ))));
+        }
 
         // Main assembly
         let mut root = LayoutGroup::new(Orientation::Vertical, 30.0);
