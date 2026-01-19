@@ -148,7 +148,7 @@ impl<'ttf> DebugUI<'ttf> {
             "CPU status:",
             "T-cycles:",
             "M-cycles:",
-            "Reg:",
+            "Registers:",
             "  ",
             "  ",
             "  ",

@@ -1,11 +1,15 @@
 use crate::canvas::Canvas;
 use colored::Colorize;
 use sdl2::event::Event;
+use sdl2::rwops::RWops;
 use sdl2::ttf::Font;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
+
+/// PressStart2P.ttf font data.
+const FONT_DATA: &[u8] = include_bytes!("../../assets/fnt/PressStart2P.ttf");
 
 /// User interface manager. Holds the widgets and renders them.
 pub struct UIManager<'ttf> {
@@ -58,9 +62,12 @@ impl<'ttf> UIManager<'ttf> {
 
         // If not found, load it.
         println!("{}: Loading font size {}", "LD".magenta(), size);
+        let rwops = RWops::from_bytes(FONT_DATA)
+            .map_err(|e| e.to_string())
+            .unwrap();
         let mut new_font = self
             .ttf
-            .load_font("assets/fnt/PressStart2P.ttf", size as u16)
+            .load_font_from_rwops(rwops, size as u16)
             .expect("Failed to load font size at runtime");
         new_font.set_hinting(sdl2::ttf::Hinting::None);
 
