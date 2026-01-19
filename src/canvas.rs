@@ -75,7 +75,7 @@ impl<'a> Canvas<'a> {
     fn interpolate(&self, w: f32, min_w: f32) -> f32 {
         let min_y = 1.5;
         let max_y = 10.5;
-        let max_w = min_w * 3.0;
+        let max_w = min_w * 3.4;
 
         min_y + ((w - min_w) * (max_y - min_y)) / (max_w - min_w)
     }
@@ -89,8 +89,6 @@ impl<'a> Canvas<'a> {
         texture
             .update(None, self.data_raw(), (self.width * 4) as usize)
             .unwrap();
-
-        let scale_factor = self.get_scale_factor();
 
         // We want to respect the aspect ratio (160:144) when resizing.
         // Get current window size.
@@ -113,7 +111,7 @@ impl<'a> Canvas<'a> {
             let base_h = constants::DISPLAY_HEIGHT as f32;
             let min_scale = 4.0;
             let min_w = (base_w * min_scale) as f32 * 1.3;
-            let s = self.interpolate(w as f32, min_w);
+            let s = self.interpolate(w as f32, min_w) / self.get_scale_factor();
             ((base_w * s) as u32, (base_h * s) as u32)
         } else {
             // Compute from scale.
@@ -163,6 +161,7 @@ impl<'a> Canvas<'a> {
             .display_dpi(window_display_index)
             .unwrap_or((96.0, 96.0, 96.0));
         ddpi / 96.0
+        // 1.0
     }
 
     /// Draws a full line.
@@ -182,7 +181,8 @@ impl<'a> Canvas<'a> {
         let base_w = constants::DISPLAY_WIDTH as u32;
         let base_h = constants::DISPLAY_HEIGHT as u32;
 
-        let min_scale = 4;
+        let scale_factor = self.get_scale_factor();
+        let min_scale = (4.0 * scale_factor) as u32;
         let min_w = if debug {
             ((base_w * min_scale) as f32 * 1.45) as u32
         } else {
@@ -194,14 +194,10 @@ impl<'a> Canvas<'a> {
             base_h * min_scale
         };
 
-        let (curr_w, curr_h) = self.sdl_canvas.window().size();
-
         // Set the hint.
-        if curr_w < min_w || curr_h < min_h {
-            self.sdl_canvas
-                .window_mut()
-                .set_minimum_size(min_w, min_h)
-                .ok();
-        }
+        self.sdl_canvas
+            .window_mut()
+            .set_minimum_size(min_w, min_h)
+            .ok();
     }
 }

@@ -96,19 +96,22 @@ impl Widget for TextField {
         }
     }
 
-    fn handle_event(&mut self, event: &Event) -> bool {
+    fn handle_event(&mut self, event: &Event, canvas: &Canvas) -> bool {
         if !self.visible {
             return false;
         }
 
+        let scale_factor = canvas.get_scale_factor();
         match event {
             Event::MouseButtonDown {
                 mouse_btn: MouseButton::Left,
-                x,
-                y,
+                mut x,
+                mut y,
                 ..
             } => {
-                self.focused = self.is_within_bounds(*x, *y);
+                x = (x as f32 / scale_factor) as i32;
+                y = (y as f32 / scale_factor) as i32;
+                self.focused = self.is_within_bounds(x, y);
                 self.focused
             }
             Event::KeyDown {

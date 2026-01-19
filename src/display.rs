@@ -52,7 +52,7 @@ impl<'a> EventHandler for Display<'a> {
             _ => {}
         }
 
-        self.ui.handle_event(event)
+        self.ui.handle_event(event, &self.canvas)
     }
 }
 
@@ -92,7 +92,7 @@ impl<'a> Display<'a> {
         )));
         ui.add_widget(Rc::clone(&fps));
 
-        let mut display = Display {
+        let display = Display {
             canvas,
             ui,
             debug_ui,
@@ -100,8 +100,6 @@ impl<'a> Display<'a> {
             fps,
             last_ly: 255,
         };
-
-        display.canvas.update_window_constraints(debug);
 
         Ok(display)
     }
@@ -179,8 +177,9 @@ impl<'a> Display<'a> {
     pub fn render_ui(&mut self) {
         // First, update positions of debug UI widgets.
         let (x, y, w, _) = self.canvas.get_lcd_rect();
-        let dx = x as f32 + w as f32;
-        let dy = y as f32;
+        let sf = self.canvas.get_scale_factor();
+        let dx = (x as f32 + w as f32 + 20.0 * sf) / sf;
+        let dy = (y as f32) / sf;
         self.debug_ui.update_positions(&self.ui, dx, dy);
 
         // Actual render operation.

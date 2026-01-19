@@ -388,6 +388,19 @@ impl<'a, 'b> Machine<'a, 'b> {
             self.debug.toggle_debugging();
             self.display.set_debug(self.debug.debugging());
         }
+        let debug_needed = {
+            let mut state = self.ui_state.borrow_mut();
+            if state.debug_requested {
+                state.debug_requested = false;
+                true
+            } else {
+                false
+            }
+        };
+        if debug_needed {
+            self.debug.toggle_debugging();
+            self.display.set_debug(self.debug.debugging());
+        }
         // Add breakpoint.
         let (br_add_needed, br_addr) = {
             let mut state = self.ui_state.borrow_mut();

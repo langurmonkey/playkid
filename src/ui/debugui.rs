@@ -92,7 +92,7 @@ impl<'ttf> DebugUI<'ttf> {
                         "Step [F6]" => state.step_requested = true,
                         "Scanline [F7]" => state.scanline_requested = true,
                         "Continue [F9]" => state.continue_requested = true,
-                        "Exit debug [d]" => state.continue_requested = true,
+                        "Exit debug [d]" => state.debug_requested = true,
                         _ => println!("{}: Unknown button: {}", "ERR".red(), label),
                     }
                 },
@@ -657,9 +657,7 @@ impl<'ttf> DebugUI<'ttf> {
     }
 
     pub fn update_positions(&mut self, ui: &UIManager, dx: f32, dy: f32) {
-        self.main_layout
-            .borrow_mut()
-            .layout(ui, dx + 10.0, dy + 10.0);
+        self.main_layout.borrow_mut().layout(ui, dx, dy);
     }
 
     pub fn set_debug_visibility(&mut self, visible: bool) {

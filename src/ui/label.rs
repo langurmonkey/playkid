@@ -108,7 +108,7 @@ impl Widget for Label {
             .unwrap();
     }
 
-    fn handle_event(&mut self, _: &sdl2::event::Event) -> bool {
+    fn handle_event(&mut self, _: &sdl2::event::Event, _: &Canvas) -> bool {
         false
     }
 

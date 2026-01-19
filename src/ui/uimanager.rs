@@ -74,10 +74,10 @@ impl<'ttf> UIManager<'ttf> {
         shared_font
     }
 
-    pub fn handle_event(&mut self, event: &Event) -> bool {
+    pub fn handle_event(&mut self, event: &Event, canvas: &Canvas) -> bool {
         let mut result = false;
         for widget in &mut self.widgets {
-            result = result || widget.borrow_mut().handle_event(event);
+            result = result || widget.borrow_mut().handle_event(event, canvas);
         }
         result
     }
@@ -89,6 +89,7 @@ pub struct UIState {
     pub step_requested: bool,
     pub scanline_requested: bool,
     pub continue_requested: bool,
+    pub debug_requested: bool,
     pub br_add_requested: bool,
     pub br_remove_requested: bool,
     pub br_clear_requested: bool,
@@ -104,6 +105,7 @@ impl UIState {
             step_requested: false,
             scanline_requested: false,
             continue_requested: false,
+            debug_requested: false,
             br_add_requested: false,
             br_remove_requested: false,
             br_clear_requested: false,
@@ -116,7 +118,7 @@ impl UIState {
 
 /// Widget trait.
 pub trait Widget {
-    fn handle_event(&mut self, event: &sdl2::event::Event) -> bool;
+    fn handle_event(&mut self, event: &sdl2::event::Event, canvas: &Canvas) -> bool;
     fn render(&self, canvas: &mut Canvas, ui: &UIManager);
     fn is_visible(&self) -> bool;
     fn set_visible(&mut self, visible: bool);

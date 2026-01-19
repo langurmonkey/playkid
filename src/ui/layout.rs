@@ -122,13 +122,13 @@ impl<'ttf> Widget for LayoutGroup<'ttf> {
     fn get_font_size(&self) -> usize {
         10
     }
-    fn handle_event(&mut self, event: &sdl2::event::Event) -> bool {
+    fn handle_event(&mut self, event: &sdl2::event::Event, canvas: &Canvas) -> bool {
         if !self.visible {
             return false;
         }
         let mut consumed = false;
         for widget_rc in &self.widgets {
-            consumed = consumed || widget_rc.borrow_mut().handle_event(event);
+            consumed = consumed || widget_rc.borrow_mut().handle_event(event, canvas);
         }
         consumed
     }
