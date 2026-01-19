@@ -161,7 +161,6 @@ impl<'a> Canvas<'a> {
             .display_dpi(window_display_index)
             .unwrap_or((96.0, 96.0, 96.0));
         ddpi / 96.0
-        // 1.0
     }
 
     /// Draws a full line.

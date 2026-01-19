@@ -42,7 +42,10 @@ jobs:
 
       - name: Install SDL2 (macOS)
         if: matrix.os == 'macos-latest'
-        run: brew install sdl2 sdl2_ttf
+        run: |
+          brew install sdl2 sdl2_ttf
+          # Tell the linker where Homebrew lives on Apple Silicon
+          echo "LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/lib" >> $GITHUB_ENV
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
