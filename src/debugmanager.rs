@@ -39,6 +39,14 @@ impl eventhandler::EventHandler for DebugManager {
                 self.request_step_scanline();
                 true
             }
+            // Pause/continue.
+            Event::KeyDown {
+                keycode: Some(Keycode::F9),
+                ..
+            } => {
+                self.toggle_paused();
+                true
+            }
             // Enable/disable debugging.
             Event::KeyDown {
                 keycode: Some(Keycode::D),
