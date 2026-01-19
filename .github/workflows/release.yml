@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*' 
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: playkid-linux
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: playkid-windows.exe
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: playkid-macos
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # Handle SDL2 dependencies per OS
+      - name: Install SDL2 (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-ttf-dev
+
+      - name: Install SDL2 (Windows)
+        if: matrix.os == 'windows-latest'
+        run: vcpkg install sdl2 sdl2-ttf:x64-windows
+
+      - name: Install SDL2 (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install sdl2 sdl2_ttf
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact_name == 'playkid-windows.exe' && 'playkid.exe' || 'playkid' }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            playkid-linux/playkid
+            playkid-windows.exe/playkid.exe
+            playkid-macos/playkid
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
