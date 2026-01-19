@@ -200,4 +200,33 @@ impl<'a> Canvas<'a> {
             .set_minimum_size(min_w, min_h)
             .ok();
     }
+
+    /// Save a screenshot of the current buffer.
+    /// Returns the filename.
+    pub fn save_screenshot(&self) -> Result<String, Error> {
+        use image::{ImageBuffer, Rgb};
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        // Create a unique filename using a timestamp.
+        let start = SystemTime::now().duration_since(UNIX_EPOCH)?;
+        let filename = format!("screenshot_{}.jpg", start.as_secs());
+
+        // Prepare the RGB buffer.
+        let mut rgb_data = Vec::with_capacity(self.width * self.height * 3);
+
+        for chunk in self.data.chunks_exact(4) {
+            rgb_data.push(chunk[0]);
+            rgb_data.push(chunk[1]);
+            rgb_data.push(chunk[2]);
+        }
+
+        // Create the ImageBuffer and save.
+        let buffer: ImageBuffer<Rgb<u8>, _> =
+            ImageBuffer::from_raw(self.width as u32, self.height as u32, rgb_data)
+                .ok_or("Failed to create image buffer")?;
+
+        buffer.save(&filename)?;
+
+        Ok(filename)
+    }
 }

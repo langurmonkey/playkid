@@ -166,23 +166,7 @@ impl Widget for TextField {
 }
 
 impl TextField {
-    pub fn new(size: usize, color: Color) -> Self {
-        TextField {
-            visible: true,
-            text: String::new(),
-            font_size: size,
-            x: 0.0,
-            y: 0.0,
-            width: 0,
-            height: 0,
-            focused: false,
-            color,
-            bg_color: Color::RGB(30, 30, 30),
-            border_color: Color::RGB(100, 100, 100),
-            cursor_timer: 0,
-        }
-    }
-    pub fn new_text(size: usize, text: String, color: Color) -> Self {
+    pub fn new(size: usize, text: String, color: Color) -> Self {
         TextField {
             visible: true,
             text,

@@ -532,6 +532,22 @@ impl<'a, 'b> Machine<'a, 'b> {
                         self.fps = !self.fps;
                         true
                     }
+                    // Palette change `p`.
+                    Event::KeyDown {
+                        keycode: Some(Keycode::P),
+                        ..
+                    } => {
+                        self.memory.ppu.cycle_palette();
+                        true
+                    }
+                    // Screenshot `s`.
+                    Event::KeyDown {
+                        keycode: Some(Keycode::S),
+                        ..
+                    } => {
+                        self.display.save_screenshot();
+                        true
+                    }
                     _ => false,
                 }
             }

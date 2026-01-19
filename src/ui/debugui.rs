@@ -374,7 +374,7 @@ impl<'ttf> DebugUI<'ttf> {
             None,
             false,
         )));
-        let br_input = Rc::new(RefCell::new(TextField::new_text(
+        let br_input = Rc::new(RefCell::new(TextField::new(
             base_font_size,
             "$0000".to_string(),
             WHITE,

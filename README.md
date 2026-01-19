@@ -56,7 +56,9 @@ Here are the keyboard mappings:
 
 Additionally, there are some more actions available:
 
+- <kbd>p</kbd> - change the palette colors
 - <kbd>f</kbd> - toggle FPS monitor
+- <kbd>s</kbd> - save a screenshot, with name `screenshot_[time].jpg`
 - <kbd>d</kbd> - enter debug mode
 - <kbd>Esc</kbd> - exit the emulator
 

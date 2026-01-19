@@ -1,5 +1,6 @@
 use crate::constants;
 
+use colored::Colorize;
 use std::collections::HashMap;
 
 /// Key for sprite tile row cache.
@@ -110,16 +111,43 @@ pub struct PPU {
 
     /// The palette.
     palette: [u8; 4 * 3],
+    /// Index of the current palette.
+    current_palette: u8,
     /// Full screen buffer in RGBA format.
     pub fb: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
     /// Color ID buffer for priorities.
     pub priorities: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH],
 }
 
+/// Palette names.
+pub const PALETTE_NAMES: [&str; 9] = [
+    "Game Boy",
+    "DMG Classic",
+    "Pocket",
+    "Deep Blue",
+    "Amber",
+    "Virtual Red",
+    "Choco Mint",
+    "GBC Yellow",
+    "Rust Belt",
+];
+/// Palette colors.
+pub const PALETTES: [[u8; 12]; 9] = [
+    [224, 248, 208, 136, 192, 112, 52, 104, 86, 8, 24, 32], // Game boy.
+    [155, 188, 15, 139, 172, 15, 48, 98, 48, 15, 56, 15],   // DMG Classic.
+    [200, 200, 168, 168, 168, 112, 104, 104, 88, 56, 48, 48], // Pocket.
+    [199, 240, 216, 103, 182, 189, 11, 95, 164, 2, 5, 25],  // Deep Blue.
+    [251, 243, 209, 197, 182, 111, 122, 105, 49, 41, 32, 14], // Amber.
+    [255, 0, 0, 170, 0, 0, 85, 0, 0, 0, 0, 0],              // Virtual red.
+    [187, 233, 191, 117, 167, 115, 74, 102, 70, 47, 46, 31], // Choco mint.
+    [255, 255, 140, 255, 140, 48, 168, 64, 24, 64, 32, 16], // GBC yellow,
+    [242, 211, 171, 196, 114, 63, 115, 59, 46, 38, 20, 20], // Rust belt.
+];
+
 impl PPU {
     pub fn new(start_dot: u32) -> Self {
-        // The 4 GB shades in RGB888.
-        let palette = [224, 248, 208, 136, 192, 112, 52, 104, 86, 8, 24, 32];
+        // Default palette.
+        let palette = PALETTES[0];
 
         PPU {
             oam: [0xFF; constants::OAM_SIZE],
@@ -160,6 +188,7 @@ impl PPU {
             last_ly_eq_lyc: false,
 
             palette,
+            current_palette: 0,
             fb: [0xff; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
             priorities: [0x01; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH],
         }
@@ -804,6 +833,17 @@ impl PPU {
     /// Are the LCD and the PPU enabled?
     pub fn is_ppu_enabled(&self) -> bool {
         self.lcdc7
+    }
+
+    /// Set the palette for rendering.
+    pub fn cycle_palette(&mut self) {
+        self.current_palette = (self.current_palette + 1) % PALETTES.len() as u8;
+        self.palette = PALETTES[self.current_palette as usize];
+        println!(
+            "{}: Palette changed to {}",
+            "OK".green(),
+            PALETTE_NAMES[self.current_palette as usize].yellow()
+        );
     }
 }
 

@@ -185,4 +185,11 @@ impl<'a> Display<'a> {
         // Actual render operation.
         self.ui.render(&mut self.canvas);
     }
+    /// Saves a screenshot of the current canvas.
+    pub fn save_screenshot(&self) {
+        match self.canvas.save_screenshot() {
+            Ok(file) => println!("{}: Screenshot saved at {}", "OK".green(), file.blue()),
+            _ => println!("{}: Error saving screenshot", "KO".red()),
+        }
+    }
 }
