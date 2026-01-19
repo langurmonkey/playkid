@@ -214,4 +214,9 @@ impl Button {
     pub fn set_callback(&mut self, on_click: Box<dyn FnMut()>) {
         self.on_click = on_click;
     }
+
+    /// Sets the text of this button.
+    pub fn set_text(&mut self, text: &str) {
+        self.text = text.to_string();
+    }
 }

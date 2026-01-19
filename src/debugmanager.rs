@@ -6,9 +6,15 @@ use sdl2::keyboard::Keycode;
 
 /// Manage the debug status and debug input events.
 pub struct DebugManager {
+    /// The debug UI is visible.
     debugging: bool,
+    /// The CPU is waiting for steps.
+    paused: bool,
+    /// Step request.
     step_instruction: bool,
+    /// Step scanline request.
     step_line: bool,
+    /// Breakpoints list.
     breakpoints: Vec<u16>,
 }
 
@@ -39,6 +45,7 @@ impl eventhandler::EventHandler for DebugManager {
                 ..
             } => {
                 self.debugging = !self.debugging;
+                self.paused = self.debugging;
                 true
             }
             _ => false,
@@ -50,6 +57,7 @@ impl DebugManager {
     pub fn new(active: bool) -> Self {
         Self {
             debugging: active,
+            paused: active,
             step_instruction: false,
             step_line: false,
             breakpoints: Vec::new(),
@@ -64,8 +72,20 @@ impl DebugManager {
         self.debugging = !self.debugging;
     }
 
-    pub fn debugging(&self) -> bool {
+    pub fn is_debugging(&self) -> bool {
         self.debugging
+    }
+
+    pub fn set_paused(&mut self, p: bool) {
+        self.paused = p;
+    }
+
+    pub fn toggle_paused(&mut self) {
+        self.paused = !self.paused;
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.paused
     }
 
     pub fn get_breakpoints_str(&self) -> String {

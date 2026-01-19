@@ -54,6 +54,9 @@ pub struct DebugUI<'ttf> {
     pub joypad: Rc<RefCell<Label>>,
     /// Breakpoints.
     pub br: Rc<RefCell<Label>>,
+
+    /// Pause/continue button.
+    pub continue_button: Rc<RefCell<Button>>,
 }
 
 impl<'ttf> DebugUI<'ttf> {
@@ -70,12 +73,7 @@ impl<'ttf> DebugUI<'ttf> {
 
         // Operations (step, scanline, continue).
         let mut operations_row = LayoutGroup::new(Orientation::Horizontal, 25.0);
-        let bindings = [
-            ("Step [F6]", GREEN),
-            ("Scanline [F7]", GREEN),
-            ("Continue [F9]", BLUE),
-            ("Exit debug [d]", BLUE),
-        ];
+        let bindings = [("Step [F6]", GREEN), ("Scanline [F7]", GREEN)];
         for (txt, clr) in bindings {
             let label = txt.to_string();
             let ui_state_b = Rc::clone(&ui_state);
@@ -91,13 +89,24 @@ impl<'ttf> DebugUI<'ttf> {
                     match label.as_str() {
                         "Step [F6]" => state.step_requested = true,
                         "Scanline [F7]" => state.scanline_requested = true,
-                        "Continue [F9]" => state.continue_requested = true,
-                        "Exit debug [d]" => state.debug_requested = true,
                         _ => println!("{}: Unknown button: {}", "ERR".red(), label),
                     }
                 },
             ))));
         }
+        let ui_state_b = Rc::clone(&ui_state);
+        let continue_button = Rc::new(RefCell::new(Button::new(
+            "Continue [F9]",
+            base_font_size,
+            BLUE,
+            DARKGRAY, // Normal color.
+            GRAY,     // Pressed color.
+            move || {
+                let mut state = ui_state_b.borrow_mut();
+                state.continue_requested = true;
+            },
+        )));
+        operations_row.add(Rc::clone(&continue_button) as Rc<RefCell<dyn Widget>>);
 
         // Instruction row.
         let pc_addr = Rc::new(RefCell::new(Label::new(
@@ -467,8 +476,9 @@ impl<'ttf> DebugUI<'ttf> {
         // Bottom buttons (FPS, reset, exit).
         let mut buttons_row = LayoutGroup::new(Orientation::Horizontal, 25.0);
         let bindings = [
+            ("Back [d]", GREEN),
             ("Show FPS [f]", GREEN),
-            ("Reset CPU [r]", ORANGE),
+            ("Reset [r]", ORANGE),
             ("Exit [Esc]", RED),
         ];
         for (txt, clr) in bindings {
@@ -484,8 +494,9 @@ impl<'ttf> DebugUI<'ttf> {
                     let mut state = ui_state_b.borrow_mut();
                     // Match against the label to decide what to do.
                     match label.as_str() {
+                        "Back [d]" => state.debug_requested = true,
                         "Show FPS [f]" => state.fps_requested = true,
-                        "Reset CPU [r]" => state.reset_requested = true,
+                        "Reset [r]" => state.reset_requested = true,
                         "Exit [Esc]" => state.exit_requested = true,
                         _ => println!("{}: Unknown button: {}", "ERR".red(), label),
                     }
@@ -529,6 +540,7 @@ impl<'ttf> DebugUI<'ttf> {
             opcode,
             joypad,
             br,
+            continue_button,
         }
     }
 
@@ -544,6 +556,13 @@ impl<'ttf> DebugUI<'ttf> {
         m_cycles: u32,
         halted: bool,
     ) {
+        // Continue button.
+        let t = if debug.is_paused() {
+            "Continue [F9]"
+        } else {
+            "Pause    [F9]"
+        };
+        self.continue_button.borrow_mut().set_text(t);
         // Instruction.
         self.pc_addr.borrow_mut().set_text(&format!("${:04x}:", pc));
         self.instr_text

@@ -136,15 +136,21 @@ impl<'a, 'b> Machine<'a, 'b> {
             // Check UI state.
             self.handle_ui_commands();
 
-            // Stop at breakpoint?
-            if self.debug.has_breakpoint(self.registers.pc) && !self.debug.debugging() {
-                // If hit, enable debugging.
+            // Breakpoint check:
+            // We are in debug mode, and we are not paused, and we've hit a breakpoint.
+            if self.debug.is_debugging()
+                && !self.debug.is_paused()
+                && self.debug.has_breakpoint(self.registers.pc)
+            {
+                self.debug.set_paused(true);
+                // Force the UI to show if we hit a breakpoint
                 self.debug.set_debugging(true);
-                self.display.set_debug(self.debug.debugging());
+                self.display.set_debug(true);
             }
 
             // Execute cycles for one full frame.
-            if self.debug.debugging() {
+            if self.debug.is_paused() {
+                // Paused mode (step/scanline).
                 if self.debug.take_step_instruction() {
                     // Handle single instruction step.
                     let (t, m, _) = self.machine_cycle();
@@ -162,21 +168,6 @@ impl<'a, 'b> Machine<'a, 'b> {
                         self.display.render_lcd(&self.memory);
                     }
                 }
-                // Update debug UI.
-                let pc = self.registers.pc;
-                let opcode = self.memory.read8(pc);
-                let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
-                self.display.machine_state_update(
-                    pc,
-                    &self.registers,
-                    &self.memory,
-                    &run_instr,
-                    &self.debug,
-                    opcode,
-                    self.t_cycles,
-                    self.m_cycles,
-                    self.halted,
-                );
             } else {
                 // Normal full-speed execution.
                 let mut cycles_this_frame: usize = 0;
@@ -193,9 +184,26 @@ impl<'a, 'b> Machine<'a, 'b> {
                     self.display.render_lcd(&self.memory);
                 }
             }
+            // Update debug UI.
+            if self.debug.is_debugging() {
+                let pc = self.registers.pc;
+                let opcode = self.memory.read8(pc);
+                let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
+                self.display.machine_state_update(
+                    pc,
+                    &self.registers,
+                    &self.memory,
+                    &run_instr,
+                    &self.debug,
+                    opcode,
+                    self.t_cycles,
+                    self.m_cycles,
+                    self.halted,
+                );
+            }
 
-            self.display.canvas.flush(self.debug.debugging());
-
+            // Rendering.
+            self.display.canvas.flush(self.debug.is_debugging());
             self.display.render_ui();
             self.display.present();
 
@@ -385,9 +393,9 @@ impl<'a, 'b> Machine<'a, 'b> {
             }
         };
         if continue_needed {
-            self.debug.toggle_debugging();
-            self.display.set_debug(self.debug.debugging());
+            self.debug.toggle_paused();
         }
+        // Debug toggle.
         let debug_needed = {
             let mut state = self.ui_state.borrow_mut();
             if state.debug_requested {
@@ -399,7 +407,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         };
         if debug_needed {
             self.debug.toggle_debugging();
-            self.display.set_debug(self.debug.debugging());
+            self.display.set_debug(self.debug.is_debugging());
         }
         // Add breakpoint.
         let (br_add_needed, br_addr) = {
@@ -533,10 +541,10 @@ impl<'a, 'b> Machine<'a, 'b> {
             }
             // Debug monitor events (step, continue, etc.).
             if !handled {
-                let d = self.debug.debugging();
+                let d = self.debug.is_debugging();
                 self.debug.handle_event(&event);
-                if d != self.debug.debugging() {
-                    self.display.set_debug(self.debug.debugging());
+                if d != self.debug.is_debugging() {
+                    self.display.set_debug(self.debug.is_debugging());
                 }
             }
         }
