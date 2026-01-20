@@ -712,10 +712,10 @@ impl PPU {
             //   1 = OBJ behind BG colors 1-3 (only draw if BG is color 0)
             let obj_behind_bg = (sprite.attributes & 0x80) != 0;
             let sprite_has_priority = if obj_behind_bg {
-                // Priority bit set: only draw sprite over BG color 0
+                // Priority bit set: only draw sprite over BG color 0.
                 bg_color_id == 0
             } else {
-                // Priority bit clear: always draw sprite (over any BG color)
+                // Priority bit clear: always draw sprite (over any BG color).
                 true
             };
 
