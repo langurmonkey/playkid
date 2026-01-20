@@ -1,10 +1,13 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 /// MBC1 Memory Bank Controller.
 #[derive(Debug)]
 pub struct MBC3 {
     rom: Vec<u8>,
     ram: Vec<u8>,
     rom_bank: usize,
-    ram_bank: usize, // Also used to select RTC registers.
+    /// The RAM bank, also used to select RTC registers.
+    ram_bank: usize,
     ram_enabled: bool,
 
     // Real Time Clock Registers.
@@ -136,7 +139,34 @@ impl MBC3 {
         }
     }
 
-    fn update_rtc(&mut self) {}
+    fn update_rtc(&mut self) {
+        // Get the current time since UNIX epoch, as seconds.
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Calculate time components.
+        self.rtc_seconds = (now % 60) as u8;
+        self.rtc_minutes = ((now / 60) % 60) as u8;
+        self.rtc_hours = ((now / 3600) % 24) as u8;
+
+        // Days counter.
+        let days = (now / 86400) as u16;
+        self.rtc_days_low = (days & 0xFF) as u8;
+
+        // Upper bits and flags in rtc_days_high.
+        // Bit 0: Most significant bit of day counter (9th bit)
+        // Bit 6: Halt flag (0 = running, 1 = halted)
+        // Bit 7: Day counter carry (overflow)
+        let day_msb = ((days >> 8) & 0x01) as u8;
+        self.rtc_days_high = (self.rtc_days_high & 0xFE) | day_msb;
+
+        // Set carry bit if days > 511.
+        if days > 511 {
+            self.rtc_days_high |= 0x80;
+        }
+    }
 
     pub fn get_ram(&self) -> &[u8] {
         &self.ram
