@@ -94,12 +94,12 @@ impl Registers {
     }
     pub fn get_hl_plus(&mut self) -> u16 {
         let result = self.get_hl();
-        self.set_hl(result + 1);
+        self.set_hl(result.wrapping_add(1));
         result
     }
     pub fn get_hl_minus(&mut self) -> u16 {
         let result = self.get_hl();
-        self.set_hl(result - 1);
+        self.set_hl(result.wrapping_sub(1));
         result
     }
     pub fn set_hl(&mut self, value: u16) {

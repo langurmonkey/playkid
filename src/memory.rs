@@ -271,7 +271,7 @@ impl<'a> Memory<'a> {
     }
     /// Read two bytes of memory at the given `address`.
     pub fn read16(&self, address: u16) -> u16 {
-        (self.read8(address) as u16) | ((self.read8(address + 1) as u16) << 8)
+        (self.read8(address) as u16) | ((self.read8(address.wrapping_add(1)) as u16) << 8)
     }
     /// Write the given byte `value` at the given `address`.
     pub fn write8(&mut self, address: u16, value: u8) {
@@ -341,7 +341,7 @@ impl<'a> Memory<'a> {
     /// Write the given word `value` at the given `address`.
     pub fn write16(&mut self, address: u16, value: u16) {
         self.write8(address, (value & 0xFF) as u8);
-        self.write8(address + 1, (value >> 8) as u8);
+        self.write8(address.wrapping_add(1), (value >> 8) as u8);
     }
 
     pub fn cycle(&mut self, t_cycles: u32) -> (u32, bool) {

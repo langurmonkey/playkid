@@ -36,6 +36,7 @@ pub enum Instruction {
     LD16(R16),
     LDfromA(R16LD),
     LDtoA(R16LD),
+    LD16SP(),
     LDfromSP(),
     LDtoSP(),
 
@@ -351,6 +352,8 @@ impl Instruction {
             0xF2 => Some(Instruction::LDtoA(R16LD::C)),
             0xFA => Some(Instruction::LDtoA(R16LD::A16)),
 
+            // LD (r16) SP
+            0x08 => Some(Instruction::LD16SP()),
             // LD x, SP
             0xF8 => Some(Instruction::LDfromSP()),
             // LD SP, x
@@ -558,7 +561,7 @@ impl Instruction {
             // Undocumented OPCODE
             _ => {
                 println!(
-                    "Warn: Unimplemented instruction {:02X}, treating as NOP",
+                    "Warn: Unimplemented instruction {:#02x}, treating as NOP",
                     byte
                 );
                 Some(Instruction::NOP())

@@ -34,6 +34,10 @@ Here are the main features of Play Kid:
   - Pokémon
   - Super Mario Land
   - Super Mario Land 2: 6 Golden Coins
+  - Wario Land (Super Mario Land 3)
+  - Wario Land II
+  - Bugs Bunny Crazy Castle
+  - The Amazing Spider-Man
   - Dr. Mario
   - Probably many more
 
@@ -115,4 +119,4 @@ Options:
 - Pandocs: https://gbdev.io/pandocs/
 - Complete tech reference: https://gekkio.fi/files/gb-docs/gbctr.pdf
 - Game Boy CPU manual: http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf
-- Game Boy instruction set: https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
+- Game Boy CPU instructions: https://meganesu.github.io/generate-gb-opcodes/

@@ -986,6 +986,12 @@ impl<'a, 'b> Machine<'a, 'b> {
                 }
             },
 
+            // LD (r16), SP
+            Instruction::LD16SP() => {
+                let val = self.read16();
+                self.memory.write16(val, self.registers.sp);
+                5
+            }
             // LD x, SP
             Instruction::LDfromSP() => {
                 let val = self.add16imm(self.registers.sp);

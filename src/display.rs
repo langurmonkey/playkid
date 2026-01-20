@@ -25,8 +25,6 @@ const BG: Color = Color::RGBA(0, 0, 0, 180);
 pub struct Display<'a> {
     /// The canvas itself.
     pub canvas: Canvas<'a>,
-    /// Holds the last rendered LY.
-    last_ly: u8,
     /// Run in debug mode (present after every line).
     debug: bool,
 
@@ -98,7 +96,6 @@ impl<'a> Display<'a> {
             debug_ui,
             debug,
             fps,
-            last_ly: 255,
         };
 
         Ok(display)
