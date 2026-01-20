@@ -80,7 +80,7 @@ impl MBC2 {
         &self.ram
     }
 
-    // Copy from the loaded buffer into the fixed array
+    // Copy from the loaded buffer into the fixed array.
     pub fn set_ram(&mut self, data: &[u8]) {
         let len = data.len().min(512);
         self.ram[..len].copy_from_slice(&data[..len]);
