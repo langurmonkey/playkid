@@ -68,10 +68,10 @@ impl Cartridge {
         {
             if data[0x143] == 0x80 {
                 // Color GB.
-                println!("{}: -> {}", "GB Color cartridge", "OK".green());
+                println!("{}: {}", "OK".green(), "GB Color cartridge");
             } else {
                 // Not color GB.
-                println!("{}: -> {}", "Regular GB cartridge", "OK".green());
+                println!("{}: {}", "OK".green(), "Regular GB cartridge",);
             }
         }
 
@@ -79,11 +79,7 @@ impl Cartridge {
         {
             let sgbf = data[0x146];
             if sgbf == 0x03 {
-                println!(
-                    "{}: -> {}",
-                    "Super Game Boy functions supported",
-                    "OK".green()
-                );
+                println!("{}: {}", "OK".green(), "Super Game Boy functions supported",);
             }
         }
 
