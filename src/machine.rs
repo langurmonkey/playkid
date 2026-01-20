@@ -26,10 +26,13 @@ use std::thread;
 /// Spin threshold in milliseconds. Minimum time to sleep until next frame.
 const SPIN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(2);
 
-/// This is our machine, which contains the registers and the memory, and
-/// executes the operations.
+/// # Machine
+/// The machine contains the registers, the memory, and the display, and
+/// controls the execution and CPU state. It also implements the CPU, which
+/// decodes and executes instructions.
+
 pub struct Machine<'a, 'b> {
-    /// Our registers.
+    /// The registers.
     pub registers: Registers,
     /// The main memory.
     pub memory: Memory<'a>,
@@ -274,7 +277,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             }
         }
 
-        // If no interrupts are pending OR IME is disabled, return
+        // If no interrupts are pending OR IME is disabled, return.
         if !self.ime || pending == 0 {
             return 0;
         }

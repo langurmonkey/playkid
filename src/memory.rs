@@ -29,7 +29,6 @@ use timer::Timer;
 /// 0xFF4C-0xFF7F: Empty (?)
 /// 0xFF80-0xFFFE: High RAM                       (HRAM)
 /// 0xFF80-0xFFFF: Interrupt Enable Register      (IER)
-
 pub struct Memory<'a> {
     /// Work RAM.
     pub wram: [u8; constants::WRAM_SIZE],

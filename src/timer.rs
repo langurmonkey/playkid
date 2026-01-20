@@ -1,3 +1,4 @@
+/// # Timer
 /// The timer registers and logic.
 pub struct Timer {
     /// Divider. It is incremented internally every T-cycle, but only the upper 8 bits

@@ -1,11 +1,9 @@
-use crate::memory;
-use crate::registers;
-
-use memory::Memory;
-use registers::Registers;
+use crate::memory::Memory;
+use crate::registers::Registers;
+use colored::Colorize;
 use std::fmt;
 
-/// # Instruction
+/// # Instructions
 /// This enum contains all supported instructions.
 /// Instructions that can act with both r8 and r16 registers are first named
 /// by default in their r8 version. The r16 versions add a `16` at the end of the name.
@@ -561,7 +559,8 @@ impl Instruction {
             // Undocumented OPCODE
             _ => {
                 println!(
-                    "Warn: Unimplemented instruction {:#02x}, treating as NOP",
+                    "{}: Unimplemented instruction {:#02x}, treating as NOP",
+                    "WARN".yellow(),
                     byte
                 );
                 Some(Instruction::NOP())
