@@ -51,9 +51,9 @@ pub struct Machine<'a, 'b> {
     /// CPU halted.
     halted: bool,
     /// T-states, basic unit of time, and 1:1 with the clock.
-    t_cycles: u32,
+    t_cycles: u64,
     /// M-cycles, base unit for CPU instructions, and 1:4 with the clock.
-    m_cycles: u32,
+    m_cycles: u64,
     /// The debug manager.
     debug: DebugManager,
     /// Print FPS every second.
@@ -267,7 +267,7 @@ impl<'a, 'b> Machine<'a, 'b> {
     /// interrupts from being handled until re-enabled (with RETI).
     /// In this case, the corresponding interrupt handler is called by pushing the PC
     /// to the stack, and then setting it to the address of the interrupt handler.
-    fn interrupt_handling(&mut self) -> u32 {
+    fn interrupt_handling(&mut self) -> u64 {
         let pending = self.memory.ie & self.memory.iff;
 
         // Wake from HALT if any interrupt is pending (even if IME is disabled).
@@ -312,7 +312,7 @@ impl<'a, 'b> Machine<'a, 'b> {
     }
 
     /// Run a machine cycle.
-    fn machine_cycle(&mut self) -> (u32, u32, bool) {
+    fn machine_cycle(&mut self) -> (u64, u64, bool) {
         // CPU instruction.
         // One machine cycle (M-cycle) is 4 clock cycles.
         let mut m_cycles = if self.running {
@@ -321,7 +321,7 @@ impl<'a, 'b> Machine<'a, 'b> {
                 1
             } else {
                 // Run next CPU instruction.
-                self.cycle() as u32
+                self.cycle() as u64
             }
         } else {
             // NOOP instruction.
@@ -332,12 +332,7 @@ impl<'a, 'b> Machine<'a, 'b> {
         // Memory cycle.
         if m_cycles > 0 {
             // Memory cycle.
-            let (_, r) = self.memory.cycle(t_cycles);
-            if !r {
-                // Close down.
-                self.running = false;
-                return (0, 0, false);
-            }
+            self.memory.cycle(t_cycles);
         } else {
             t_cycles = 0;
             m_cycles = 0;

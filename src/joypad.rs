@@ -415,7 +415,7 @@ impl Joypad {
     /// Implements a Joypad cycle.
     /// Assumes `handle_event()` has been called previously and the state
     /// of the joypad is up to date.
-    pub fn cycle(&mut self) -> bool {
+    pub fn cycle(&mut self) {
         // Update state and raise interrupt if necessary.
         self.update_state();
 
@@ -423,7 +423,6 @@ impl Joypad {
             self.i_mask = 0b0001_0000;
             self.request_interrupt = false;
         }
-        true
     }
 
     /// Updates the flags in bits 5 and 4 (select buttons, select D-pad) of JOYP.

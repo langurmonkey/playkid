@@ -552,8 +552,8 @@ impl<'ttf> DebugUI<'ttf> {
         run_instr: &RunInstr,
         debug: &DebugManager,
         opcode: u8,
-        t_cycles: u32,
-        m_cycles: u32,
+        t_cycles: u64,
+        m_cycles: u64,
         halted: bool,
     ) {
         // Continue button.

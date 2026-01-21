@@ -107,7 +107,7 @@ impl Timer {
     }
 
     /// Advances the timer(s) by the given amount of T-cycles.
-    pub fn cycle(&mut self, t_cycles: u32) {
+    pub fn cycle(&mut self, t_cycles: u64) {
         // DIV increments every M-cycle (4 T-cycles)
         for _ in 0..t_cycles {
             self.divider = self.divider.wrapping_add(1);

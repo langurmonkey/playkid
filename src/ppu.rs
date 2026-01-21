@@ -36,11 +36,11 @@ pub struct PPU {
     /// - 3: HDraw
     mode: u8,
     /// Start dot of the PPU.
-    start_dot: u32,
+    start_dot: u64,
     /// Current dot within a frame, in [0,4560).
-    fdot: u32,
+    fdot: u64,
     /// Current dot within the line, in [0,456).
-    ldot: u32,
+    ldot: u64,
 
     // The LCDC byte.
     pub lcdc: u8,
@@ -163,7 +163,7 @@ pub const PALETTES: [[u8; 12]; 18] = [
 ];
 
 impl PPU {
-    pub fn new(start_dot: u32) -> Self {
+    pub fn new(start_dot: u64) -> Self {
         // Default palette.
         let palette = PALETTES[0];
 
@@ -363,7 +363,7 @@ impl PPU {
     /// Timing is divided between 154 lines, 144 during VDraw (modes 0, 2, 3),
     /// and 10 during VBlank. Each line takes 456 dots, and one frame takes
     /// 70224 dots.
-    pub fn cycle(&mut self, t_cycles: u32) {
+    pub fn cycle(&mut self, t_cycles: u64) {
         if !self.is_ppu_enabled() {
             return;
         }

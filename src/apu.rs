@@ -21,7 +21,7 @@ pub struct APU {
 
     /// Frame sequencer.
     frame_sequencer: u8,
-    frame_timer: u32,
+    frame_timer: u64,
 
     // Channel 1.
     ch1_enabled: bool,
@@ -305,7 +305,7 @@ impl APU {
     }
 
     /// Run the APU for `t_cycles` T-cycles.
-    pub fn cycle(&mut self, t_cycles: u32) {
+    pub fn cycle(&mut self, t_cycles: u64) {
         // Update Channel 1 Frequency Timer.
         // The timer period is (2048 - frequency) * 4.
         let freq_low = self.read(0xFF13) as u16;
