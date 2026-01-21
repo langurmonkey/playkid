@@ -54,6 +54,8 @@ pub struct Machine<'a, 'b> {
     t_cycles: u64,
     /// M-cycles, base unit for CPU instructions, and 1:4 with the clock.
     m_cycles: u64,
+    /// T-cycles since the last SRAM save operation.
+    last_save_cycles: u64,
     /// The debug manager.
     debug: DebugManager,
     /// Print FPS every second.
@@ -87,6 +89,7 @@ impl<'a, 'b> Machine<'a, 'b> {
             halted: false,
             t_cycles: 324,
             m_cycles: 0,
+            last_save_cycles: 0,
             debug: DebugManager::new(debug),
             fps,
             event_pump: sdl.event_pump().unwrap(),
@@ -219,6 +222,16 @@ impl<'a, 'b> Machine<'a, 'b> {
                 self.display.update_fps(actual_fps);
                 frame_count = 0;
                 fps_timer = std::time::Instant::now();
+            }
+
+            // If SRAM is dirty, save it. Check every minute.
+            let cycles_since_save = self.t_cycles - self.last_save_cycles;
+            if cycles_since_save >= 6 * 41_943_040 {
+                if self.memory.cart.is_dirty() {
+                    self.memory.cart.save_sram();
+                    self.memory.cart.consume_dirty();
+                }
+                self.last_save_cycles = self.t_cycles;
             }
 
             // Now, sleep for the remaining time in the frame.

@@ -68,7 +68,7 @@ fn main() -> io::Result<()> {
         .expect(&format!("{}: Error reading rom file", "ERR".red()));
 
     // Load existing save data from disk.
-    cart.load_sram(rom);
+    cart.load_sram();
 
     let sdl_context = sdl2::init().unwrap();
     let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).unwrap();
@@ -91,7 +91,7 @@ fn main() -> io::Result<()> {
     }
 
     // Save data back to disk after the machine stops running.
-    cart.save_sram(rom);
+    cart.save_sram();
 
     // Finish gracefully by returning OK.
     Ok(())

@@ -26,7 +26,7 @@ Here are the main features of Play Kid:
   - Displays internal state.
   - Breakpoints.
   - Uses own minimal UI library with horizontal/vertical layouts, labels, buttons, and text fields.
-- Save RAM to `.sav` files to emulate the battery-backed SRAM.
+- Save RAM to `.sav` files to emulate the battery-backed SRAM. Those are saved every minute.
 - Automatically adapts to multi-DPI setups by scaling the UI.
 - Working games/roms:
   - Passes `dmg-acid2`

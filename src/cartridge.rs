@@ -30,6 +30,8 @@ pub struct Cartridge {
     pub cart_type: CartridgeType,
     /// Holds the ROM data in an array of bytes.
     data: Vec<u8>,
+    /// Flag to keep track of dirty (unsaved) RAM.
+    dirty: bool,
 }
 
 /// Game Boy logo sequence.
@@ -47,7 +49,7 @@ impl eventhandler::EventHandler for Cartridge {
                 keycode: Some(Keycode::W),
                 ..
             } => {
-                self.save_sram(&self.rom);
+                self.save_sram();
                 true
             }
             _ => false,
@@ -242,7 +244,18 @@ impl Cartridge {
             rom: rom.to_string(),
             cart_type: cart_type_enum,
             data,
+            dirty: false,
         })
+    }
+
+    /// Is the RAM dirty?
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Consume the RAM so that it is clean again.
+    pub fn consume_dirty(&mut self) {
+        self.dirty = false;
     }
 
     /// ROM read.
@@ -291,6 +304,8 @@ impl Cartridge {
             CartridgeType::MBC2(mbc) => mbc.write_ram(address, value),
             CartridgeType::MBC3(mbc) => mbc.write_ram(address, value),
         }
+        // Mark RAM dirty.
+        self.dirty = true;
     }
 
     /// Get cartridge type as a descriptive string.
@@ -329,7 +344,8 @@ impl Cartridge {
     }
 
     /// Save SRAM of current cartridge to `.sav` file.
-    pub fn save_sram(&self, rom_path: &str) {
+    pub fn save_sram(&self) {
+        let rom_path = &self.rom;
         let save_path = Path::new(rom_path).with_extension("sav");
 
         // Only save if the mapper actually has RAM.
@@ -353,7 +369,8 @@ impl Cartridge {
     }
 
     /// Load `.sav` file into SRAM.
-    pub fn load_sram(&mut self, rom_path: &str) {
+    pub fn load_sram(&mut self) {
+        let rom_path = &self.rom;
         let save_path = Path::new(rom_path).with_extension("sav");
 
         if !save_path.exists() {
