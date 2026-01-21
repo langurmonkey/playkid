@@ -229,7 +229,7 @@ impl<'a> Canvas<'a> {
 
         // Create a JpegEncoder and set the quality.
         let mut file = std::fs::File::create(&filename)?;
-        let mut encoder = JpegEncoder::new_with_quality(&mut file, 90);
+        let mut encoder = JpegEncoder::new_with_quality(&mut file, 92);
         encoder.encode_image(&image)?;
 
         Ok(filename)
