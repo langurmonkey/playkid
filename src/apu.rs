@@ -368,13 +368,13 @@ impl APU {
             }
         }
 
-        // 64Hz Envelope Clock (65536 T-cycles)
+        // 64Hz Envelope Clock (65536 T-cycles).
         self.frame_timer += t_cycles;
 
         if self.frame_timer >= 8192 {
-            // 512Hz
+            // 512Hz is 4.19 Mhz / 8192.
             self.frame_timer -= 8192;
-
+            // 8 phases, from 0 to 7.
             match self.frame_sequencer {
                 0 | 2 | 4 | 6 => {
                     self.step_length();
