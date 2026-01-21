@@ -587,7 +587,7 @@ impl APU {
         let r_vol = ((nr50 & 0x07) as f32 + 1.0) / 8.0;
         let l_vol = (((nr50 & 0x70) >> 4) as f32 + 1.0) / 8.0;
 
-        // Apply master volume and a small safety gain to prevent digital clipping
+        // Apply master volume and a small safety gain to prevent digital clipping.
         (left * l_vol * 0.2, right * r_vol * 0.2)
     }
 
@@ -649,26 +649,26 @@ impl APU {
             return 0.0;
         }
 
-        // Volume shift: bits 5-6 of NR32 ($FF1C)
+        // Volume shift: bits 5-6 of NR32 ($FF1C).
         let volume_shift = match (self.read(0xFF1C) >> 5) & 0x03 {
-            0 => 4, // Mute (actually shifts out all bits)
+            0 => 4, // Mute (actually shifts out all bits).
             1 => 0, // 100%
             2 => 1, // 50%
             3 => 2, // 25%
             _ => 4,
         };
 
-        // Get 4-bit sample from Wave RAM (32 samples total, 2 per byte)
+        // Get 4-bit sample from Wave RAM (32 samples total, 2 per byte).
         let byte = self.wave_ram[self.ch3_sample_idx / 2];
         let mut sample = if self.ch3_sample_idx % 2 == 0 {
-            byte >> 4 // High nibble
+            byte >> 4 // High nibble.
         } else {
-            byte & 0x0F // Low nibble
+            byte & 0x0F // Low nibble.
         };
 
         sample >>= volume_shift;
 
-        // Normalize 0..15 to -1.0..1.0
+        // Normalize 0..15 to -1.0..1.0.
         (sample as f32 / 7.5 - 1.0) * 0.05
     }
 
@@ -677,7 +677,7 @@ impl APU {
             return 0.0;
         }
 
-        // Result is the inverse of the first bit
+        // Result is the inverse of the first bit.
         let bit = (!self.ch4_lfsr) & 0x01;
         let vol = (self.ch4_volume as f32 / 15.0) * 0.05;
 
@@ -707,14 +707,14 @@ impl APU {
 
                 let sweep_step = nr10 & 0x07;
                 if new_freq <= 2047 && sweep_step > 0 {
-                    // Update shadow frequency
+                    // Update shadow frequency.
                     self.ch1_sweep_shadow_freq = new_freq;
 
-                    // Update NR13 and NR14 registers
+                    // Update NR13 and NR14 registers.
                     self.regs[0x03] = (new_freq & 0xFF) as u8;
                     self.regs[0x04] = (self.regs[0x04] & 0xF8) | ((new_freq >> 8) & 0x07) as u8;
 
-                    // Overflow check again with the NEW frequency
+                    // Overflow check again with the NEW frequency.
                     self.calculate_sweep_freq();
                 }
             }
