@@ -57,16 +57,19 @@ Make the binary with:
 
 # Operation
 
-Here are the keyboard mappings:
+Here are the Joypad keyboard mappings:
 
 - <kbd>enter</kbd> - Start button
 - <kbd>space</kbd> - Select button
 - <kbd>a</kbd> - A button
 - <kbd>b</kbd> - B button
 
+You can also use any game controller. The SDL2 usual mappings apply.
+
 Additionally, there are some more actions available:
 
 - <kbd>p</kbd> - change the palette colors
+- <kbd>w</kbd> - trigger the SRAM save operation to `.sav` file.
 - <kbd>f</kbd> - toggle FPS monitor
 - <kbd>s</kbd> - save a screenshot, with name `screenshot_[time].jpg`
 - <kbd>d</kbd> - enter debug mode

@@ -553,6 +553,10 @@ impl<'a, 'b> Machine<'a, 'b> {
             if !handled {
                 handled = self.memory.joypad.handle_event(&event)
             }
+            // Cartridge key bindings (like write SRAM).
+            if !handled {
+                handled = self.memory.cart.handle_event(&event);
+            }
             // Debug monitor events (step, continue, etc.).
             if !handled {
                 let d = self.debug.is_debugging();

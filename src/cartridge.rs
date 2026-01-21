@@ -2,10 +2,13 @@ mod mbc1;
 mod mbc2;
 mod mbc3;
 
+use crate::eventhandler;
 use colored::Colorize;
 use mbc1::MBC1;
 use mbc2::MBC2;
 use mbc3::MBC3;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind, Result};
@@ -23,6 +26,7 @@ pub enum CartridgeType {
 /// Checks for logo, header checksum, and detects Memory Bank Controller (MBC) type.
 /// MBC1/2/3 implemented in dedicated files.
 pub struct Cartridge {
+    rom: String,
     pub cart_type: CartridgeType,
     /// Holds the ROM data in an array of bytes.
     data: Vec<u8>,
@@ -34,6 +38,22 @@ const LOGO: [u8; 48] = [
     0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
     0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
 ];
+
+impl eventhandler::EventHandler for Cartridge {
+    fn handle_event(&mut self, event: &Event) -> bool {
+        match event {
+            // Write SRAM file on `w`.
+            Event::KeyDown {
+                keycode: Some(Keycode::W),
+                ..
+            } => {
+                self.save_sram(&self.rom);
+                true
+            }
+            _ => false,
+        }
+    }
+}
 
 impl Cartridge {
     pub fn new(rom: &str, skip_checksum: bool) -> Result<Self> {
@@ -219,6 +239,7 @@ impl Cartridge {
         };
 
         Ok(Self {
+            rom: rom.to_string(),
             cart_type: cart_type_enum,
             data,
         })
@@ -323,7 +344,7 @@ impl Cartridge {
             if let Ok(mut file) = File::create(&save_path) {
                 let _ = file.write_all(ram_data);
                 println!(
-                    "{}: Save data written to disk: {}",
+                    "{}: SRAM written to disk: {}",
                     "WR".magenta(),
                     save_path.display()
                 );
@@ -347,7 +368,7 @@ impl Cartridge {
                         if mbc.get_ram().len() == buffer.len() {
                             mbc.set_ram(buffer);
                         } else {
-                            println!("{}: Save file size mismatch!", "WARN".yellow());
+                            println!("{}: SRAM file size mismatch!", "WARN".yellow());
                         }
                     }
                     CartridgeType::MBC2(mbc) => mbc.set_ram(&buffer),
@@ -355,14 +376,14 @@ impl Cartridge {
                         if mbc.get_ram().len() == buffer.len() {
                             mbc.set_ram(buffer);
                         } else {
-                            println!("{}: Save file size mismatch!", "WARN".yellow());
+                            println!("{}: SRAM file size mismatch!", "WARN".yellow());
                         }
                     }
                     _ => (),
                 }
 
                 println!(
-                    "{}: Save data loaded from disk: {}",
+                    "{}: SRAM loaded from disk: {}",
                     "LD".magenta(),
                     save_path.display()
                 );
