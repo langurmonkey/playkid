@@ -203,7 +203,7 @@ impl<'a> Canvas<'a> {
     /// Save a screenshot of the current buffer.
     /// Returns the filename.
     pub fn save_screenshot(&self) -> Result<String, Error> {
-        use image::{ImageBuffer, Rgb};
+        use image::{codecs::jpeg::JpegEncoder, DynamicImage, ImageBuffer, Rgb};
         use std::time::{SystemTime, UNIX_EPOCH};
 
         // Create a unique filename using a timestamp.
@@ -224,7 +224,13 @@ impl<'a> Canvas<'a> {
             ImageBuffer::from_raw(self.width as u32, self.height as u32, rgb_data)
                 .ok_or("Failed to create image buffer")?;
 
-        buffer.save(&filename)?;
+        // Create a DynamicImage from the buffer.
+        let image = DynamicImage::ImageRgb8(buffer);
+
+        // Create a JpegEncoder and set the quality.
+        let mut file = std::fs::File::create(&filename)?;
+        let mut encoder = JpegEncoder::new_with_quality(&mut file, 90);
+        encoder.encode_image(&image)?;
 
         Ok(filename)
     }
