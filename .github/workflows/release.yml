@@ -109,6 +109,17 @@ jobs:
             tar -czf ../../../${{ matrix.artifact_name }}.tar.gz ${{ matrix.bin }}
           fi
 
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          # This name appears in the GitHub Actions summary
+          name: ${{ matrix.artifact_name }}
+          # This finds the .zip or .tar.gz created in the root by the previous step
+          path: |
+            *.tar.gz
+            *.zip
+          retention-days: 5
+
   release:
     needs: build
     runs-on: ubuntu-latest
