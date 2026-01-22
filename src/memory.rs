@@ -1,14 +1,9 @@
-// use crate::apu;
-use crate::cartridge;
+use crate::apu::APU;
+use crate::cartridge::Cartridge;
 use crate::constants;
-use crate::joypad;
-use crate::ppu;
-use crate::timer;
-
-use cartridge::Cartridge;
-use joypad::Joypad;
-use ppu::PPU;
-use timer::Timer;
+use crate::joypad::Joypad;
+use crate::ppu::PPU;
+use crate::timer::Timer;
 
 /// # Memory
 /// The Game Boy uses a 2-byte address space (0x0000 to 0xFFFF) to map the different
@@ -47,7 +42,7 @@ pub struct Memory<'a> {
     /// The joypad.
     pub joypad: Joypad,
     // The APU, Audio Processing Unit.
-    // pub apu: APU,
+    pub apu: APU,
 }
 
 impl<'a> Memory<'a> {
@@ -63,7 +58,7 @@ impl<'a> Memory<'a> {
             ppu: PPU::new(0x194),
             timer: Timer::new(),
             joypad: Joypad::new(),
-            // apu: APU::new(sdl),
+            apu: APU::new(),
         }
     }
 
@@ -249,11 +244,7 @@ impl<'a> Memory<'a> {
             0xFF0F => self.iff | 0b1110_0000,
 
             // Audio.
-            0xFF10..=0xFF3F =>
-            /* TODO self.apu.read(address)*/
-            {
-                0x00
-            }
+            0xFF10..=0xFF3F => self.apu.read(address),
 
             // VRAM registers.
             0xFF40..=0xFF4F => self.ppu.read(address),
@@ -313,9 +304,7 @@ impl<'a> Memory<'a> {
             0xFF0F => self.iff = value,
 
             // Audio.
-            0xFF10..=0xFF3F =>
-                /*self.apu.write(address, value)*/
-                {}
+            0xFF10..=0xFF3F => self.apu.write(address, value),
 
             // OAM DMA.
             0xFF46 => {
@@ -365,8 +354,8 @@ impl<'a> Memory<'a> {
         self.ppu.i_mask = 0;
 
         // APU
-        // self.apu.cycle(t_cycles);
-        // self.iff |= self.apu.i_mask;
-        // self.apu.i_mask = 0;
+        self.apu.cycle(t_cycles);
+        self.iff |= self.apu.i_mask;
+        self.apu.i_mask = 0;
     }
 }

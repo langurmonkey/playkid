@@ -1,6 +1,7 @@
 #![deny(clippy::all)]
 #![forbid(unsafe_code)]
 
+mod apu;
 mod cartridge;
 mod constants;
 mod eventhandler;
