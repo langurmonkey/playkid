@@ -2,14 +2,25 @@
 #![forbid(unsafe_code)]
 
 mod cartridge;
+mod constants;
 mod eventhandler;
+mod instruction;
+mod joypad;
+mod machine;
+mod memory;
+mod ppu;
+mod registers;
+mod timer;
+mod uistate;
 
+use crate::eventhandler::EventHandler;
 use crate::gui::Framework;
 use cartridge::Cartridge;
 use clap::Parser;
 use colored::Colorize;
 use error_iter::ErrorIter as _;
 use log::error;
+use machine::Machine;
 use pixels::{Error, Pixels, SurfaceTexture};
 use std::path::PathBuf;
 use winit::dpi::LogicalSize;
@@ -96,6 +107,7 @@ fn main() -> Result<(), Error> {
         (pixels, framework)
     };
     // Create Machine.
+    let mut machine = Machine::new(&mut cart);
 
     // Event loop.
     let res = event_loop.run(|event, elwt| {
@@ -115,6 +127,8 @@ fn main() -> Result<(), Error> {
                 framework.scale_factor(scale_factor);
             }
 
+            machine.handle_event(&input);
+
             // Resize the window.
             if let Some(size) = input.window_resized() {
                 if let Err(err) = pixels.resize_surface(size.width, size.height) {
@@ -126,6 +140,7 @@ fn main() -> Result<(), Error> {
             }
 
             // Update Machine.
+            machine.update();
 
             // Request a redraw.
             window.request_redraw();
@@ -137,18 +152,10 @@ fn main() -> Result<(), Error> {
                 event: WindowEvent::RedrawRequested,
                 ..
             } => {
-                // Render machine. Pass pixels.frame_mut()
+                // Render machine.
+                let fb = machine.memory.ppu.fb;
                 let frame = pixels.frame_mut();
-                for (_, pixel) in frame.chunks_exact_mut(4).enumerate() {
-                    let r = rand::random();
-                    let rgba = if r {
-                        [190, 45, 25, 255]
-                    } else {
-                        [25, 190, 85, 255]
-                    };
-
-                    pixel.copy_from_slice(&rgba);
-                }
+                frame.copy_from_slice(&fb);
 
                 // Prepare egui.
                 framework.prepare(&window);

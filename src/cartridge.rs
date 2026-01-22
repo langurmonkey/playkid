@@ -42,7 +42,7 @@ const LOGO: [u8; 48] = [
 ];
 
 impl eventhandler::EventHandler for Cartridge {
-    fn handle_event(&mut self, event: WinitInputHelper) -> bool {
+    fn handle_event(&mut self, event: &WinitInputHelper) -> bool {
         // Write SRAM file on `w`.
         if event.key_released(KeyCode::KeyW) {
             self.save_sram();

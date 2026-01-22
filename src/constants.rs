@@ -1,0 +1,26 @@
+
+/// Work RAM size (8 KiB).
+pub const WRAM_SIZE: usize = 8192;
+/// Video RAM size (8 KiB).
+pub const VRAM_SIZE: usize = 8 * 1024;
+// High RAM size (128 bytes).
+pub const HRAM_SIZE: usize = 128;
+// OAM size (160 bytes).
+pub const OAM_SIZE: usize = 4 * 40;
+// IO size (128 bytes).
+pub const IO_SIZE: usize = 128;
+/// Display width.
+pub const DISPLAY_WIDTH: usize = 160;
+/// Display height.
+pub const DISPLAY_HEIGHT: usize = 144;
+/// Target frame rate.
+pub const TARGET_FPS: u64 = 60;
+/// Target frame duration.
+pub const TARGET_FRAME_DURATION: std::time::Duration =
+    std::time::Duration::from_millis(1000 / TARGET_FPS);
+/// CPU frequency [Hz].
+pub const CPU_FREQ_HZ: usize = 4194304;
+/// CPU cycles per frame.
+pub const CYCLES_PER_FRAME: usize = (CPU_FREQ_HZ as f64 / TARGET_FPS as f64) as usize;
+/// Maximum number of sprites per line.
+pub const MAX_SPRITES_PER_LINE: usize = 10;
