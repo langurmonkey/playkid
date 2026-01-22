@@ -66,8 +66,11 @@ jobs:
           # Tell the linker where Homebrew lives on Apple Silicon
           echo "LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/lib" >> $GITHUB_ENV
 
-      # --- BUILD ---
+        # --- BUILD ---
       - name: Build
+        env:
+          # This tells the Windows linker specifically where to find the .lib files
+          RUSTFLAGS: ${{ matrix.os == 'windows-latest' && format('-L native={0}\installed\x64-windows\lib', env.VCPKG_INSTALLATION_ROOT) || '' }}
         run: cargo build --release --target ${{ matrix.target }}
 
       # --- PACKAGING ---
