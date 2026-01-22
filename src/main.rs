@@ -83,9 +83,13 @@ fn main() -> Result<(), Error> {
     let event_loop = EventLoop::new().unwrap();
     let mut input = WinitInputHelper::new();
     let window = {
-        let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
+        let scale = args.scale as f64;
+        let size = LogicalSize::new(
+            constants::DISPLAY_WIDTH as f64 * scale,
+            constants::DISPLAY_HEIGHT as f64 * scale,
+        );
         WindowBuilder::new()
-            .with_title("Hello Pixels + egui")
+            .with_title("Play Kid")
             .with_inner_size(size)
             .with_min_inner_size(size)
             .build(&event_loop)
