@@ -14,13 +14,17 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: playkid-linux
+            artifact_name: playkid-linux-x64
+            bin: playkid
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: playkid-windows.exe
+            artifact_name: playkid-win-x64
+            bin: playkid.exe
           - os: macos-latest
+            # We list the primary target, but we will add the second one in the steps
             target: aarch64-apple-darwin
-            artifact_name: playkid-macos
+            artifact_name: playkid-macos-universal
+            bin: playkid
 
     steps:
       - name: Checkout code
@@ -29,46 +33,97 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.target }} ${{ matrix.os == 'macos-latest' && 'x86_64-apple-darwin' || '' }}
 
-      # Handle SDL2 dependencies per OS
+      # --- Dependency Installation ---
       - name: Install SDL2 (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-ttf-dev
 
       - name: Install SDL2 (Windows)
         if: matrix.os == 'windows-latest'
-        run: vcpkg install sdl2 sdl2-ttf:x64-windows
+        run: |
+          vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows
+          echo "VCPKG_BIN=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" >> $GITHUB_ENV
+          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $GITHUB_ENV
 
       - name: Install SDL2 (macOS)
         if: matrix.os == 'macos-latest'
         run: |
           brew install sdl2 sdl2_ttf
-          # Tell the linker where Homebrew lives on Apple Silicon
-          echo "LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/lib" >> $GITHUB_ENV
+          # Homebrew on Apple Silicon is in /opt/homebrew, on Intel it is in /usr/local
+          # We point the linker to both so it can find the libs for both architectures
+          echo "LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/lib:/usr/local/lib" >> $GITHUB_ENV
 
-      - name: Build
+      # --- Build ---
+      - name: Build (Standard)
+        if: matrix.os != 'macos-latest'
         run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build (macOS Universal)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Build for both architectures
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          
+          # Combine them into a single "Universal" binary
+          lipo -create \
+            target/aarch64-apple-darwin/release/playkid \
+            target/x86_64-apple-darwin/release/playkid \
+            -output target/playkid-universal
+
+      # --- Packaging ---
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release/
+          cp "${{ env.VCPKG_BIN }}\SDL2.dll" .
+          cp "${{ env.VCPKG_BIN }}\SDL2_ttf.dll" .
+          compress-archive -Path ${{ matrix.bin }}, *.dll -DestinationPath ../../../${{ matrix.artifact_name }}.zip
+
+      - name: Package (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Package the universal binary we created with lipo
+          cd target/
+          tar -czf ../${{ matrix.artifact_name }}.tar.gz playkid-universal
+
+      - name: Package (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd target/${{ matrix.target }}/release/
+          tar -czf ../../../${{ matrix.artifact_name }}.tar.gz ${{ matrix.bin }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact_name == 'playkid-windows.exe' && 'playkid.exe' || 'playkid' }}
+          path: "*.tar.gz" # This picks up the root-level archives
+          if-no-files-found: ignore
+
+      - name: Upload Windows Artifact
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: "*.zip"
 
   release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            playkid-linux/playkid
-            playkid-windows.exe/playkid.exe
-            playkid-macos/playkid
+          files: release-files/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
