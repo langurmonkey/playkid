@@ -10,6 +10,7 @@ jobs:
     name: Build for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -42,24 +43,58 @@ jobs:
 
       - name: Install SDL2 (Windows)
         if: matrix.os == 'windows-latest'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: '9e73ca079a4059437648325a25035f608977161b' # Use a recent stable commit
+          runVcpkgInstall: true
+          # This specifies exactly what to install and caches it
+          vcpkgArguments: 'sdl2 sdl2-ttf'
+
+      - name: Setup Windows Environment
+        if: matrix.os == 'windows-latest'
         run: |
-          vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows
-          echo "VCPKG_BIN=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" >> $GITHUB_ENV
+          # Use the output from the run-vcpkg action to find the libs
           echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $GITHUB_ENV
+          echo "LIB=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\lib" >> $GITHUB_ENV
+          echo "VCPKG_BIN=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" >> $GITHUB_ENV
 
       - name: Install SDL2 (macOS)
         if: matrix.os == 'macos-latest'
         run: |
+          # Install the native version (arm64)
           brew install sdl2 sdl2_ttf
-          # Homebrew on Apple Silicon is in /opt/homebrew, on Intel it is in /usr/local
-          # We point the linker to both so it can find the libs for both architectures
-          echo "LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/lib:/usr/local/lib" >> $GITHUB_ENV
+          
+          # Download the official SDL2 Frameworks which are already Universal
+          # This is much more reliable than trying to mix Homebrew architectures
+          curl -L https://www.libsdl.org/release/SDL2-2.30.0.dmg -o SDL2.dmg
+          hdiutil attach SDL2.dmg
+          sudo cp -R /Volumes/SDL2/SDL2.framework /Library/Frameworks/
+          
+          curl -L https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.22.0.dmg -o SDL2_ttf.dmg
+          hdiutil attach SDL2_ttf.dmg
+          sudo cp -R /Volumes/SDL2_ttf/SDL2_ttf.framework /Library/Frameworks/
 
       # --- Build ---
       - name: Build (Standard)
         if: matrix.os != 'macos-latest'
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Build (macOS Universal)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Build ARM64
+          cargo build --release --target aarch64-apple-darwin
+          
+          # Build x86_64
+          # We tell the linker to look in the Frameworks folder we just populated
+          RUSTFLAGS="-C link-arg=-F/Library/Frameworks -C link-arg=-framework -C link-arg=SDL2 -C link-arg=-framework -C link-arg=SDL2_ttf" \
+          cargo build --release --target x86_64-apple-darwin
+          
+          # Combine
+          lipo -create \
+            target/aarch64-apple-darwin/release/playkid \
+            target/x86_64-apple-darwin/release/playkid \
+            -output target/playkid-universal
       - name: Build (macOS Universal)
         if: matrix.os == 'macos-latest'
         run: |
