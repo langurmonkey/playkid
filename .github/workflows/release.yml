@@ -22,7 +22,6 @@ jobs:
             artifact_name: playkid-win-x64
             bin: playkid.exe
           - os: macos-latest
-            # We list the primary target, but we will add the second one in the steps
             target: aarch64-apple-darwin
             artifact_name: playkid-macos-universal
             bin: playkid
@@ -36,79 +35,52 @@ jobs:
         with:
           targets: ${{ matrix.target }} ${{ matrix.os == 'macos-latest' && 'x86_64-apple-darwin' || '' }}
 
-      # --- Dependency Installation ---
+      # --- LINUX SETUP ---
       - name: Install SDL2 (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-ttf-dev
 
+      # --- WINDOWS SETUP ---
       - name: Install SDL2 (Windows)
         if: matrix.os == 'windows-latest'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: '9e73ca079a4059437648325a25035f608977161b' # Use a recent stable commit
-          runVcpkgInstall: true
-          # This specifies exactly what to install and caches it
           vcpkgArguments: 'sdl2 sdl2-ttf'
+          runVcpkgInstall: true
 
-      - name: Setup Windows Environment
+      - name: Setup Windows Paths
         if: matrix.os == 'windows-latest'
         run: |
-          # Use the output from the run-vcpkg action to find the libs
-          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" >> $GITHUB_ENV
           echo "LIB=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\lib" >> $GITHUB_ENV
           echo "VCPKG_BIN=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" >> $GITHUB_ENV
 
+      # --- MACOS SETUP ---
       - name: Install SDL2 (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          # Install the native version (arm64)
-          brew install sdl2 sdl2_ttf
-          
-          # Download the official SDL2 Frameworks which are already Universal
-          # This is much more reliable than trying to mix Homebrew architectures
           curl -L https://www.libsdl.org/release/SDL2-2.30.0.dmg -o SDL2.dmg
           hdiutil attach SDL2.dmg
           sudo cp -R /Volumes/SDL2/SDL2.framework /Library/Frameworks/
-          
           curl -L https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.22.0.dmg -o SDL2_ttf.dmg
           hdiutil attach SDL2_ttf.dmg
           sudo cp -R /Volumes/SDL2_ttf/SDL2_ttf.framework /Library/Frameworks/
 
-      # --- Build ---
+      # --- BUILD COMMANDS ---
       - name: Build (Standard)
         if: matrix.os != 'macos-latest'
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Build (macOS Universal)
         if: matrix.os == 'macos-latest'
+        env:
+          # This tells the linker to look for Frameworks and use them instead of dylibs
+          RUSTFLAGS: "-C link-arg=-F/Library/Frameworks -C link-arg=-framework -C link-arg=SDL2 -C link-arg=-framework -C link-arg=SDL2_ttf"
         run: |
-          # Build ARM64
-          cargo build --release --target aarch64-apple-darwin
-          
-          # Build x86_64
-          # We tell the linker to look in the Frameworks folder we just populated
-          RUSTFLAGS="-C link-arg=-F/Library/Frameworks -C link-arg=-framework -C link-arg=SDL2 -C link-arg=-framework -C link-arg=SDL2_ttf" \
-          cargo build --release --target x86_64-apple-darwin
-          
-          # Combine
-          lipo -create \
-            target/aarch64-apple-darwin/release/playkid \
-            target/x86_64-apple-darwin/release/playkid \
-            -output target/playkid-universal
-      - name: Build (macOS Universal)
-        if: matrix.os == 'macos-latest'
-        run: |
-          # Build for both architectures
           cargo build --release --target aarch64-apple-darwin
           cargo build --release --target x86_64-apple-darwin
-          
-          # Combine them into a single "Universal" binary
-          lipo -create \
-            target/aarch64-apple-darwin/release/playkid \
-            target/x86_64-apple-darwin/release/playkid \
-            -output target/playkid-universal
+          lipo -create target/aarch64-apple-darwin/release/playkid target/x86_64-apple-darwin/release/playkid -output target/playkid-universal
 
-      # --- Packaging ---
+      # --- PACKAGING ---
       - name: Package (Windows)
         if: matrix.os == 'windows-latest'
         run: |
@@ -117,32 +89,22 @@ jobs:
           cp "${{ env.VCPKG_BIN }}\SDL2_ttf.dll" .
           compress-archive -Path ${{ matrix.bin }}, *.dll -DestinationPath ../../../${{ matrix.artifact_name }}.zip
 
-      - name: Package (macOS)
-        if: matrix.os == 'macos-latest'
+      - name: Package (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
-          # Package the universal binary we created with lipo
-          cd target/
-          tar -czf ../${{ matrix.artifact_name }}.tar.gz playkid-universal
-
-      - name: Package (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          cd target/${{ matrix.target }}/release/
-          tar -czf ../../../${{ matrix.artifact_name }}.tar.gz ${{ matrix.bin }}
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            tar -czf ${{ matrix.artifact_name }}.tar.gz -C target playkid-universal
+          else
+            tar -czf ${{ matrix.artifact_name }}.tar.gz -C target/${{ matrix.target }}/release ${{ matrix.bin }}
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: "*.tar.gz" # This picks up the root-level archives
-          if-no-files-found: ignore
-
-      - name: Upload Windows Artifact
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: "*.zip"
+          path: |
+            *.tar.gz
+            *.zip
 
   release:
     needs: build
