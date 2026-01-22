@@ -87,19 +87,27 @@ jobs:
           
           compress-archive -Path playkid.exe, *.dll -DestinationPath ../../../playkid-win-x64.zip
 
-      - name: Package (Unix)
+      - name: Package (Linux/macOS)
         if: matrix.os != 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release/
-          tar -czf ../../../${{ matrix.artifact_name }}.tar.gz ${{ matrix.bin }}
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: |
-            *.tar.gz
-            *.zip
+          
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # 1. Copy the libraries from Homebrew into the release folder
+            cp /opt/homebrew/opt/sdl2/lib/libSDL2-2.0.0.dylib .
+            cp /opt/homebrew/opt/sdl2_ttf/lib/libSDL2_ttf-2.0.0.dylib .
+            
+            # 2. Tell the binary to look for these libs in the same directory (@executable_path)
+            # instead of the absolute Homebrew path
+            install_name_tool -change /opt/homebrew/opt/sdl2/lib/libSDL2-2.0.0.dylib @executable_path/libSDL2-2.0.0.dylib ${{ matrix.bin }}
+            install_name_tool -change /opt/homebrew/opt/sdl2_ttf/lib/libSDL2_ttf-2.0.0.dylib @executable_path/libSDL2_ttf-2.0.0.dylib ${{ matrix.bin }}
+            
+            # 3. Zip it all up
+            tar -czf ../../../${{ matrix.artifact_name }}.tar.gz ${{ matrix.bin }} *.dylib
+          else
+            # Standard Linux packaging
+            tar -czf ../../../${{ matrix.artifact_name }}.tar.gz ${{ matrix.bin }}
+          fi
 
   release:
     needs: build
