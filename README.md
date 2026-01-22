@@ -40,10 +40,18 @@ Here are the main features of Play Kid:
   - The Amazing Spider-Man
   - Dr. Mario
   - Probably many more
+- Works on Linux, macOS, and Windows.
+
+# Download
+
+The easiest way to run Play Kid is getting the package for your operating system:
+
+- [Codeberg releases](https://codeberg.org/langurmonkey/playkid/releases)
+- [GitHub releases](https://github.com/langurmonkey/playkid/releases)
 
 # Dependencies
 
-The project uses SDL2, so you need to have it installed on your system. There is a good guide for all OSs in the [crates.io page](https://crates.io/crates/sdl2).
+The project uses SDL2 (and SDL2-ttf), so you need to have it installed on your system. There is a good guide for all OSs in the [crates.io page](https://crates.io/crates/sdl2).
 
 ## Linux
 
