@@ -3,7 +3,7 @@ name = "playkid"
 version = "0.1.0"
 description = "A Game Boy emulator and debugger"
 authors = ["Toni Sagristà Sellés <me@tonisagrista.com>"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 sdl2 = { version = "0.38.*", features = ["ttf"] }

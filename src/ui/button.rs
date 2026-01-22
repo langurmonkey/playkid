@@ -96,20 +96,20 @@ impl Widget for Button {
         let scale_factor = canvas.get_scale_factor();
         match event {
             // Track mouse movement for hover state
-            Event::MouseMotion { mut x, mut y, .. } => {
-                x = (x as f32 / scale_factor) as i32;
-                y = (y as f32 / scale_factor) as i32;
+            Event::MouseMotion { x, y, .. } => {
+                let x = (*x as f32 / scale_factor) as i32;
+                let y = (*y as f32 / scale_factor) as i32;
                 self.is_hovered = self.is_within_bounds(x, y);
                 false // Return false so other widgets can also see motion
             }
             Event::MouseButtonDown {
                 mouse_btn: MouseButton::Left,
-                mut x,
-                mut y,
+                x,
+                y,
                 ..
             } => {
-                x = (x as f32 / scale_factor) as i32;
-                y = (y as f32 / scale_factor) as i32;
+                let x = (*x as f32 / scale_factor) as i32;
+                let y = (*y as f32 / scale_factor) as i32;
                 if self.is_within_bounds(x, y) {
                     self.is_pressed = true;
                     return true;
@@ -118,14 +118,14 @@ impl Widget for Button {
             }
             Event::MouseButtonUp {
                 mouse_btn: MouseButton::Left,
-                mut x,
-                mut y,
+                x,
+                y,
                 ..
             } => {
                 if self.is_pressed {
                     self.is_pressed = false;
-                    x = (x as f32 / scale_factor) as i32;
-                    y = (y as f32 / scale_factor) as i32;
+                    let x = (*x as f32 / scale_factor) as i32;
+                    let y = (*y as f32 / scale_factor) as i32;
                     if self.is_within_bounds(x, y) {
                         (self.on_click)();
                     }

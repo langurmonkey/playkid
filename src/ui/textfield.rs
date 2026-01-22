@@ -105,12 +105,12 @@ impl Widget for TextField {
         match event {
             Event::MouseButtonDown {
                 mouse_btn: MouseButton::Left,
-                mut x,
-                mut y,
+                x,
+                y,
                 ..
             } => {
-                x = (x as f32 / scale_factor) as i32;
-                y = (y as f32 / scale_factor) as i32;
+                let x = (*x as f32 / scale_factor) as i32;
+                let y = (*y as f32 / scale_factor) as i32;
                 self.focused = self.is_within_bounds(x, y);
                 self.focused
             }
