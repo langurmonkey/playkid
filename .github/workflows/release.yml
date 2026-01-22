@@ -66,20 +66,26 @@ jobs:
           # Tell the linker where Homebrew lives on Apple Silicon
           echo "LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/lib" >> $GITHUB_ENV
 
-        # --- BUILD ---
+      # --- BUILD ---
       - name: Build
-        env:
-          # This tells the Windows linker specifically where to find the .lib files
-          RUSTFLAGS: ${{ matrix.os == 'windows-latest' && format('-L native={0}\installed\x64-windows\lib', env.VCPKG_INSTALLATION_ROOT) || '' }}
         run: cargo build --release --target ${{ matrix.target }}
+        env:
+          # We use the direct path to C:\vcpkg to ensure the linker finds the .lib files
+          RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-L native=C:\vcpkg\installed\x64-windows\lib' || '' }}
 
       # --- PACKAGING ---
       - name: Package (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          cd target/${{ matrix.target }}/release/
-          cp "${{ env.VCPKG_BIN }}\*.dll" .
-          compress-archive -Path ${{ matrix.bin }}, *.dll -DestinationPath ../../../${{ matrix.artifact_name }}.zip
+          cd target\x86_64-pc-windows-msvc\release\
+          # Copy DLLs using the explicit C:\vcpkg path
+          $BIN_PATH = "C:\vcpkg\installed\x64-windows\bin"
+          cp "$BIN_PATH\SDL2.dll" .
+          cp "$BIN_PATH\SDL2_ttf.dll" .
+          # Copy dependencies that sdl2-ttf often requires
+          Get-ChildItem "$BIN_PATH\*.dll" | Copy-Item -Destination . -ErrorAction SilentlyContinue
+          
+          compress-archive -Path playkid.exe, *.dll -DestinationPath ../../../playkid-win-x64.zip
 
       - name: Package (Unix)
         if: matrix.os != 'windows-latest'

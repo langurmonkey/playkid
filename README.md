@@ -41,17 +41,42 @@ Here are the main features of Play Kid:
   - Dr. Mario
   - Probably many more
 
+# Dependencies
+
+The project uses SDL2, so you need to have it installed on your system. There is a good guide for all OSs in the [crates.io page](https://crates.io/crates/sdl2).
+
+## Linux
+
+Just use your package manager, like `apt install libsdl2-dev`, `dnf install SDL2-devel`, or `pacman -S sdl2`.
+
+## macOS
+
+Install SDL2 through `brew` and make sure that the libraries are seen.
+
+```bash
+brew install sdl2 sdl2_ttf
+export LIBRARY_PATH="$LIBRARY_PATH:$(brew --prefix)/lib"
+```
+
+## Windows
+
+Follow the instructions for Windows in the [crate documentation](https://crates.io/crates/sdl2). They are too long for me to reproduce here.
+
+# Build
+
+Build the project with `cargo build`.
+
 # Run
 
 The usual Rust stuff.
 
-```
+```bash
   cargo run -- [ROM_FILE]
 ```
 
 Make the binary with:
 
-```
+```bash
   cargo build --release
 ```
 
