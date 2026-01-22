@@ -1,4 +1,3 @@
-
 use crate::constants;
 
 use colored::Colorize;
@@ -114,8 +113,10 @@ pub struct PPU {
     palette: [u8; 4 * 3],
     /// Index of the current palette.
     current_palette: u8,
-    /// Full screen buffer in RGBA format.
-    pub fb: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
+    /// The buffer currently being drawn to by the PPU (Back Buffer)
+    fb_back: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
+    /// The buffer ready to be displayed (Front Buffer)
+    pub fb_front: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
     /// Color ID buffer for priorities.
     pub priorities: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH],
 }
@@ -208,7 +209,8 @@ impl PPU {
 
             palette,
             current_palette: 0,
-            fb: [0xff; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
+            fb_front: [0xff; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
+            fb_back: [0xff; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
             priorities: [0x01; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH],
         }
     }
@@ -216,7 +218,8 @@ impl PPU {
     pub fn reset(&mut self) {
         self.oam.fill(0xff);
         self.vram.fill(0x00);
-        self.fb.fill(0xff);
+        self.fb_front.fill(0xff);
+        self.fb_back.fill(0xff);
         self.priorities.fill(0x00);
         self.mode = 0;
         self.lcdc = 0;
@@ -423,6 +426,9 @@ impl PPU {
 
             // VBlank.
             1 => {
+                // Frame is done, present it to front.
+                self.fb_front.copy_from_slice(&self.fb_back);
+
                 self.wly_flag = false;
                 self.wly = 0;
                 self.i_mask |= 0x01;
@@ -758,17 +764,23 @@ impl PPU {
         let base = paletted_color as usize * 3;
 
         // RGBA, in order.
-        self.fb[pos * 4 + 0] = self.palette[base];
-        self.fb[pos * 4 + 1] = self.palette[base + 1];
-        self.fb[pos * 4 + 2] = self.palette[base + 2];
-        self.fb[pos * 4 + 3] = 0xff;
+        self.fb_back[pos * 4 + 0] = self.palette[base];
+        self.fb_back[pos * 4 + 1] = self.palette[base + 1];
+        self.fb_back[pos * 4 + 2] = self.palette[base + 2];
+        self.fb_back[pos * 4 + 3] = 0xff;
     }
 
     fn clear_screen(&mut self) {
         // Get the first palette color (RGB888 format).
         let (r, g, b) = (self.palette[0], self.palette[1], self.palette[2]);
 
-        self.fb.chunks_exact_mut(4).for_each(|chunk| {
+        self.fb_front.chunks_exact_mut(4).for_each(|chunk| {
+            chunk[0] = r;
+            chunk[1] = g;
+            chunk[2] = b;
+            chunk[3] = 0xff;
+        });
+        self.fb_back.chunks_exact_mut(4).for_each(|chunk| {
             chunk[0] = r;
             chunk[1] = g;
             chunk[2] = b;

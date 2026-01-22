@@ -86,8 +86,6 @@ impl<'a> Machine<'a> {
 
     /// Update the state of the machine with a cycle.
     pub fn update(&mut self) {
-        let frame_start_time = std::time::Instant::now();
-
         // Normal full-speed execution.
         let mut cycles_this_frame: usize = 0;
         while cycles_this_frame < constants::CYCLES_PER_FRAME {
@@ -112,6 +110,15 @@ impl<'a> Machine<'a> {
         }
 
         // self.sleep_next_frame(frame_start_time);
+    }
+
+    /// Returns whether there is new data available in the PPU
+    pub fn ppu_data_available(&self) -> bool {
+        self.memory.ppu.data_available
+    }
+
+    pub fn reset_ppu_data_flag(&mut self) {
+        self.memory.ppu.data_available = false;
     }
 
     /// Sleeps until next frame, given a start time.

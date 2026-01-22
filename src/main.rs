@@ -111,11 +111,15 @@ fn main() -> Result<(), Error> {
 
         (pixels, framework)
     };
+
+    let mut last_update_inst = std::time::Instant::now();
+
     // Create Machine.
     let mut machine = Machine::new(&mut cart);
 
     // Event loop.
     let res = event_loop.run(|event, elwt| {
+        elwt.set_control_flow(winit::event_loop::ControlFlow::Poll);
         // Handle input events.
         if input.update(&event) {
             // Close events.
@@ -143,53 +147,46 @@ fn main() -> Result<(), Error> {
                 }
                 framework.resize(size.width, size.height);
             }
-
-            // Update Machine.
-            machine.update();
-
-            // Request a redraw.
-            window.request_redraw();
         }
 
         match event {
-            // Draw the current frame
+            Event::AboutToWait => {
+                // Control timing.
+                if last_update_inst.elapsed() >= constants::TARGET_FRAME_DURATION {
+                    // Update Machine.
+                    machine.update();
+                    last_update_inst += constants::TARGET_FRAME_DURATION;
+
+                    // Signal that we have a fresh frame ready to show.
+                    window.request_redraw();
+                }
+            }
+            // Draw the current frame.
             Event::WindowEvent {
                 event: WindowEvent::RedrawRequested,
                 ..
             } => {
-                // Render machine.
-                let fb = machine.memory.ppu.fb;
-                let frame = pixels.frame_mut();
-                frame.copy_from_slice(&fb);
+                // Render machine if needed.
+                let fb = machine.memory.ppu.fb_front;
+                pixels.frame_mut().copy_from_slice(&fb);
+                machine.reset_ppu_data_flag();
 
                 // Prepare egui.
                 framework.prepare(&window);
 
-                // Render everything together.
-                let render_result = pixels.render_with(|encoder, render_target, context| {
-                    // Render the world texture.
-                    context.scaling_renderer.render(encoder, render_target);
-
-                    // Render egui.
-                    framework.render(encoder, render_target, context);
-
-                    Ok(())
-                });
-
-                // Basic error handling.
-                if let Err(err) = render_result {
-                    log_error("pixels.render", err);
-                    elwt.exit();
-                }
+                // Render pixels and egui.
+                pixels
+                    .render_with(|encoder, render_target, context| {
+                        context.scaling_renderer.render(encoder, render_target);
+                        framework.render(encoder, render_target, context);
+                        Ok(())
+                    })
+                    .unwrap();
             }
             Event::WindowEvent { event, .. } => {
                 // Update egui inputs.
                 framework.handle_event(&window, &event);
             }
-            // Event::AboutToWait => {
-            //     // This tells the OS we want to draw again as soon as the monitor is ready
-            //     window.request_redraw();
-            // }
             _ => (),
         }
     });
