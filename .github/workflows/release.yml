@@ -23,7 +23,7 @@ jobs:
             bin: playkid.exe
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: playkid-macos-universal
+            artifact_name: playkid-macos-arm64
             bin: playkid
 
     steps:
@@ -33,7 +33,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }} ${{ matrix.os == 'macos-latest' && 'x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.target }}
 
       # --- LINUX SETUP ---
       - name: Install SDL2 (Linux)
@@ -41,62 +41,48 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-ttf-dev
 
       # --- WINDOWS SETUP ---
+      - name: Cache vcpkg
+        if: matrix.os == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.VCPKG_INSTALLATION_ROOT }}\installed
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
       - name: Install SDL2 (Windows)
         if: matrix.os == 'windows-latest'
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgArguments: 'sdl2 sdl2-ttf'
-          runVcpkgInstall: true
-
-      - name: Setup Windows Paths
-        if: matrix.os == 'windows-latest'
         run: |
+          vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows
           echo "LIB=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\lib" >> $GITHUB_ENV
           echo "VCPKG_BIN=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" >> $GITHUB_ENV
 
-      # --- MACOS SETUP ---
+      # --- MACOS SETUP (ARM64 ONLY) ---
       - name: Install SDL2 (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          curl -L https://www.libsdl.org/release/SDL2-2.30.0.dmg -o SDL2.dmg
-          hdiutil attach SDL2.dmg
-          sudo cp -R /Volumes/SDL2/SDL2.framework /Library/Frameworks/
-          curl -L https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.22.0.dmg -o SDL2_ttf.dmg
-          hdiutil attach SDL2_ttf.dmg
-          sudo cp -R /Volumes/SDL2_ttf/SDL2_ttf.framework /Library/Frameworks/
+          brew install sdl2 sdl2_ttf
+          # Tell the linker where Homebrew lives on Apple Silicon
+          echo "LIBRARY_PATH=$LIBRARY_PATH:/opt/homebrew/lib" >> $GITHUB_ENV
 
-      # --- BUILD COMMANDS ---
-      - name: Build (Standard)
-        if: matrix.os != 'macos-latest'
+      # --- BUILD ---
+      - name: Build
         run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Build (macOS Universal)
-        if: matrix.os == 'macos-latest'
-        env:
-          # This tells the linker to look for Frameworks and use them instead of dylibs
-          RUSTFLAGS: "-C link-arg=-F/Library/Frameworks -C link-arg=-framework -C link-arg=SDL2 -C link-arg=-framework -C link-arg=SDL2_ttf"
-        run: |
-          cargo build --release --target aarch64-apple-darwin
-          cargo build --release --target x86_64-apple-darwin
-          lipo -create target/aarch64-apple-darwin/release/playkid target/x86_64-apple-darwin/release/playkid -output target/playkid-universal
 
       # --- PACKAGING ---
       - name: Package (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release/
-          cp "${{ env.VCPKG_BIN }}\SDL2.dll" .
-          cp "${{ env.VCPKG_BIN }}\SDL2_ttf.dll" .
+          cp "${{ env.VCPKG_BIN }}\*.dll" .
           compress-archive -Path ${{ matrix.bin }}, *.dll -DestinationPath ../../../${{ matrix.artifact_name }}.zip
 
       - name: Package (Unix)
         if: matrix.os != 'windows-latest'
         run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            tar -czf ${{ matrix.artifact_name }}.tar.gz -C target playkid-universal
-          else
-            tar -czf ${{ matrix.artifact_name }}.tar.gz -C target/${{ matrix.target }}/release ${{ matrix.bin }}
-          fi
+          cd target/${{ matrix.target }}/release/
+          tar -czf ../../../${{ matrix.artifact_name }}.tar.gz ${{ matrix.bin }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
