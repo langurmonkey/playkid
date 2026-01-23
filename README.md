@@ -38,7 +38,7 @@ Here are the main features of Play Kid:
   - Bugs Bunny Crazy Castle
   - The Amazing Spider-Man
   - Dr. Mario
-  - Probably many more
+  - Probably many, many more
 - Works on Linux, macOS, and Windows.
 
 # Download
@@ -105,7 +105,7 @@ You can use the provided UI controls to work with debug mode. You can also use t
 - <kbd>d</kbd> - exit debug mode and go back to normal full-speed emulation
 - <kbd>Esc</kbd> - exit the emulator
 
-You can also use breakpoints. A list with the current breakpoint addresses is provided in yellow. To create a breakpoint, enter the desired address (in `$abcd` format) into the text field and click <kbd>Add BR</kbd>. Remove a breakpoint with <kbd>Remove BR</kbd>. Clear all current breakpoints with <kbd>Clear all</kbd>.
+You can also use breakpoints. A list with the current breakpoint addresses is provided at the bottom. To create a breakpoint, enter the desired address (in `$abcd` format) into the text field and click <kbd>Add BR</kbd>. Remove a breakpoint with <kbd>Remove BR</kbd>. Clear all current breakpoints with <kbd>Clear all</kbd>.
 
 # CLI args
 

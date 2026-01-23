@@ -49,7 +49,7 @@ struct Args {
     /// Path to the input ROM file to load.
     input: PathBuf,
     /// Initial window scale. It can also be resized manually.
-    #[arg(short, long, default_value_t = 3, value_parser = clap::value_parser!(u8).range(3..15))]
+    #[arg(short, long, default_value_t = 4, value_parser = clap::value_parser!(u8).range(4..15))]
     scale: u8,
     /// Activate debug mode. Use `d` to stop program at any point.
     #[arg(short, long)]

@@ -2,11 +2,25 @@ use crate::constants;
 use crate::instruction::RunInstr;
 use crate::machine::Machine;
 use crate::uistate::UIState;
-use egui::{ClippedPrimitive, Context, TexturesDelta, ViewportId};
+use egui::{
+    ClippedPrimitive, Color32, Context, FontFamily, FontId, RichText, TexturesDelta, ViewportId,
+    text::LayoutJob, text::TextFormat,
+};
 use egui_wgpu::{Renderer, ScreenDescriptor};
 use pixels::{PixelsContext, wgpu};
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::Window;
+
+pub const BLUE: Color32 = Color32::from_rgb(66, 133, 244);
+pub const GRAY: Color32 = Color32::from_rgb(110, 110, 110);
+pub const WHITE: Color32 = Color32::from_rgb(255, 255, 255);
+pub const CYAN: Color32 = Color32::from_rgb(0, 188, 212);
+pub const MAGENTA: Color32 = Color32::from_rgb(233, 30, 99);
+pub const YELLOW: Color32 = Color32::from_rgb(244, 180, 0);
+pub const GREEN: Color32 = Color32::from_rgb(15, 157, 88);
+pub const RED: Color32 = Color32::from_rgb(219, 68, 55);
+pub const ORANGE: Color32 = Color32::from_rgb(255, 152, 0);
+pub const DARKGRAY: Color32 = Color32::from_rgb(30, 30, 30);
 
 /// Manages all state required for rendering egui over `Pixels`.
 pub(crate) struct Framework {
@@ -329,53 +343,154 @@ impl Gui {
                     let pc = machine.registers.pc;
                     let opcode = machine.memory.read8(pc);
                     ui.vertical(|ui| {
-                        // Control Buttons
-                        ui.horizontal(|ui| {
-                            let pause_label = if machine.debug.is_paused() {
-                                "▶ Continue"
-                            } else {
-                                "⏸ Pause"
-                            };
-                            if ui.button(pause_label).clicked() {
-                                machine.debug.toggle_paused();
-                            }
+                        // Control Buttons.
+                        ui.horizontal_top(|ui| {
+                            let button_size = egui::vec2(120.0, 0.0);
 
+                            // Step instruction.
+                            let mut stepi_label = LayoutJob::default();
+                            RichText::new("⤴ Step Instr")
+                                .color(BLUE)
+                                .font(FontId::new(14.0, FontFamily::Proportional))
+                                .strong()
+                                .append_to(
+                                    &mut stepi_label,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
+                            RichText::new("   [F6]")
+                                .color(GRAY)
+                                .font(FontId::new(10.0, FontFamily::Proportional))
+                                .weak()
+                                .append_to(
+                                    &mut stepi_label,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
                             if ui
-                                .add_enabled(
-                                    machine.debug.is_paused(),
-                                    egui::Button::new("Step Instr (F6)"),
-                                )
+                                .add_enabled_ui(machine.debug.is_paused(), |ui| {
+                                    ui.add_sized(button_size, egui::Button::new(stepi_label))
+                                        .on_hover_text("Step one instruction. [F6]")
+                                })
+                                .inner
                                 .clicked()
                             {
                                 machine.debug.request_step_instruction();
                             }
 
+                            // Step scanline.
+                            let mut steps_label = LayoutJob::default();
+                            RichText::new("⮫ Step Line")
+                                .color(BLUE)
+                                .font(FontId::new(14.0, FontFamily::Proportional))
+                                .strong()
+                                .append_to(
+                                    &mut steps_label,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
+                            RichText::new("   [F7]")
+                                .color(GRAY)
+                                .font(FontId::new(10.0, FontFamily::Proportional))
+                                .weak()
+                                .append_to(
+                                    &mut steps_label,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
                             if ui
-                                .add_enabled(
-                                    machine.debug.is_paused(),
-                                    egui::Button::new("Step Line (F7)"),
-                                )
+                                .add_enabled_ui(machine.debug.is_paused(), |ui| {
+                                    ui.add_sized(button_size, egui::Button::new(steps_label))
+                                        .on_hover_text("Step a scanline. [F7]")
+                                })
+                                .inner
                                 .clicked()
                             {
                                 machine.debug.request_step_scanline();
                             }
+
+                            // Continue/Pause
+                            let pause_text = if machine.debug.is_paused() {
+                                "▶ Continue"
+                            } else {
+                                "⏸ Pause"
+                            };
+                            let mut pause_label = LayoutJob::default();
+                            RichText::new(pause_text)
+                                .color(GREEN)
+                                .font(FontId::new(14.0, FontFamily::Proportional))
+                                .strong()
+                                .append_to(
+                                    &mut pause_label,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
+                            RichText::new("   [F9]")
+                                .color(GRAY)
+                                .font(FontId::new(10.0, FontFamily::Proportional))
+                                .weak()
+                                .append_to(
+                                    &mut pause_label,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
+                            if ui
+                                .add_sized(button_size, egui::Button::new(pause_label))
+                                .on_hover_text("Continue/pause. [F9]")
+                                .clicked()
+                            {
+                                machine.debug.toggle_paused();
+                            }
                         });
 
                         ui.separator();
+                        ui.add_space(10.0);
+
                         // Current instruction.
                         ui.vertical(|ui| {
                             let run_instr =
                                 RunInstr::new(opcode, &machine.memory, &machine.registers);
-                            ui.label(
-                                egui::RichText::new(format!(
-                                    "${:04x}:     {}   {}",
-                                    pc,
-                                    run_instr.instruction_str(),
-                                    run_instr.operand_str()
-                                ))
-                                .monospace()
-                                .strong(),
-                            );
+                            let mut instr = LayoutJob::default();
+                            RichText::new(format!("${:04x}:", pc))
+                                .color(GRAY)
+                                .font(FontId::new(18.0, FontFamily::Monospace))
+                                .strong()
+                                .append_to(
+                                    &mut instr,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
+                            RichText::new(format!(" {}", run_instr.instruction_str()))
+                                .color(ORANGE)
+                                .font(FontId::new(18.0, FontFamily::Monospace))
+                                .strong()
+                                .append_to(
+                                    &mut instr,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
+                            RichText::new(format!("  {}", run_instr.operand_str()))
+                                .color(WHITE)
+                                .font(FontId::new(18.0, FontFamily::Monospace))
+                                .strong()
+                                .append_to(
+                                    &mut instr,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
+                            ui.label(instr)
+                                .on_hover_text("Current PC address, instruction, and operand.");
+
+                            ui.add_space(20.0);
 
                             // CPU state.
                             ui.monospace(format!(
@@ -472,16 +587,18 @@ impl Gui {
                         ui.separator();
 
                         // Breakpoints section.
-                        ui.label(format!(
-                            "Breakpoints: {}",
-                            machine.debug.get_breakpoints_str()
-                        ));
+                        ui.horizontal(|ui| {
+                            ui.label("Breakpoints:");
+                            ui.visuals_mut().override_text_color = Some(YELLOW);
+                            ui.label(format!("{}", machine.debug.get_breakpoints_str()));
+                            ui.visuals_mut().override_text_color = None;
+                        });
                         // Simple input for new breakpoint.
                         ui.horizontal(|ui| {
                             ui.label("Add (Hex):");
 
                             if self.breakpoint_error {
-                                ui.visuals_mut().override_text_color = Some(egui::Color32::RED);
+                                ui.visuals_mut().override_text_color = Some(RED);
                             }
                             let br_input = egui::TextEdit::singleline(&mut self.breakpoint_input)
                                 .hint_text("$0123")
