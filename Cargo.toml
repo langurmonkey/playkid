@@ -1,9 +1,15 @@
 [package]
-name = "pixels-native"
+name = "playkid"
 version = "0.1.0"
-description = "A Game Boy emulator and debugger"
 authors = ["Toni Sagristà Sellés <me@tonisagrista.com>"]
+description = "Game Boy emulator and debugger written in Rust."
+documentation = "https://tonisagrista.com/projects/playkid"
+homepage = "https://tonisagrista.com/projects/playkid"
+repository = "https://codeberg.org/langurmonkey/playkid"
 edition = "2024"
+license = "MIT"
+license-file = "LICENSE"
+readme = "README.md"
 publish = false
 
 [dependencies]
@@ -22,5 +28,6 @@ winit_input_helper = "0.15"
 log = "0.4.*"
 rodio = "0.21.1"
 gilrs = "0.11.1"
+image = "0.25.9"
 
 

@@ -49,7 +49,7 @@ struct Args {
     /// Path to the input ROM file to load.
     input: PathBuf,
     /// Initial window scale. It can also be resized manually.
-    #[arg(short, long, default_value_t = 4, value_parser = clap::value_parser!(u8).range(4..15))]
+    #[arg(short, long, default_value_t = 3, value_parser = clap::value_parser!(u8).range(3..15))]
     scale: u8,
     /// Activate debug mode. Use `d` to stop program at any point.
     #[arg(short, long)]
@@ -101,6 +101,7 @@ fn main() -> Result<(), Error> {
             window_size.height,
             scale_factor,
             &pixels,
+            args.fps,
             args.debug,
         );
 
@@ -124,6 +125,9 @@ fn main() -> Result<(), Error> {
         elwt.set_control_flow(winit::event_loop::ControlFlow::Poll);
         // Handle input events.
         if input.update(&event) {
+            // Check if egui wants the keyboard.
+            let egui_wants_input = framework.egui_ctx.wants_keyboard_input();
+
             // Handle gamepad events.
             machine.memory.joypad.handle_controller_input();
 
@@ -136,22 +140,51 @@ fn main() -> Result<(), Error> {
                 // Close program.
                 elwt.exit();
                 return;
-            } else if input.key_released(KeyCode::KeyP) {
-                // Cycle palette.
-                machine.memory.ppu.cycle_palette();
-                handled = true;
-            } else if input.key_released(KeyCode::KeyW) {
-                // Write SRAM.
-                if machine.memory.cart.is_dirty() {
-                    machine.memory.cart.save_sram();
-                    machine.memory.cart.consume_dirty();
-                }
-                handled = true;
             }
+            if !egui_wants_input {
+                if input.key_released(KeyCode::KeyD) {
+                    // Debug.
+                    let d = machine.debug.toggle_debugging();
+                    machine.debug.set_paused(d);
+                    framework.gui.show_debugger(d);
+                    handled = true;
+                } else if input.key_released(KeyCode::KeyF) {
+                    // FPS.
+                    framework.gui.toggle_fps();
+                    handled = true;
+                } else if input.key_released(KeyCode::KeyP) {
+                    // Cycle palette.
+                    machine.memory.ppu.cycle_palette();
+                    handled = true;
+                } else if input.key_released(KeyCode::KeyR) {
+                    // Reset.
+                    machine.reset();
+                    handled = true;
+                } else if input.key_released(KeyCode::KeyW) {
+                    // Write SRAM.
+                    if machine.memory.cart.is_dirty() {
+                        machine.memory.cart.save_sram();
+                        machine.memory.cart.consume_dirty();
+                    }
+                    handled = true;
+                } else if input.key_released(KeyCode::KeyS) {
+                    // Capture the frame.
+                    let frame = pixels.frame();
+                    match save_screenshot(WIDTH, HEIGHT, frame) {
+                        Err(err) => {
+                            error!("{}: Failed to save screenshot: {}", "ERR".red(), err);
+                        }
+                        Ok(filename) => {
+                            println!("{}: Screenshot saved: {}", "OK".green(), filename.blue());
+                        }
+                    }
+                    handled = true;
+                }
 
-            // Handle events in machine.
-            if !handled {
-                machine.handle_event(&input);
+                // Handle events in machine.
+                if !handled {
+                    machine.handle_event(&input);
+                }
             }
 
             // Handle GUI requests.
@@ -160,6 +193,20 @@ fn main() -> Result<(), Error> {
                 framework.gui.ui_state.exit_requested = false;
                 // Quit.
                 elwt.exit();
+            }
+            if framework.gui.ui_state.screenshot_requested {
+                // Consume.
+                framework.gui.ui_state.screenshot_requested = false;
+                // Screenshot.
+                let frame = pixels.frame();
+                match save_screenshot(WIDTH, HEIGHT, frame) {
+                    Err(err) => {
+                        error!("{}: Failed to save screenshot: {}", "ERR".red(), err);
+                    }
+                    Ok(filename) => {
+                        println!("{}: Screenshot saved: {}", "OK".green(), filename.blue());
+                    }
+                }
             }
 
             // Resize the window.
@@ -252,4 +299,27 @@ fn log_error<E: std::error::Error + 'static>(method_name: &str, err: E) {
     for source in err.sources().skip(1) {
         error!("  Caused by: {source}");
     }
+}
+
+fn save_screenshot(
+    width: u32,
+    height: u32,
+    frame: &[u8],
+) -> Result<String, Box<dyn std::error::Error>> {
+    use image::{ImageBuffer, Rgba};
+
+    // Create an ImageBuffer from the raw pixels.
+    let img: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(width, height, frame.to_vec())
+        .ok_or("Failed to create image buffer from pixels")?;
+
+    // Generate a filename with a timestamp.
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
+    let filename = format!("screenshot_{}.png", timestamp);
+
+    // Save as PNG.
+    img.save(&filename)?;
+
+    Ok(filename)
 }

@@ -1,3 +1,5 @@
+use crate::constants;
+use crate::instruction::RunInstr;
 use crate::machine::Machine;
 use crate::uistate::UIState;
 use egui::{ClippedPrimitive, Context, TexturesDelta, ViewportId};
@@ -9,7 +11,7 @@ use winit::window::Window;
 /// Manages all state required for rendering egui over `Pixels`.
 pub(crate) struct Framework {
     // State for egui.
-    egui_ctx: Context,
+    pub egui_ctx: Context,
     egui_state: egui_winit::State,
     screen_descriptor: ScreenDescriptor,
     renderer: Renderer,
@@ -25,16 +27,22 @@ pub(crate) struct Framework {
 pub struct Gui {
     /// Show about window.
     show_about: bool,
-    /// Show memory monitor.
-    show_memory_monitor: bool,
     /// Show debugger.
     show_debugger: bool,
-    /// Memory snapshot for the memory monitor.
-    memory_snapshot: Vec<u8>,
+    /// Show FPS.
+    show_fps: bool,
+    /// The menu timer.
+    menu_timer: f32,
+    /// Last mouse position.
+    last_mouse_pos: Option<egui::Pos2>,
     /// The UI state.
     pub ui_state: UIState,
     /// Breakpoint input data.
     breakpoint_input: String,
+    /// Input error in breakpoints.
+    breakpoint_error: bool,
+    /// Logo texture.
+    logo_texture: Option<egui::TextureHandle>,
 }
 
 impl Framework {
@@ -45,6 +53,7 @@ impl Framework {
         height: u32,
         scale_factor: f32,
         pixels: &pixels::Pixels,
+        fps: bool,
         debug: bool,
     ) -> Self {
         let max_texture_size = pixels.device().limits().max_texture_dimension_2d as usize;
@@ -63,7 +72,7 @@ impl Framework {
         };
         let renderer = Renderer::new(pixels.device(), pixels.render_texture_format(), None, 1);
         let textures = TexturesDelta::default();
-        let gui = Gui::new(debug);
+        let gui = Gui::new(debug, fps);
         // Warm up the context.
         let _ = egui_ctx.run(egui::RawInput::default(), |_| {});
 
@@ -175,64 +184,140 @@ impl Framework {
 
 impl Gui {
     /// Create a `Gui`.
-    fn new(debug: bool) -> Self {
+    fn new(show_debugger: bool, show_fps: bool) -> Self {
         Self {
             show_about: false,
-            show_debugger: debug,
-            show_memory_monitor: false,
-            memory_snapshot: vec![0; 0x10000],
+            show_debugger,
+            show_fps,
+            menu_timer: 0.0,
+            last_mouse_pos: None,
             ui_state: UIState::new(),
             breakpoint_input: String::new(),
+            breakpoint_error: false,
+            logo_texture: None,
         }
     }
 
-    /// Update the current snapshot from memory.
-    fn refresh_memory_snapshot(&mut self, machine: &Machine) {
-        for i in 0..=0xFFFF {
-            self.memory_snapshot[i as usize] = machine.memory.read8(i);
-        }
+    /// Toggle state of FPS.
+    pub fn toggle_fps(&mut self) {
+        self.show_fps = !self.show_fps;
+    }
+
+    pub fn show_debugger(&mut self, show: bool) {
+        self.show_debugger = show;
     }
 
     /// Create the UI using egui.
     fn ui(&mut self, ctx: &Context, machine: &mut Machine) {
-        egui::TopBottomPanel::top("menubar_container").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("About...").clicked() {
-                        self.show_about = true;
-                        ui.close_menu();
-                    };
-                    if ui.button("Quit").clicked() {
-                        self.ui_state.exit_requested = true;
-                        ui.close_menu();
-                    }
+        let mouse_pos = ctx.input(|i| i.pointer.hover_pos());
+        let dt = ctx.input(|i| i.stable_dt);
+
+        // Check for movement.
+        let mouse_moved = if let (Some(current), Some(last)) = (mouse_pos, self.last_mouse_pos) {
+            current != last
+        } else {
+            false
+        };
+        // Check sensors.
+        let mouse_at_top = mouse_pos.map_or(false, |pos| pos.y < 30.0);
+        let menu_in_use = ctx.input(|i| i.pointer.has_pointer())
+            && ctx
+                .layer_id_at(mouse_pos.unwrap_or_default())
+                .map_or(false, |l| {
+                    l.order == egui::Order::Foreground || l.order == egui::Order::Tooltip
                 });
-                ui.menu_button("Debug", |ui| {
-                    if ui.button("Debugger...").clicked() {
-                        self.show_debugger = true;
-                        ui.close_menu();
-                    }
-                    if ui.button("Memory monitor...").clicked() {
-                        self.show_memory_monitor = true;
-                        ui.close_menu();
-                    }
-                })
+
+        // Update Timer (5s).
+        if mouse_moved || mouse_at_top || menu_in_use {
+            self.menu_timer = 5.0;
+        } else {
+            self.menu_timer -= dt;
+        }
+        self.last_mouse_pos = mouse_pos;
+
+        if self.menu_timer > 0.0 {
+            egui::TopBottomPanel::top("menubar_container").show(ctx, |ui| {
+                egui::menu::bar(ui, |ui| {
+                    ui.menu_button("File", |ui| {
+                        if ui.button("About...").clicked() {
+                            self.show_about = true;
+                            ui.close_menu();
+                        };
+                        if ui.button("Quit").clicked() {
+                            self.ui_state.exit_requested = true;
+                            ui.close_menu();
+                        }
+                    });
+                    ui.menu_button("Graphics", |ui| {
+                        ui.menu_button("Palette", |ui| {
+                            let current_palette = machine.memory.ppu.get_palette_index();
+
+                            for (i, name) in crate::ppu::PALETTE_NAMES.iter().enumerate() {
+                                let i = i as u8;
+                                if ui.radio(current_palette == i, *name).clicked() {
+                                    machine.memory.ppu.set_palette(i);
+                                }
+                            }
+                        });
+                        if ui.button("Save screenshot").clicked() {
+                            self.ui_state.screenshot_requested = true;
+                            ui.close_menu();
+                        }
+                    });
+                    ui.menu_button("Machine", |ui| {
+                        if ui.button("Reset CPU").clicked() {
+                            machine.reset();
+                            ui.close_menu();
+                        }
+                        if ui.checkbox(&mut self.show_fps, "Show FPS").clicked() {
+                            ui.close_menu();
+                        }
+                        if ui.button("Debug panel...").clicked() {
+                            self.show_debugger = true;
+                            ui.close_menu();
+                        };
+                    })
+                });
             });
-        });
+        }
 
         // About window.
-        egui::Window::new("Hello, egui!")
+        egui::Window::new(constants::NAME)
             .open(&mut self.show_about)
             .show(ctx, |ui| {
-                ui.label("This example demonstrates using egui with pixels.");
-                ui.label("Made with 💖 in San Francisco!");
+                let texture: &egui::TextureHandle = self.logo_texture.get_or_insert_with(|| {
+                    // Embed the file at compile time.
+                    let image_data = include_bytes!("../img/logo.png");
+                    let image = image::load_from_memory(image_data)
+                        .expect("Failed to load logo")
+                        .to_rgba8();
 
-                ui.separator();
+                    let (width, height) = image.dimensions();
+                    let size = [width as usize, height as usize];
+                    let pixels = image.as_flat_samples();
 
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x /= 2.0;
-                    ui.label("Learn more about egui at");
-                    ui.hyperlink("https://docs.rs/egui");
+                    let color_image =
+                        egui::ColorImage::from_rgba_unmultiplied(size, pixels.as_slice());
+
+                    ctx.load_texture("app-logo", color_image, egui::TextureOptions::NEAREST)
+                });
+                ui.vertical_centered(|ui| {
+                    // Display the logo scaled up.
+                    ui.image((texture.id(), texture.size_vec2()));
+                    ui.heading(env!("CARGO_PKG_VERSION"));
+                    ui.add_space(10.0); // Padding
+
+                    ui.label(env!("CARGO_PKG_DESCRIPTION"));
+
+                    ui.add_space(10.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    ui.label(env!("CARGO_PKG_AUTHORS"));
+                    ui.hyperlink(env!("CARGO_PKG_HOMEPAGE"));
+                    ui.hyperlink(env!("CARGO_PKG_REPOSITORY"));
+
+                    ui.add_space(10.0);
                 });
             });
 
@@ -241,6 +326,8 @@ impl Gui {
             egui::Window::new("💻 CPU Debugger")
                 .open(&mut self.show_debugger)
                 .show(ctx, |ui| {
+                    let pc = machine.registers.pc;
+                    let opcode = machine.memory.read8(pc);
                     ui.vertical(|ui| {
                         // Control Buttons
                         ui.horizontal(|ui| {
@@ -275,14 +362,112 @@ impl Gui {
                         });
 
                         ui.separator();
+                        // Current instruction.
+                        ui.vertical(|ui| {
+                            let run_instr =
+                                RunInstr::new(opcode, &machine.memory, &machine.registers);
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "${:04x}:     {}   {}",
+                                    pc,
+                                    run_instr.instruction_str(),
+                                    run_instr.operand_str()
+                                ))
+                                .monospace()
+                                .strong(),
+                            );
 
-                        // Registers Display
-                        ui.columns(2, |cols| {
-                            cols[0].monospace(format!("PC: 0x{:04X}", machine.registers.pc));
-                            cols[0].monospace(format!("SP: 0x{:04X}", machine.registers.sp));
-                            cols[1].monospace(format!("AF: 0x{:04X}", machine.registers.get_af()));
-                            cols[1].monospace(format!("BC: 0x{:04X}", machine.registers.get_bc()));
+                            // CPU state.
+                            ui.monospace(format!(
+                                "CPU state:  {}",
+                                if machine.halted { "HALTED" } else { "RUNNING" }
+                            ));
+                            // Timing Stats
+                            ui.monospace(format!("T-cycles:   {}", machine.t_cycles));
+                            ui.monospace(format!("M-cycles:   {}", machine.m_cycles));
+
+                            ui.add_space(8.0);
+                            ui.separator();
                         });
+
+                        // Registers Display.
+                        egui::Grid::new("registers_grid")
+                            .num_columns(2)
+                            .spacing([10.0, 4.0])
+                            .show(ui, |ui| {
+                                // Registers
+                                ui.monospace("Registers: ");
+                                ui.vertical(|ui| {
+                                    ui.monospace(format!(
+                                        "AF {:02x} {:02x}",
+                                        machine.registers.a, machine.registers.f
+                                    ));
+                                    ui.monospace(format!(
+                                        "BC {:02x} {:02x}",
+                                        machine.registers.b, machine.registers.c
+                                    ));
+                                    ui.monospace(format!(
+                                        "DE {:02x} {:02x}",
+                                        machine.registers.d, machine.registers.e
+                                    ));
+                                    ui.monospace(format!(
+                                        "HL {:02x} {:02x}",
+                                        machine.registers.h, machine.registers.l
+                                    ));
+                                });
+                                ui.end_row();
+
+                                // Flags
+                                ui.monospace("Flags:");
+                                let f = machine.registers.f;
+                                // Format: Z N H C (matches standard GB nomenclature)
+                                let z = if f & 0x80 != 0 { "Z" } else { "_" };
+                                let n = if f & 0x40 != 0 { "N" } else { "_" };
+                                let h = if f & 0x20 != 0 { "H" } else { "_" };
+                                let c = if f & 0x10 != 0 { "C" } else { "_" };
+                                ui.monospace(format!("{} {} {} {}", z, n, h, c));
+                                ui.end_row();
+
+                                let mem = &machine.memory;
+
+                                ui.monospace("SP:");
+                                ui.monospace(format!("{:#04x}", machine.registers.sp));
+                                ui.end_row();
+                                ui.monospace("DIV:");
+                                ui.monospace(format!("{:#06x}", mem.timer.div16()));
+                                ui.end_row();
+                                ui.monospace("LCDC:");
+                                ui.monospace(format!("{:#02x}", mem.ppu.lcdc));
+                                ui.end_row();
+                                ui.monospace("STAT:");
+                                ui.monospace(format!("{:#02x}", mem.ppu.stat));
+                                ui.end_row();
+                                ui.monospace("LYC:");
+                                ui.monospace(format!("{:#02x}", mem.ppu.lyc));
+                                ui.end_row();
+                                ui.monospace("LY:");
+                                ui.monospace(format!("{:#02x}", mem.ppu.ly));
+                                ui.end_row();
+                                ui.monospace("LX:");
+                                ui.monospace(format!("{:#02x}", mem.ppu.lx));
+                                ui.end_row();
+                                ui.monospace("Opcode:");
+                                ui.monospace(format!("{:#02x}", opcode));
+                                ui.end_row();
+                                ui.monospace("Joypad:");
+                                ui.monospace(&format!(
+                                    "{} {} {} {} {} {} {} {}",
+                                    if mem.joypad.up { "↑" } else { "_" },
+                                    if mem.joypad.down { "↓" } else { "_" },
+                                    if mem.joypad.left { "←" } else { "_" },
+                                    if mem.joypad.right { "→" } else { "_" },
+                                    if mem.joypad.a { "A" } else { "_" },
+                                    if mem.joypad.b { "B" } else { "_" },
+                                    if mem.joypad.start { "S" } else { "_" },
+                                    if mem.joypad.select { "s" } else { "_" }
+                                ));
+                                ui.end_row();
+                            });
 
                         ui.separator();
 
@@ -295,55 +480,67 @@ impl Gui {
                         ui.horizontal(|ui| {
                             ui.label("Add (Hex):");
 
-                            // Use the field from self instead of a static mut
-                            ui.text_edit_singleline(&mut self.breakpoint_input);
+                            if self.breakpoint_error {
+                                ui.visuals_mut().override_text_color = Some(egui::Color32::RED);
+                            }
+                            let br_input = egui::TextEdit::singleline(&mut self.breakpoint_input)
+                                .hint_text("$0123")
+                                .font(egui::TextStyle::Monospace)
+                                .desired_width(60.0);
+                            let response = ui.add(br_input);
+                            if response.changed() {
+                                self.breakpoint_error = false;
+                            }
+                            ui.visuals_mut().override_text_color = None;
 
                             if ui.button("+").clicked() {
-                                if let Ok(addr) = u16::from_str_radix(&self.breakpoint_input, 16) {
+                                let text = &self
+                                    .breakpoint_input
+                                    .strip_prefix("$")
+                                    .unwrap_or(&self.breakpoint_input);
+                                if let Ok(addr) = u16::from_str_radix(text, 16) {
                                     machine.debug.add_breakpoint(addr);
-                                    self.breakpoint_input.clear(); // Optional: clear after adding
+                                    self.breakpoint_error = false;
+                                } else {
+                                    self.breakpoint_error = true;
                                 }
+                            }
+                            if ui.button("-").clicked() {
+                                let text = &self
+                                    .breakpoint_input
+                                    .strip_prefix("$")
+                                    .unwrap_or(&self.breakpoint_input);
+
+                                if let Ok(addr) = u16::from_str_radix(text, 16) {
+                                    machine.debug.delete_breakpoint(addr);
+                                }
+                            }
+                            if ui.button("Clear all").clicked() {
+                                machine.debug.clear_breakpoints();
                             }
                         });
                     });
                 });
         }
 
-        // Memory monitor window.
-        if self.show_memory_monitor {
-            let mut is_open = self.show_memory_monitor;
-            egui::Window::new("Memory Monitor")
-                .open(&mut is_open)
-                .default_size([450.0, 400.0])
+        if self.show_fps {
+            // Area allows us to place things freely on the screen
+            egui::Area::new(egui::Id::new("fps_counter"))
+                .anchor(egui::Align2::LEFT_TOP, egui::vec2(10.0, 10.0))
                 .show(ctx, |ui| {
-                    ui.horizontal(|ui| {
-                        if ui.button("🔄 Refresh Snapshot").clicked() {
-                            self.refresh_memory_snapshot(machine);
-                        }
-                        ui.label(format!("Showing snapshot from address 0x0000 to 0xFFFF"));
-                    });
-
-                    ui.separator();
-
-                    egui::ScrollArea::vertical()
-                        .auto_shrink([false; 2])
+                    egui::Frame::none()
+                        .fill(egui::Color32::from_black_alpha(150))
+                        .rounding(2.0)
+                        .inner_margin(5.0)
                         .show(ui, |ui| {
-                            ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
-
-                            for i in (0..0x10000).step_by(16) {
-                                ui.horizontal(|ui| {
-                                    ui.label(format!("{:04X}:", i));
-
-                                    // Constructing one string is often faster than 16 individual labels
-                                    let mut hex_line = String::with_capacity(48);
-                                    for j in 0..16 {
-                                        if let Some(&val) = self.memory_snapshot.get(i + j) {
-                                            hex_line.push_str(&format!("{:02X} ", val));
-                                        }
-                                    }
-                                    ui.label(hex_line);
-                                });
-                            }
+                            // Get FPS from context.
+                            let fps_text =
+                                format!("FPS: {:.1}", ctx.input(|i| i.unstable_dt.recip()));
+                            ui.label(
+                                egui::RichText::new(fps_text)
+                                    .color(egui::Color32::RED)
+                                    .monospace(),
+                            );
                         });
                 });
         }

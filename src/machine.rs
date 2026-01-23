@@ -6,13 +6,10 @@ use crate::memory;
 use crate::registers;
 
 use crate::debugmanager::DebugManager;
-use crate::uistate::UIState;
 use cartridge::Cartridge;
 use instruction::{CC, Instruction, R8, R16, R16EXT, R16LD, RunInstr, TGT3};
 use memory::Memory;
 use registers::Registers;
-use std::cell::RefCell;
-use std::rc::Rc;
 use winit_input_helper::WinitInputHelper;
 
 /// # Machine
@@ -25,8 +22,6 @@ pub struct Machine<'a> {
     pub registers: Registers,
     /// The main memory.
     pub memory: Memory<'a>,
-    /// The UI state.
-    ui_state: Rc<RefCell<UIState>>,
     /// Interrupt master enable flag.
     ime: bool,
     /// EI operation is delayed by one instruction, so we use this counter.
@@ -34,11 +29,11 @@ pub struct Machine<'a> {
     /// DI operation is delayed by one instruction, so we use this counter.
     di: u8,
     /// CPU halted.
-    halted: bool,
+    pub halted: bool,
     /// T-states, basic unit of time, and 1:1 with the clock.
-    t_cycles: u64,
+    pub t_cycles: u64,
     /// M-cycles, base unit for CPU instructions, and 1:4 with the clock.
-    m_cycles: u64,
+    pub m_cycles: u64,
     /// T-cycles since the last SRAM save operation.
     last_save_cycles: u64,
     /// The debug manager.
@@ -49,11 +44,9 @@ impl<'a> Machine<'a> {
     /// Create a new instance of the Game Boy.
     pub fn new(cart: &'a mut Cartridge, debug: bool) -> Self {
         // UI state object.
-        let ui_state = Rc::new(RefCell::new(UIState::new()));
         Machine {
             registers: Registers::new(),
             memory: Memory::new(cart),
-            ui_state: Rc::clone(&ui_state),
             ime: false,
             ei: 0,
             di: 0,

@@ -31,10 +31,6 @@ impl eventhandler::EventHandler for DebugManager {
         } else if event.key_released(KeyCode::F9) {
             self.toggle_paused();
             true
-        } else if event.key_released(KeyCode::KeyD) {
-            self.debugging = !self.debugging;
-            self.paused = self.debugging;
-            true
         } else {
             false
         }
@@ -52,12 +48,9 @@ impl DebugManager {
         }
     }
 
-    pub fn set_debugging(&mut self, d: bool) {
-        self.debugging = d;
-    }
-
-    pub fn toggle_debugging(&mut self) {
+    pub fn toggle_debugging(&mut self) -> bool {
         self.debugging = !self.debugging;
+        self.debugging
     }
 
     pub fn is_debugging(&self) -> bool {

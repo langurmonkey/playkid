@@ -861,13 +861,23 @@ impl PPU {
 
     /// Set the palette for rendering.
     pub fn cycle_palette(&mut self) {
-        self.current_palette = (self.current_palette + 1) % PALETTES.len() as u8;
+        self.set_palette((self.current_palette + 1) % PALETTES.len() as u8);
+    }
+
+    /// Set the palette index.
+    pub fn set_palette(&mut self, index: u8) {
+        self.current_palette = index;
         self.palette = PALETTES[self.current_palette as usize];
         println!(
             "{}: Palette changed to {}",
             "OK".green(),
             PALETTE_NAMES[self.current_palette as usize].yellow()
         );
+    }
+
+    /// Get the current palette index.
+    pub fn get_palette_index(&self) -> u8 {
+        self.current_palette
     }
 }
 
