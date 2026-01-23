@@ -12,7 +12,7 @@ use winit::event_loop::EventLoopWindowTarget;
 use winit::window::Window;
 
 pub const BLUE: Color32 = Color32::from_rgb(66, 133, 244);
-pub const GRAY: Color32 = Color32::from_rgb(110, 110, 110);
+pub const GRAY: Color32 = Color32::from_rgb(127, 127, 127);
 pub const WHITE: Color32 = Color32::from_rgb(255, 255, 255);
 pub const CYAN: Color32 = Color32::from_rgb(0, 188, 212);
 pub const MAGENTA: Color32 = Color32::from_rgb(233, 30, 99);
@@ -493,10 +493,31 @@ impl Gui {
                             ui.add_space(20.0);
 
                             // CPU state.
-                            ui.monospace(format!(
-                                "CPU state:  {}",
+                            let mut state = LayoutJob::default();
+                            RichText::new("CPU state:  ")
+                                .color(GRAY)
+                                .font(FontId::new(12.0, FontFamily::Monospace))
+                                .strong()
+                                .append_to(
+                                    &mut state,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
+                            RichText::new(format!(
+                                "{}",
                                 if machine.halted { "HALTED" } else { "RUNNING" }
-                            ));
+                            ))
+                            .color(if machine.halted { RED } else { GREEN })
+                            .font(FontId::new(16.0, FontFamily::Monospace))
+                            .strong()
+                            .append_to(
+                                &mut state,
+                                ui.style(),
+                                egui::FontSelection::Default,
+                                egui::Align::Center,
+                            );
+                            ui.label(state);
                             // Timing Stats
                             ui.monospace(format!("T-cycles:   {}", machine.t_cycles));
                             ui.monospace(format!("M-cycles:   {}", machine.m_cycles));
