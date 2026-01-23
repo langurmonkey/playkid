@@ -66,6 +66,11 @@ pub struct APU {
     ch3_length_enabled: bool,
     ch4_length_timer: u16,
     ch4_length_enabled: bool,
+
+    // Accumulated.
+    accumulated_l: f32,
+    accumulated_r: f32,
+    accumulated_count: u32,
 }
 
 impl APU {
@@ -126,6 +131,10 @@ impl APU {
             ch3_length_enabled: false,
             ch4_length_timer: 0,
             ch4_length_enabled: false,
+
+            accumulated_l: 0.0,
+            accumulated_r: 0.0,
+            accumulated_count: 0,
         }
     }
 
@@ -299,21 +308,20 @@ impl APU {
 
     /// Run the APU for `t_cycles` T-cycles.
     pub fn cycle(&mut self, t_cycles: u64) {
-        // Update Channel 1 Frequency Timer.
-        // The timer period is (2048 - frequency) * 4.
+        // --- 1. Update Hardware Timers ---
+        // Channel 1
         let freq_low = self.read(0xFF13) as u16;
         let freq_high = (self.read(0xFF14) & 0x07) as u16;
         let frequency = (freq_high << 8) | freq_low;
         let period_ch1 = (2048 - frequency as i32) * 4;
 
-        // Channel 1.
         self.ch1_timer -= t_cycles as i32;
         if self.ch1_timer <= 0 {
             self.ch1_timer += period_ch1;
             self.ch1_duty_step = (self.ch1_duty_step + 1) % 8;
         }
 
-        // Channel 2.
+        // Channel 2
         let ch2_freq = (((self.read(0xFF19) & 0x07) as u16) << 8) | self.read(0xFF18) as u16;
         self.ch2_timer -= t_cycles as i32;
         if self.ch2_timer <= 0 {
@@ -321,7 +329,7 @@ impl APU {
             self.ch2_duty_step = (self.ch2_duty_step + 1) % 8;
         }
 
-        // Channel 3.
+        // Channel 3
         let ch3_freq = (((self.read(0xFF1E) & 0x07) as u16) << 8) | self.read(0xFF1D) as u16;
         self.ch3_timer -= t_cycles as i32;
         if self.ch3_timer <= 0 {
@@ -329,7 +337,7 @@ impl APU {
             self.ch3_sample_idx = (self.ch3_sample_idx + 1) % 32;
         }
 
-        // Channel 4.
+        // Channel 4
         let nr43 = self.read(0xFF22);
         let shift = (nr43 >> 4) as i32;
         let divisor = match nr43 & 0x07 {
@@ -348,26 +356,19 @@ impl APU {
         self.ch4_timer -= t_cycles as i32;
         if self.ch4_timer <= 0 {
             self.ch4_timer += period_ch4;
-
-            // LFSR Step.
             let bit0 = self.ch4_lfsr & 0x01;
             let bit1 = (self.ch4_lfsr >> 1) & 0x01;
             let result = bit0 ^ bit1;
-
             self.ch4_lfsr = (self.ch4_lfsr >> 1) | (result << 14);
             if (nr43 & 0x08) != 0 {
-                // Short mode (7-bit)
                 self.ch4_lfsr = (self.ch4_lfsr & !(1 << 6)) | (result << 6);
             }
         }
 
-        // 64Hz Envelope Clock (65536 T-cycles)
+        // --- 2. Frame Sequencer (Length, Sweep, Envelope) ---
         self.frame_timer += t_cycles;
-
         if self.frame_timer >= 8192 {
-            // 512Hz
             self.frame_timer -= 8192;
-
             match self.frame_sequencer {
                 0 | 2 | 4 | 6 => {
                     self.step_length();
@@ -385,25 +386,38 @@ impl APU {
             self.frame_sequencer = (self.frame_sequencer + 1) % 8;
         }
 
-        // Sample Generation Logic.
+        // --- 3. Anti-Aliasing Accumulation ---
+        // We capture the state of the audio for these cycles and add it to our average
+        let (l_sample, r_sample) = self.generate_sample();
+        self.accumulated_l += l_sample * t_cycles as f32;
+        self.accumulated_r += r_sample * t_cycles as f32;
+        self.accumulated_count += t_cycles as u32;
+
+        // --- 4. Sample Generation & Resampling ---
         self.sample_timer += t_cycles as f32;
         while self.sample_timer >= self.t_cycles_per_sample {
             self.sample_timer -= self.t_cycles_per_sample;
 
-            let (l_sample, r_sample) = self.generate_sample();
-            self.buffer.push(l_sample);
-            self.buffer.push(r_sample);
+            // Calculate average for this sample period to smooth the sound
+            if self.accumulated_count > 0 {
+                let avg_l = self.accumulated_l / self.accumulated_count as f32;
+                let avg_r = self.accumulated_r / self.accumulated_count as f32;
+                self.buffer.push(avg_l);
+                self.buffer.push(avg_r);
 
-            // 1024 for mono, 2040 for stereo.
-            if self.buffer.len() >= 2048 {
-                // Throttle: If the queue is getting too full, wait a bit.
-                // This prevents the emulator from running at 500% speed.
-                while self.sink.len() > 8192 {
-                    std::thread::sleep(std::time::Duration::from_millis(1));
+                // Reset accumulators for next sample
+                self.accumulated_l = 0.0;
+                self.accumulated_r = 0.0;
+                self.accumulated_count = 0;
+            }
+
+            // --- 5. Buffer Management & Throttling ---
+            if self.buffer.len() >= 1024 {
+                // Increased sink limit slightly to prevent underflow "tearing"
+                if self.sink.len() < 10 {
+                    let source = rodio::buffer::SamplesBuffer::new(2, 44100, self.buffer.clone());
+                    self.sink.append(source);
                 }
-                // Append the buffer as a source.
-                let source = SamplesBuffer::new(2, 44100, self.buffer.clone());
-                self.sink.append(source);
                 self.buffer.clear();
             }
         }
@@ -734,5 +748,14 @@ impl APU {
 
     fn check_sweep_overflow(&mut self) {
         self.calculate_sweep_freq();
+    }
+
+    /// Flush the buffer.
+    pub fn flush(&mut self) {
+        if !self.buffer.is_empty() {
+            let source = SamplesBuffer::new(2, 44100, self.buffer.clone());
+            self.sink.append(source);
+            self.buffer.clear();
+        }
     }
 }

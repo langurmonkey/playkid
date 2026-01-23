@@ -117,6 +117,8 @@ impl<'a> Machine<'a> {
                 self.last_save_cycles = self.t_cycles;
             }
         }
+        // Flush APU.
+        self.memory.apu.flush();
     }
 
     /// Updates the IME (Interrupt Master Enable) flag.
