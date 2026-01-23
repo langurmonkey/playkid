@@ -21,5 +21,6 @@ winit = "0.29"
 winit_input_helper = "0.15"
 log = "0.4.*"
 rodio = "0.21.1"
+gilrs = "0.11.1"
 
 

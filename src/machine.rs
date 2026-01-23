@@ -5,20 +5,15 @@ use crate::instruction;
 use crate::memory;
 use crate::registers;
 
+use crate::debugmanager::DebugManager;
 use crate::uistate::UIState;
 use cartridge::Cartridge;
-use colored::Colorize;
 use instruction::{CC, Instruction, R8, R16, R16EXT, R16LD, RunInstr, TGT3};
 use memory::Memory;
 use registers::Registers;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::thread;
-use winit::keyboard::KeyCode;
 use winit_input_helper::WinitInputHelper;
-
-/// Spin threshold in milliseconds. Minimum time to sleep until next frame.
-const SPIN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(2);
 
 /// # Machine
 /// The machine contains the registers, the memory, and the display, and
@@ -46,11 +41,13 @@ pub struct Machine<'a> {
     m_cycles: u64,
     /// T-cycles since the last SRAM save operation.
     last_save_cycles: u64,
+    /// The debug manager.
+    pub debug: DebugManager,
 }
 
 impl<'a> Machine<'a> {
     /// Create a new instance of the Game Boy.
-    pub fn new(cart: &'a mut Cartridge) -> Self {
+    pub fn new(cart: &'a mut Cartridge, debug: bool) -> Self {
         // UI state object.
         let ui_state = Rc::new(RefCell::new(UIState::new()));
         Machine {
@@ -64,6 +61,7 @@ impl<'a> Machine<'a> {
             t_cycles: 324,
             m_cycles: 0,
             last_save_cycles: 0,
+            debug: DebugManager::new(debug),
         }
     }
 
@@ -86,52 +84,45 @@ impl<'a> Machine<'a> {
 
     /// Update the state of the machine with a cycle.
     pub fn update(&mut self) {
-        // Normal full-speed execution.
-        let mut cycles_this_frame: usize = 0;
-        while cycles_this_frame < constants::CYCLES_PER_FRAME {
-            let (t, m, r) = self.machine_cycle();
-            if !r {
-                // Early exit due to joypad.
-                break;
+        // Check for breakpoints.
+        if self.debug.is_debugging() && !self.debug.is_paused() {
+            if self.debug.has_breakpoint(self.registers.pc) {
+                self.debug.set_paused(true);
             }
-            self.m_cycles += m;
-            self.t_cycles += t;
-            cycles_this_frame += t as usize;
         }
 
-        // If SRAM is dirty, save it. Check every minute.
-        let cycles_since_save = self.t_cycles - self.last_save_cycles;
-        if cycles_since_save >= 6 * 41_943_040 {
-            if self.memory.cart.is_dirty() {
-                self.memory.cart.save_sram();
-                self.memory.cart.consume_dirty();
+        // Step instruction or line.
+        if self.debug.is_paused() {
+            if self.debug.take_step_instruction() {
+                self.machine_cycle(); // Execute just one
+            } else if self.debug.take_step_line() {
+                let current_ly = self.memory.ppu().ly;
+                while self.memory.ppu().ly == current_ly {
+                    self.machine_cycle();
+                }
             }
-            self.last_save_cycles = self.t_cycles;
-        }
-
-        // self.sleep_next_frame(frame_start_time);
-    }
-
-    /// Returns whether there is new data available in the PPU
-    pub fn ppu_data_available(&self) -> bool {
-        self.memory.ppu.data_available
-    }
-
-    pub fn reset_ppu_data_flag(&mut self) {
-        self.memory.ppu.data_available = false;
-    }
-
-    /// Sleeps until next frame, given a start time.
-    pub fn sleep_next_frame(&self, frame_start_time: std::time::Instant) {
-        // Now, sleep for the remaining time in the frame.
-        let elapsed = frame_start_time.elapsed();
-        if elapsed < constants::TARGET_FRAME_DURATION {
-            let remaining = constants::TARGET_FRAME_DURATION - elapsed;
-            if remaining > SPIN_THRESHOLD {
-                thread::sleep(remaining - SPIN_THRESHOLD);
+        } else {
+            // Normal full-speed execution.
+            let mut cycles_this_frame: usize = 0;
+            while cycles_this_frame < constants::CYCLES_PER_FRAME {
+                let (t, m, r) = self.machine_cycle();
+                if !r {
+                    // Early exit due to joypad.
+                    break;
+                }
+                self.m_cycles += m;
+                self.t_cycles += t;
+                cycles_this_frame += t as usize;
             }
-            // Busy spin for remaining small amount.
-            while frame_start_time.elapsed() < constants::TARGET_FRAME_DURATION {}
+            // If SRAM is dirty, save it. Check every minute.
+            let cycles_since_save = self.t_cycles - self.last_save_cycles;
+            if cycles_since_save >= 6 * 41_943_040 {
+                if self.memory.cart.is_dirty() {
+                    self.memory.cart.save_sram();
+                    self.memory.cart.consume_dirty();
+                }
+                self.last_save_cycles = self.t_cycles;
+            }
         }
     }
 
@@ -2989,19 +2980,16 @@ impl<'a> eventhandler::EventHandler for Machine<'a> {
         // Reset cycles.
         let mut handled = false;
 
-        // Handle events here.
-        if event.key_released(KeyCode::KeyP) {
-            // Palette change?
-        }
-
         // Handle general emulator events.
         if !handled {
             handled = self.memory.joypad.handle_event(&event);
         }
-        // Cartridge key bindings (like write SRAM).
+
+        // Debug events.
         if !handled {
-            handled = self.memory.cart.handle_event(&event);
+            handled = self.debug.handle_event(&event);
         }
+
         handled
     }
 }

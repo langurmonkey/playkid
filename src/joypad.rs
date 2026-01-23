@@ -1,9 +1,9 @@
 use crate::eventhandler;
 use colored::Colorize;
+use gilrs::{Button, Event, EventType, Gilrs};
 use winit::keyboard::KeyCode;
 use winit_input_helper::WinitInputHelper;
 
-/// Describes the current state of the Game Boy joypad.
 pub struct Joypad {
     /// The P1/JOYP register.
     joyp: u8,
@@ -33,6 +33,8 @@ pub struct Joypad {
     pub i_mask: u8,
     /// Cycle counter,
     cycles: usize,
+    /// Game controller library.
+    gilrs: Gilrs,
 }
 
 impl eventhandler::EventHandler for Joypad {
@@ -108,10 +110,19 @@ impl Joypad {
             request_interrupt: false,
             i_mask: 0,
             cycles: 0,
+            gilrs: Gilrs::new().unwrap(),
         };
 
-        // Try to open the first available game controller
-        // joypad.init_controller();
+        // Print out detected gamepads.
+        let gamepads = joypad.gilrs.gamepads();
+        gamepads.for_each(move |(gid, g)| {
+            println!(
+                "{}: Gamepad {} detected: {} ",
+                "OK".green(),
+                gid,
+                g.name().to_string().yellow()
+            )
+        });
 
         joypad
     }
@@ -157,52 +168,108 @@ impl Joypad {
 
     /// Updates the flags in bits 5 and 4 (select buttons, select D-pad) of JOYP.
     fn update_state(&mut self) {
-        // Start with all buttons unpressed (1 is unpressed in GB logic)
-        // Keep the selection bits (4-5) as set by the CPU
-        let mut res = self.joyp | 0x0F;
+        let old_joyp = self.joyp;
+        // Start with bits 0-3 as 1 (unpressed).
+        let mut current_nibble = 0x0F;
 
-        self.select_buttons = (self.joyp & 0x20) == 0;
-        self.select_dpad = (self.joyp & 0x10) == 0;
+        // Selection bits are active LOW.
+        let select_buttons = (self.joyp & 0x20) == 0;
+        let select_dpad = (self.joyp & 0x10) == 0;
 
-        // Use separate IF blocks because BOTH can be selected at once
-        if self.select_buttons {
+        if select_buttons {
             if self.a {
-                res &= 0xFE;
-                self.request_interrupt = true;
+                current_nibble &= !0x01;
             }
             if self.b {
-                res &= 0xFD;
-                self.request_interrupt = true;
+                current_nibble &= !0x02;
             }
             if self.select {
-                res &= 0xFB;
-                self.request_interrupt = true;
+                current_nibble &= !0x04;
             }
             if self.start {
-                res &= 0xF7;
-                self.request_interrupt = true;
+                current_nibble &= !0x08;
             }
         }
 
-        if self.select_dpad {
+        if select_dpad {
             if self.right {
-                res &= 0xFE;
-                self.request_interrupt = true;
+                current_nibble &= !0x01;
             }
             if self.left {
-                res &= 0xFD;
-                self.request_interrupt = true;
+                current_nibble &= !0x02;
             }
             if self.up {
-                res &= 0xFB;
-                self.request_interrupt = true;
+                current_nibble &= !0x04;
             }
             if self.down {
-                res &= 0xF7;
-                self.request_interrupt = true;
+                current_nibble &= !0x08;
             }
         }
 
-        self.joyp = res;
+        // Combine selection bits and new button nibble.
+        self.joyp = (self.joyp & 0xF0) | current_nibble;
+
+        // Interrupt triggers when any bit in lower nibble transitions from 1 to 0.
+        // This happens if (old_bits & !new_bits) is non-zero.
+        if (old_joyp & 0x0F) & !(self.joyp & 0x0F) != 0 {
+            self.request_interrupt = true;
+        }
+    }
+
+    /// Main game controller handler.
+    pub fn handle_controller_input(&mut self) {
+        // Examine all events from the controller
+        while let Some(Event { id, event, .. }) = self.gilrs.next_event() {
+            match event {
+                EventType::Connected => {
+                    let gamepad = self.gilrs.gamepad(id);
+                    println!(
+                        "{}: Gamepad connected: {} (VID: {:04x} PID: {:04x})",
+                        "OK".green(),
+                        gamepad.name().yellow(),
+                        gamepad.vendor_id().unwrap_or(0),
+                        gamepad.product_id().unwrap_or(0)
+                    );
+                }
+                EventType::Disconnected => {
+                    let gamepad = self.gilrs.gamepad(id);
+                    println!(
+                        "{}: Gamepad disconnected: {} (VID: {:04x} PID: {:04x})",
+                        "WARN".yellow(),
+                        gamepad.name().yellow(),
+                        gamepad.vendor_id().unwrap_or(0),
+                        gamepad.product_id().unwrap_or(0)
+                    );
+                }
+                EventType::ButtonPressed(button, _) => self.update_button(button, true),
+                EventType::ButtonReleased(button, _) => self.update_button(button, false),
+                EventType::AxisChanged(axis, value, _) => {
+                    if axis == gilrs::Axis::LeftStickX {
+                        self.left = value < -0.5;
+                        self.right = value > 0.5;
+                    }
+                    if axis == gilrs::Axis::LeftStickY {
+                        self.up = value > 0.5;
+                        self.down = value < -0.5;
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    /// Game controller button handling.
+    fn update_button(&mut self, button: Button, pressed: bool) {
+        match button {
+            Button::South | Button::East => self.a = pressed,
+            Button::North | Button::West => self.b = pressed,
+            Button::Start => self.start = pressed,
+            Button::Select => self.select = pressed,
+            Button::DPadUp => self.up = pressed,
+            Button::DPadDown => self.down = pressed,
+            Button::DPadLeft => self.left = pressed,
+            Button::DPadRight => self.right = pressed,
+            _ => (),
+        }
     }
 }

@@ -104,8 +104,6 @@ pub struct PPU {
 
     /// Whether we are in HBlank region.
     pub hblank: bool,
-    /// Flag that goes up when the screen is updated.
-    pub data_available: bool,
     /// Did LY==LYC previously?
     last_ly_eq_lyc: bool,
 
@@ -204,7 +202,6 @@ impl PPU {
             obp1: 0,
             i_mask: 0,
             hblank: false,
-            data_available: false,
             last_ly_eq_lyc: false,
 
             palette,
@@ -240,7 +237,6 @@ impl PPU {
         self.obp1 = 1;
         self.i_mask = 0;
         self.hblank = false;
-        self.data_available = false;
         self.last_ly_eq_lyc = false;
     }
 
@@ -432,15 +428,12 @@ impl PPU {
                 self.wly_flag = false;
                 self.wly = 0;
                 self.i_mask |= 0x01;
-                // Signal data available.
-                self.data_available = true;
                 self.stat4
             }
 
             // OAM scan.
             2 => {
-                // Nothing else...
-                self.data_available = false;
+                // Nothing else.
                 self.stat5
             }
 

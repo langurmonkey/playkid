@@ -2,7 +2,6 @@ mod mbc1;
 mod mbc2;
 mod mbc3;
 
-use crate::eventhandler;
 use colored::Colorize;
 use mbc1::MBC1;
 use mbc2::MBC2;
@@ -12,8 +11,6 @@ use std::io::prelude::*;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use std::str;
-use winit::keyboard::KeyCode;
-use winit_input_helper::WinitInputHelper;
 
 pub enum CartridgeType {
     RomOnly,
@@ -40,18 +37,6 @@ const LOGO: [u8; 48] = [
     0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
     0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
 ];
-
-impl eventhandler::EventHandler for Cartridge {
-    fn handle_event(&mut self, event: &WinitInputHelper) -> bool {
-        // Write SRAM file on `w`.
-        if event.key_released(KeyCode::KeyW) {
-            self.save_sram();
-            true
-        } else {
-            false
-        }
-    }
-}
 
 impl Cartridge {
     pub fn new(rom: &str, skip_checksum: bool) -> Result<Self> {

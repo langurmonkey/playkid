@@ -1,9 +1,9 @@
 #![deny(clippy::all)]
-#![forbid(unsafe_code)]
 
 mod apu;
 mod cartridge;
 mod constants;
+mod debugmanager;
 mod eventhandler;
 mod instruction;
 mod joypad;
@@ -68,17 +68,7 @@ fn main() -> Result<(), Error> {
     let rom = args.input.as_path().to_str().unwrap();
     println!("{}: Using rom file: {}", "OK".green(), rom);
 
-    if args.debug {
-        println!("{}: Debug mode is on", "WARN".yellow());
-    }
-
-    // Load ROM file into cartridge.
-    let mut cart = Cartridge::new(rom, args.skipcheck)
-        .expect(&format!("{}: Error reading rom file", "ERR".red()));
-
-    // Load existing save data from disk.
-    cart.load_sram();
-
+    // Initialize window.
     env_logger::init();
     let event_loop = EventLoop::new().unwrap();
     let mut input = WinitInputHelper::new();
@@ -96,17 +86,22 @@ fn main() -> Result<(), Error> {
             .unwrap()
     };
 
+    // Initialize pixels renderer.
     let (mut pixels, mut framework) = {
         let window_size = window.inner_size();
         let scale_factor = window.scale_factor() as f32;
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-        let pixels = Pixels::new(WIDTH, HEIGHT, surface_texture)?;
+        // Create the pixels instance.
+        let mut pixels = Pixels::new(WIDTH, HEIGHT, surface_texture)?;
+        // Disable v-sync in case we want to run faster.
+        pixels.enable_vsync(false);
         let framework = Framework::new(
             &event_loop,
             window_size.width,
             window_size.height,
             scale_factor,
             &pixels,
+            args.debug,
         );
 
         (pixels, framework)
@@ -114,29 +109,58 @@ fn main() -> Result<(), Error> {
 
     let mut last_update_inst = std::time::Instant::now();
 
+    // Load ROM file into cartridge.
+    let mut cart = Cartridge::new(rom, args.skipcheck)
+        .expect(&format!("{}: Error reading rom file", "ERR".red()));
+
+    // Load existing save data from disk.
+    cart.load_sram();
+
     // Create Machine.
-    let mut machine = Machine::new(&mut cart);
+    let mut machine = Machine::new(&mut cart, args.debug);
 
     // Event loop.
     let res = event_loop.run(|event, elwt| {
         elwt.set_control_flow(winit::event_loop::ControlFlow::Poll);
         // Handle input events.
         if input.update(&event) {
-            // Close events.
-            if input.key_pressed(KeyCode::Escape)
-                || input.key_pressed(KeyCode::CapsLock)
+            // Handle gamepad events.
+            machine.memory.joypad.handle_controller_input();
+
+            let mut handled = false;
+
+            if input.key_released(KeyCode::Escape)
+                || input.key_released(KeyCode::CapsLock)
                 || input.close_requested()
             {
+                // Close program.
                 elwt.exit();
                 return;
+            } else if input.key_released(KeyCode::KeyP) {
+                // Cycle palette.
+                machine.memory.ppu.cycle_palette();
+                handled = true;
+            } else if input.key_released(KeyCode::KeyW) {
+                // Write SRAM.
+                if machine.memory.cart.is_dirty() {
+                    machine.memory.cart.save_sram();
+                    machine.memory.cart.consume_dirty();
+                }
+                handled = true;
             }
 
-            // Update the scale factor.
-            if let Some(scale_factor) = input.scale_factor() {
-                framework.scale_factor(scale_factor);
+            // Handle events in machine.
+            if !handled {
+                machine.handle_event(&input);
             }
 
-            machine.handle_event(&input);
+            // Handle GUI requests.
+            if framework.gui.ui_state.exit_requested {
+                // Consume.
+                framework.gui.ui_state.exit_requested = false;
+                // Quit.
+                elwt.exit();
+            }
 
             // Resize the window.
             if let Some(size) = input.window_resized() {
@@ -169,10 +193,9 @@ fn main() -> Result<(), Error> {
                 // Render machine if needed.
                 let fb = machine.memory.ppu.fb_front;
                 pixels.frame_mut().copy_from_slice(&fb);
-                machine.reset_ppu_data_flag();
 
                 // Prepare egui.
-                framework.prepare(&window);
+                framework.prepare(&window, &mut machine);
 
                 // Render pixels and egui.
                 pixels
@@ -183,8 +206,34 @@ fn main() -> Result<(), Error> {
                     })
                     .unwrap();
             }
+
+            // Handle scaling and resizing
             Event::WindowEvent { event, .. } => {
-                // Update egui inputs.
+                match event {
+                    WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                        // Update egui's logical scaling.
+                        framework.scale_factor(scale_factor);
+
+                        // Sync the pixels surface to the new physical dimensions.
+                        let new_size = window.inner_size();
+                        if let Err(err) = pixels.resize_surface(new_size.width, new_size.height) {
+                            log_error("pixels.resize_surface", err);
+                            elwt.exit();
+                        }
+                        framework.resize(new_size.width, new_size.height);
+                    }
+                    // Handle standard window resizing.
+                    WindowEvent::Resized(size) => {
+                        if let Err(err) = pixels.resize_surface(size.width, size.height) {
+                            log_error("pixels.resize_surface", err);
+                            elwt.exit();
+                        }
+                        framework.resize(size.width, size.height);
+                    }
+                    _ => (),
+                }
+
+                // Update egui inputs for all other window events.
                 framework.handle_event(&window, &event);
             }
             _ => (),
