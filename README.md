@@ -76,7 +76,7 @@ Here are the Joypad keyboard mappings:
 - <kbd>a</kbd> - A button
 - <kbd>b</kbd> - B button
 
-You can also use any game controller. The SDL2 usual mappings apply.
+The kebyoard is clumsy for playing Game Boy games, so you can use any game controller. Controllers are detected when hot-plugged.
 
 Additionally, there are some more actions available:
 
