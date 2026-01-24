@@ -91,7 +91,7 @@ You can also use the provided UI.
 
 # Debug mode
 
-You can enter the debug mode any time by pressing `d`, by clikcing on `Debug` > `Debug panel...`, or activate it at launch with the `-d`/`--debug` flag.
+You can enter the debug mode any time by pressing <kbd>d</kbd>, by clikcing on `Debug` > `Debug panel...`, or activate it at launch with the `-d`/`--debug` flag.
 
 <p align="center">
   <img src="assets/img/debug-mode.avif" />
