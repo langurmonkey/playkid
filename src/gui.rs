@@ -4,7 +4,7 @@ use crate::machine::Machine;
 use crate::uistate::UIState;
 use egui::{
     ClippedPrimitive, Color32, Context, FontFamily, FontId, RichText, TexturesDelta, ViewportId,
-    text::LayoutJob, text::TextFormat,
+    text::LayoutJob,
 };
 use egui_wgpu::{Renderer, ScreenDescriptor};
 use pixels::{PixelsContext, wgpu};
@@ -20,7 +20,6 @@ pub const YELLOW: Color32 = Color32::from_rgb(244, 180, 0);
 pub const GREEN: Color32 = Color32::from_rgb(15, 157, 88);
 pub const RED: Color32 = Color32::from_rgb(219, 68, 55);
 pub const ORANGE: Color32 = Color32::from_rgb(255, 152, 0);
-pub const DARKGRAY: Color32 = Color32::from_rgb(30, 30, 30);
 
 /// Manages all state required for rendering egui over `Pixels`.
 pub(crate) struct Framework {
@@ -534,22 +533,110 @@ impl Gui {
                                 // Registers
                                 ui.monospace("Registers: ");
                                 ui.vertical(|ui| {
-                                    ui.monospace(format!(
-                                        "AF {:02x} {:02x}",
+                                    // AF.
+                                    let mut af = LayoutJob::default();
+                                    RichText::new("AF ")
+                                        .color(WHITE)
+                                        .font(FontId::new(12.0, FontFamily::Monospace))
+                                        .strong()
+                                        .append_to(
+                                            &mut af,
+                                            ui.style(),
+                                            egui::FontSelection::Default,
+                                            egui::Align::Center,
+                                        );
+                                    RichText::new(format!(
+                                        "{:02x} {:02x}",
                                         machine.registers.a, machine.registers.f
-                                    ));
-                                    ui.monospace(format!(
-                                        "BC {:02x} {:02x}",
+                                    ))
+                                    .color(MAGENTA)
+                                    .font(FontId::new(12.0, FontFamily::Monospace))
+                                    .strong()
+                                    .append_to(
+                                        &mut af,
+                                        ui.style(),
+                                        egui::FontSelection::Default,
+                                        egui::Align::Center,
+                                    );
+                                    ui.label(af);
+                                    // BC.
+                                    let mut bc = LayoutJob::default();
+                                    RichText::new("BC ")
+                                        .color(WHITE)
+                                        .font(FontId::new(12.0, FontFamily::Monospace))
+                                        .strong()
+                                        .append_to(
+                                            &mut bc,
+                                            ui.style(),
+                                            egui::FontSelection::Default,
+                                            egui::Align::Center,
+                                        );
+                                    RichText::new(format!(
+                                        "{:02x} {:02x}",
                                         machine.registers.b, machine.registers.c
-                                    ));
-                                    ui.monospace(format!(
-                                        "DE {:02x} {:02x}",
+                                    ))
+                                    .color(MAGENTA)
+                                    .font(FontId::new(12.0, FontFamily::Monospace))
+                                    .strong()
+                                    .append_to(
+                                        &mut bc,
+                                        ui.style(),
+                                        egui::FontSelection::Default,
+                                        egui::Align::Center,
+                                    );
+                                    ui.label(bc);
+                                    // DE.
+                                    let mut de = LayoutJob::default();
+                                    RichText::new("DE ")
+                                        .color(WHITE)
+                                        .font(FontId::new(12.0, FontFamily::Monospace))
+                                        .strong()
+                                        .append_to(
+                                            &mut de,
+                                            ui.style(),
+                                            egui::FontSelection::Default,
+                                            egui::Align::Center,
+                                        );
+                                    RichText::new(format!(
+                                        "{:02x} {:02x}",
                                         machine.registers.d, machine.registers.e
-                                    ));
-                                    ui.monospace(format!(
-                                        "HL {:02x} {:02x}",
+                                    ))
+                                    .color(MAGENTA)
+                                    .font(FontId::new(12.0, FontFamily::Monospace))
+                                    .strong()
+                                    .append_to(
+                                        &mut de,
+                                        ui.style(),
+                                        egui::FontSelection::Default,
+                                        egui::Align::Center,
+                                    );
+                                    ui.label(de);
+                                    // HL.
+                                    let mut hl = LayoutJob::default();
+                                    RichText::new("HL ")
+                                        .color(WHITE)
+                                        .font(FontId::new(12.0, FontFamily::Monospace))
+                                        .strong()
+                                        .append_to(
+                                            &mut hl,
+                                            ui.style(),
+                                            egui::FontSelection::Default,
+                                            egui::Align::Center,
+                                        );
+                                    RichText::new(format!(
+                                        "{:02x} {:02x}",
                                         machine.registers.h, machine.registers.l
-                                    ));
+                                    ))
+                                    .color(MAGENTA)
+                                    .font(FontId::new(12.0, FontFamily::Monospace))
+                                    .strong()
+                                    .append_to(
+                                        &mut hl,
+                                        ui.style(),
+                                        egui::FontSelection::Default,
+                                        egui::Align::Center,
+                                    );
+                                    ui.label(hl);
                                 });
                                 ui.end_row();
 
@@ -561,7 +648,19 @@ impl Gui {
                                 let n = if f & 0x40 != 0 { "N" } else { "_" };
                                 let h = if f & 0x20 != 0 { "H" } else { "_" };
                                 let c = if f & 0x10 != 0 { "C" } else { "_" };
-                                ui.monospace(format!("{} {} {} {}", z, n, h, c));
+
+                                let mut flags = LayoutJob::default();
+                                RichText::new(format!("{} {} {} {}", z, n, h, c))
+                                    .color(CYAN)
+                                    .font(FontId::new(12.0, FontFamily::Monospace))
+                                    .strong()
+                                    .append_to(
+                                        &mut flags,
+                                        ui.style(),
+                                        egui::FontSelection::Default,
+                                        egui::Align::Center,
+                                    );
+                                ui.label(flags);
                                 ui.end_row();
 
                                 let mem = &machine.memory;
@@ -591,7 +690,9 @@ impl Gui {
                                 ui.monospace(format!("{:#02x}", opcode));
                                 ui.end_row();
                                 ui.monospace("Joypad:");
-                                ui.monospace(&format!(
+
+                                let mut joypad = LayoutJob::default();
+                                RichText::new(&format!(
                                     "{} {} {} {} {} {} {} {}",
                                     if mem.joypad.up { "↑" } else { "_" },
                                     if mem.joypad.down { "↓" } else { "_" },
@@ -601,7 +702,17 @@ impl Gui {
                                     if mem.joypad.b { "B" } else { "_" },
                                     if mem.joypad.start { "S" } else { "_" },
                                     if mem.joypad.select { "s" } else { "_" }
-                                ));
+                                ))
+                                .color(CYAN)
+                                .font(FontId::new(12.0, FontFamily::Monospace))
+                                .strong()
+                                .append_to(
+                                    &mut joypad,
+                                    ui.style(),
+                                    egui::FontSelection::Default,
+                                    egui::Align::Center,
+                                );
+                                ui.label(joypad);
                                 ui.end_row();
                             });
 

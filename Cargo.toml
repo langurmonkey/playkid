@@ -7,7 +7,6 @@ documentation = "https://tonisagrista.com/projects/playkid"
 homepage = "https://tonisagrista.com/projects/playkid"
 repository = "https://codeberg.org/langurmonkey/playkid"
 edition = "2024"
-license = "MIT"
 license-file = "LICENSE"
 readme = "README.md"
 publish = false
