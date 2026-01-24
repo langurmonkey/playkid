@@ -14,7 +14,7 @@ Here are the main features of Play Kid:
 - Full memory map implemented.
 - Modes: ROM, MBC1, MBC2, MBC3.
 - Audio is implemented, with 4 channels, envelopes, sweep, and stereo.
-- Supports game controllers via SDL.
+- Supports game controllers.
 - Multiple color palettes.
 - Save screenshot of current frame buffer.
 - Respects 160:144 aspect ratio by letter-boxing.
@@ -25,7 +25,6 @@ Here are the main features of Play Kid:
   - FPS counter.
   - Displays internal state.
   - Breakpoints.
-  - Uses own minimal UI library with horizontal/vertical layouts, labels, buttons, and text fields.
 - Save RAM to `.sav` files to emulate the battery-backed SRAM. Those are saved every minute.
 - Automatically adapts to multi-DPI setups by scaling the UI.
 - Working games/roms:
@@ -39,7 +38,7 @@ Here are the main features of Play Kid:
   - Bugs Bunny Crazy Castle
   - The Amazing Spider-Man
   - Dr. Mario
-  - Probably many more
+  - Probably many, many more
 - Works on Linux, macOS, and Windows.
 
 # Download
@@ -48,27 +47,6 @@ The easiest way to run Play Kid is getting the package for your operating system
 
 - [Codeberg releases](https://codeberg.org/langurmonkey/playkid/releases)
 - [GitHub releases](https://github.com/langurmonkey/playkid/releases)
-
-# Dependencies
-
-The project uses SDL2 (and SDL2-ttf), so you need to have it installed on your system. There is a good guide for all OSs in the [crates.io page](https://crates.io/crates/sdl2).
-
-## Linux
-
-Just use your package manager, like `apt install libsdl2-dev`, `dnf install SDL2-devel`, or `pacman -S sdl2`.
-
-## macOS
-
-Install SDL2 through `brew` and make sure that the libraries are seen.
-
-```bash
-brew install sdl2 sdl2_ttf
-export LIBRARY_PATH="$LIBRARY_PATH:$(brew --prefix)/lib"
-```
-
-## Windows
-
-Follow the instructions for Windows in the [crate documentation](https://crates.io/crates/sdl2). They are too long for me to reproduce here.
 
 # Build
 
@@ -108,9 +86,11 @@ Additionally, there are some more actions available:
 - <kbd>d</kbd> - enter debug mode
 - <kbd>Esc</kbd> - exit the emulator
 
+You can also use the provided UI.
+
 # Debug mode
 
-You can enter the debug mode any time by pressing `d`, or activate it at launch with the `-d`/`--debug` flag.
+You can enter the debug mode any time by pressing `d`, by clikcing on `Debug` > `Debug panel...`, or activate it at launch with the `-d`/`--debug` flag.
 
 <p align="center">
   <img src="assets/img/debug-mode.avif" />
@@ -125,7 +105,7 @@ You can use the provided UI controls to work with debug mode. You can also use t
 - <kbd>d</kbd> - exit debug mode and go back to normal full-speed emulation
 - <kbd>Esc</kbd> - exit the emulator
 
-You can also use breakpoints. A list with the current breakpoint addresses is provided in yellow. To create a breakpoint, enter the desired address (in `$abcd` format) into the text field and click <kbd>Add BR</kbd>. Remove a breakpoint with <kbd>Remove BR</kbd>. Clear all current breakpoints with <kbd>Clear all</kbd>.
+You can also use breakpoints. A list with the current breakpoint addresses is provided at the bottom. To create a breakpoint, enter the desired address (in `$abcd` format) into the text field and click <kbd>+</kbd>. Remove a breakpoint with <kbd>-</kbd>. Clear all current breakpoints with <kbd>Clear all</kbd>.
 
 # CLI args
 

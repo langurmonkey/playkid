@@ -104,8 +104,6 @@ pub struct PPU {
 
     /// Whether we are in HBlank region.
     pub hblank: bool,
-    /// Flag that goes up when the screen is updated.
-    pub data_available: bool,
     /// Did LY==LYC previously?
     last_ly_eq_lyc: bool,
 
@@ -113,8 +111,10 @@ pub struct PPU {
     palette: [u8; 4 * 3],
     /// Index of the current palette.
     current_palette: u8,
-    /// Full screen buffer in RGBA format.
-    pub fb: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
+    /// The buffer currently being drawn to by the PPU (Back Buffer)
+    fb_back: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
+    /// The buffer ready to be displayed (Front Buffer)
+    pub fb_front: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
     /// Color ID buffer for priorities.
     pub priorities: [u8; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH],
 }
@@ -202,12 +202,12 @@ impl PPU {
             obp1: 0,
             i_mask: 0,
             hblank: false,
-            data_available: false,
             last_ly_eq_lyc: false,
 
             palette,
             current_palette: 0,
-            fb: [0xff; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
+            fb_front: [0xff; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
+            fb_back: [0xff; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH * 4],
             priorities: [0x01; constants::DISPLAY_HEIGHT * constants::DISPLAY_WIDTH],
         }
     }
@@ -215,7 +215,8 @@ impl PPU {
     pub fn reset(&mut self) {
         self.oam.fill(0xff);
         self.vram.fill(0x00);
-        self.fb.fill(0xff);
+        self.fb_front.fill(0xff);
+        self.fb_back.fill(0xff);
         self.priorities.fill(0x00);
         self.mode = 0;
         self.lcdc = 0;
@@ -236,7 +237,6 @@ impl PPU {
         self.obp1 = 1;
         self.i_mask = 0;
         self.hblank = false;
-        self.data_available = false;
         self.last_ly_eq_lyc = false;
     }
 
@@ -422,18 +422,18 @@ impl PPU {
 
             // VBlank.
             1 => {
+                // Frame is done, present it to front.
+                self.fb_front.copy_from_slice(&self.fb_back);
+
                 self.wly_flag = false;
                 self.wly = 0;
                 self.i_mask |= 0x01;
-                // Signal data available.
-                self.data_available = true;
                 self.stat4
             }
 
             // OAM scan.
             2 => {
-                // Nothing else...
-                self.data_available = false;
+                // Nothing else.
                 self.stat5
             }
 
@@ -757,17 +757,23 @@ impl PPU {
         let base = paletted_color as usize * 3;
 
         // RGBA, in order.
-        self.fb[pos * 4 + 0] = self.palette[base];
-        self.fb[pos * 4 + 1] = self.palette[base + 1];
-        self.fb[pos * 4 + 2] = self.palette[base + 2];
-        self.fb[pos * 4 + 3] = 0xff;
+        self.fb_back[pos * 4 + 0] = self.palette[base];
+        self.fb_back[pos * 4 + 1] = self.palette[base + 1];
+        self.fb_back[pos * 4 + 2] = self.palette[base + 2];
+        self.fb_back[pos * 4 + 3] = 0xff;
     }
 
     fn clear_screen(&mut self) {
         // Get the first palette color (RGB888 format).
         let (r, g, b) = (self.palette[0], self.palette[1], self.palette[2]);
 
-        self.fb.chunks_exact_mut(4).for_each(|chunk| {
+        self.fb_front.chunks_exact_mut(4).for_each(|chunk| {
+            chunk[0] = r;
+            chunk[1] = g;
+            chunk[2] = b;
+            chunk[3] = 0xff;
+        });
+        self.fb_back.chunks_exact_mut(4).for_each(|chunk| {
             chunk[0] = r;
             chunk[1] = g;
             chunk[2] = b;
@@ -855,13 +861,23 @@ impl PPU {
 
     /// Set the palette for rendering.
     pub fn cycle_palette(&mut self) {
-        self.current_palette = (self.current_palette + 1) % PALETTES.len() as u8;
+        self.set_palette((self.current_palette + 1) % PALETTES.len() as u8);
+    }
+
+    /// Set the palette index.
+    pub fn set_palette(&mut self, index: u8) {
+        self.current_palette = index;
         self.palette = PALETTES[self.current_palette as usize];
         println!(
             "{}: Palette changed to {}",
             "OK".green(),
             PALETTE_NAMES[self.current_palette as usize].yellow()
         );
+    }
+
+    /// Get the current palette index.
+    pub fn get_palette_index(&self) -> u8 {
+        self.current_palette
     }
 }
 

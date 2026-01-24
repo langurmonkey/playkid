@@ -1,3 +1,4 @@
+
 /// # Registers
 /// We have 7 1-bit registers (`a`, `b`, `c`, `d`, `e`, `h`, `l`) which can be accessed individually,
 /// or together as 16 bits, in the combinations `af`, `bc`, `de` and `hl`.

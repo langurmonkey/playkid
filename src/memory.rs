@@ -1,16 +1,9 @@
-use crate::apu;
-use crate::cartridge;
+use crate::apu::APU;
+use crate::cartridge::Cartridge;
 use crate::constants;
-use crate::joypad;
-use crate::ppu;
-use crate::timer;
-
-use apu::APU;
-use cartridge::Cartridge;
-use joypad::Joypad;
-use ppu::PPU;
-use sdl2::Sdl;
-use timer::Timer;
+use crate::joypad::Joypad;
+use crate::ppu::PPU;
+use crate::timer::Timer;
 
 /// # Memory
 /// The Game Boy uses a 2-byte address space (0x0000 to 0xFFFF) to map the different
@@ -48,13 +41,13 @@ pub struct Memory<'a> {
     pub timer: Timer,
     /// The joypad.
     pub joypad: Joypad,
-    /// The APU, Audio Processing Unit.
+    // The APU, Audio Processing Unit.
     pub apu: APU,
 }
 
 impl<'a> Memory<'a> {
     /// Create a new memory instance.
-    pub fn new(cart: &'a mut Cartridge, sdl: &Sdl) -> Self {
+    pub fn new(cart: &'a mut Cartridge) -> Self {
         Memory {
             wram: [0; constants::WRAM_SIZE],
             hram: [0; constants::HRAM_SIZE],
@@ -64,8 +57,8 @@ impl<'a> Memory<'a> {
             cart,
             ppu: PPU::new(0x194),
             timer: Timer::new(),
-            joypad: Joypad::new(sdl),
-            apu: APU::new(sdl),
+            joypad: Joypad::new(),
+            apu: APU::new(),
         }
     }
 

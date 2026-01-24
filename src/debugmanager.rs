@@ -1,8 +1,8 @@
 use crate::eventhandler;
 
 use colored::Colorize;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
+use winit::keyboard::KeyCode;
+use winit_input_helper::WinitInputHelper;
 
 /// Manage the debug status and debug input events.
 pub struct DebugManager {
@@ -21,42 +21,18 @@ pub struct DebugManager {
 impl eventhandler::EventHandler for DebugManager {
     /// Process keyboard inputs specifically for debugging.
     /// Returns true if the event was handled.
-    fn handle_event(&mut self, event: &Event) -> bool {
-        match event {
-            // Step single instruction.
-            Event::KeyDown {
-                keycode: Some(Keycode::F6),
-                ..
-            } => {
-                self.request_step_instruction();
-                true
-            }
-            // Step a scan line.
-            Event::KeyDown {
-                keycode: Some(Keycode::F7),
-                ..
-            } => {
-                self.request_step_scanline();
-                true
-            }
-            // Pause/continue.
-            Event::KeyDown {
-                keycode: Some(Keycode::F9),
-                ..
-            } => {
-                self.toggle_paused();
-                true
-            }
-            // Enable/disable debugging.
-            Event::KeyDown {
-                keycode: Some(Keycode::D),
-                ..
-            } => {
-                self.debugging = !self.debugging;
-                self.paused = self.debugging;
-                true
-            }
-            _ => false,
+    fn handle_event(&mut self, event: &WinitInputHelper) -> bool {
+        if event.key_pressed(KeyCode::F6) {
+            self.request_step_instruction();
+            true
+        } else if event.key_released(KeyCode::F7) {
+            self.request_step_scanline();
+            true
+        } else if event.key_released(KeyCode::F9) {
+            self.toggle_paused();
+            true
+        } else {
+            false
         }
     }
 }
@@ -72,12 +48,9 @@ impl DebugManager {
         }
     }
 
-    pub fn set_debugging(&mut self, d: bool) {
-        self.debugging = d;
-    }
-
-    pub fn toggle_debugging(&mut self) {
+    pub fn toggle_debugging(&mut self) -> bool {
         self.debugging = !self.debugging;
+        self.debugging
     }
 
     pub fn is_debugging(&self) -> bool {

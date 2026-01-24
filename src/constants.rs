@@ -1,3 +1,4 @@
+pub const NAME: &str = "Play Kid";
 /// Work RAM size (8 KiB).
 pub const WRAM_SIZE: usize = 8192;
 /// Video RAM size (8 KiB).

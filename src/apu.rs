@@ -1,5 +1,4 @@
-use sdl2::audio::AudioQueue;
-use sdl2::Sdl;
+use rodio::{OutputStream, Sink, buffer::SamplesBuffer};
 
 pub struct APU {
     /// APU Registers 0xFF10-0xFF3F.
@@ -9,8 +8,11 @@ pub struct APU {
     /// APU interrupt mask for registers IE and IF.
     pub i_mask: u8,
 
-    /// Audio device,
-    device: AudioQueue<f32>,
+    /// Audio device.
+    sink: Sink,
+    /// We must keep the stream alive for audio to play.
+    _stream: OutputStream,
+
     /// Audio buffer.
     buffer: Vec<f32>,
 
@@ -64,30 +66,26 @@ pub struct APU {
     ch3_length_enabled: bool,
     ch4_length_timer: u16,
     ch4_length_enabled: bool,
+
+    // Accumulated.
+    accumulated_l: f32,
+    accumulated_r: f32,
+    accumulated_count: u32,
 }
 
 impl APU {
-    pub fn new(sdl: &Sdl) -> Self {
-        let audio_subsystem = sdl.audio().unwrap();
-
-        let desired_spec = sdl2::audio::AudioSpecDesired {
-            freq: Some(44100),
-            // Stereo.
-            channels: Some(2),
-            samples: Some(1024),
-        };
-
-        // Start audio playback.
-        let device = audio_subsystem
-            .open_queue::<f32, _>(None, &desired_spec)
-            .unwrap();
-        device.resume();
+    pub fn new() -> Self {
+        // Initialize Rodio.
+        let stream_handle =
+            rodio::OutputStreamBuilder::open_default_stream().expect("open default audio stream");
+        let sink = rodio::Sink::connect_new(&stream_handle.mixer());
 
         Self {
             regs: [0; 0x30],
             wave_ram: [0; 16],
             i_mask: 0,
-            device,
+            sink,
+            _stream: stream_handle,
             buffer: Vec::with_capacity(1024),
             sample_timer: 0.0,
             // 4194304 Hz / 44100 Hz = 95.1089...
@@ -133,6 +131,10 @@ impl APU {
             ch3_length_enabled: false,
             ch4_length_timer: 0,
             ch4_length_enabled: false,
+
+            accumulated_l: 0.0,
+            accumulated_r: 0.0,
+            accumulated_count: 0,
         }
     }
 
@@ -306,21 +308,20 @@ impl APU {
 
     /// Run the APU for `t_cycles` T-cycles.
     pub fn cycle(&mut self, t_cycles: u64) {
-        // Update Channel 1 Frequency Timer.
-        // The timer period is (2048 - frequency) * 4.
+        // --- 1. Update Hardware Timers ---
+        // Channel 1
         let freq_low = self.read(0xFF13) as u16;
         let freq_high = (self.read(0xFF14) & 0x07) as u16;
         let frequency = (freq_high << 8) | freq_low;
         let period_ch1 = (2048 - frequency as i32) * 4;
 
-        // Channel 1.
         self.ch1_timer -= t_cycles as i32;
         if self.ch1_timer <= 0 {
             self.ch1_timer += period_ch1;
             self.ch1_duty_step = (self.ch1_duty_step + 1) % 8;
         }
 
-        // Channel 2.
+        // Channel 2
         let ch2_freq = (((self.read(0xFF19) & 0x07) as u16) << 8) | self.read(0xFF18) as u16;
         self.ch2_timer -= t_cycles as i32;
         if self.ch2_timer <= 0 {
@@ -328,7 +329,7 @@ impl APU {
             self.ch2_duty_step = (self.ch2_duty_step + 1) % 8;
         }
 
-        // Channel 3.
+        // Channel 3
         let ch3_freq = (((self.read(0xFF1E) & 0x07) as u16) << 8) | self.read(0xFF1D) as u16;
         self.ch3_timer -= t_cycles as i32;
         if self.ch3_timer <= 0 {
@@ -336,7 +337,7 @@ impl APU {
             self.ch3_sample_idx = (self.ch3_sample_idx + 1) % 32;
         }
 
-        // Channel 4.
+        // Channel 4
         let nr43 = self.read(0xFF22);
         let shift = (nr43 >> 4) as i32;
         let divisor = match nr43 & 0x07 {
@@ -355,26 +356,19 @@ impl APU {
         self.ch4_timer -= t_cycles as i32;
         if self.ch4_timer <= 0 {
             self.ch4_timer += period_ch4;
-
-            // LFSR Step.
             let bit0 = self.ch4_lfsr & 0x01;
             let bit1 = (self.ch4_lfsr >> 1) & 0x01;
             let result = bit0 ^ bit1;
-
             self.ch4_lfsr = (self.ch4_lfsr >> 1) | (result << 14);
             if (nr43 & 0x08) != 0 {
-                // Short mode (7-bit)
                 self.ch4_lfsr = (self.ch4_lfsr & !(1 << 6)) | (result << 6);
             }
         }
 
-        // 64Hz Envelope Clock (65536 T-cycles).
+        // --- 2. Frame Sequencer (Length, Sweep, Envelope) ---
         self.frame_timer += t_cycles;
-
         if self.frame_timer >= 8192 {
-            // 512Hz is 4.19 Mhz / 8192.
             self.frame_timer -= 8192;
-            // 8 phases, from 0 to 7.
             match self.frame_sequencer {
                 0 | 2 | 4 | 6 => {
                     self.step_length();
@@ -392,23 +386,38 @@ impl APU {
             self.frame_sequencer = (self.frame_sequencer + 1) % 8;
         }
 
-        // Sample Generation Logic.
+        // --- 3. Anti-Aliasing Accumulation ---
+        // We capture the state of the audio for these cycles and add it to our average
+        let (l_sample, r_sample) = self.generate_sample();
+        self.accumulated_l += l_sample * t_cycles as f32;
+        self.accumulated_r += r_sample * t_cycles as f32;
+        self.accumulated_count += t_cycles as u32;
+
+        // --- 4. Sample Generation & Resampling ---
         self.sample_timer += t_cycles as f32;
         while self.sample_timer >= self.t_cycles_per_sample {
             self.sample_timer -= self.t_cycles_per_sample;
 
-            let (l_sample, r_sample) = self.generate_sample();
-            self.buffer.push(l_sample);
-            self.buffer.push(r_sample);
+            // Calculate average for this sample period to smooth the sound
+            if self.accumulated_count > 0 {
+                let avg_l = self.accumulated_l / self.accumulated_count as f32;
+                let avg_r = self.accumulated_r / self.accumulated_count as f32;
+                self.buffer.push(avg_l);
+                self.buffer.push(avg_r);
 
-            // 1024 for mono, 2040 for stereo.
-            if self.buffer.len() >= 2048 {
-                // Throttle: If the queue is getting too full, wait a bit.
-                // This prevents the emulator from running at 500% speed.
-                while self.device.size() > 8192 {
-                    std::thread::sleep(std::time::Duration::from_millis(1));
+                // Reset accumulators for next sample
+                self.accumulated_l = 0.0;
+                self.accumulated_r = 0.0;
+                self.accumulated_count = 0;
+            }
+
+            // --- 5. Buffer Management & Throttling ---
+            if self.buffer.len() >= 1024 {
+                // Increased sink limit slightly to prevent underflow "tearing"
+                if self.sink.len() < 10 {
+                    let source = rodio::buffer::SamplesBuffer::new(2, 44100, self.buffer.clone());
+                    self.sink.append(source);
                 }
-                self.device.queue_audio(&self.buffer).unwrap();
                 self.buffer.clear();
             }
         }
@@ -587,7 +596,7 @@ impl APU {
         let r_vol = ((nr50 & 0x07) as f32 + 1.0) / 8.0;
         let l_vol = (((nr50 & 0x70) >> 4) as f32 + 1.0) / 8.0;
 
-        // Apply master volume and a small safety gain to prevent digital clipping.
+        // Apply master volume and a small safety gain to prevent digital clipping
         (left * l_vol * 0.2, right * r_vol * 0.2)
     }
 
@@ -649,26 +658,26 @@ impl APU {
             return 0.0;
         }
 
-        // Volume shift: bits 5-6 of NR32 ($FF1C).
+        // Volume shift: bits 5-6 of NR32 ($FF1C)
         let volume_shift = match (self.read(0xFF1C) >> 5) & 0x03 {
-            0 => 4, // Mute (actually shifts out all bits).
+            0 => 4, // Mute (actually shifts out all bits)
             1 => 0, // 100%
             2 => 1, // 50%
             3 => 2, // 25%
             _ => 4,
         };
 
-        // Get 4-bit sample from Wave RAM (32 samples total, 2 per byte).
+        // Get 4-bit sample from Wave RAM (32 samples total, 2 per byte)
         let byte = self.wave_ram[self.ch3_sample_idx / 2];
         let mut sample = if self.ch3_sample_idx % 2 == 0 {
-            byte >> 4 // High nibble.
+            byte >> 4 // High nibble
         } else {
-            byte & 0x0F // Low nibble.
+            byte & 0x0F // Low nibble
         };
 
         sample >>= volume_shift;
 
-        // Normalize 0..15 to -1.0..1.0.
+        // Normalize 0..15 to -1.0..1.0
         (sample as f32 / 7.5 - 1.0) * 0.05
     }
 
@@ -677,15 +686,11 @@ impl APU {
             return 0.0;
         }
 
-        // Result is the inverse of the first bit.
+        // Result is the inverse of the first bit
         let bit = (!self.ch4_lfsr) & 0x01;
         let vol = (self.ch4_volume as f32 / 15.0) * 0.05;
 
-        if bit == 1 {
-            vol
-        } else {
-            -vol
-        }
+        if bit == 1 { vol } else { -vol }
     }
 
     fn step_sweep(&mut self) {
@@ -707,14 +712,14 @@ impl APU {
 
                 let sweep_step = nr10 & 0x07;
                 if new_freq <= 2047 && sweep_step > 0 {
-                    // Update shadow frequency.
+                    // Update shadow frequency
                     self.ch1_sweep_shadow_freq = new_freq;
 
-                    // Update NR13 and NR14 registers.
+                    // Update NR13 and NR14 registers
                     self.regs[0x03] = (new_freq & 0xFF) as u8;
                     self.regs[0x04] = (self.regs[0x04] & 0xF8) | ((new_freq >> 8) & 0x07) as u8;
 
-                    // Overflow check again with the NEW frequency.
+                    // Overflow check again with the NEW frequency
                     self.calculate_sweep_freq();
                 }
             }
@@ -743,5 +748,14 @@ impl APU {
 
     fn check_sweep_overflow(&mut self) {
         self.calculate_sweep_freq();
+    }
+
+    /// Flush the buffer.
+    pub fn flush(&mut self) {
+        if !self.buffer.is_empty() {
+            let source = SamplesBuffer::new(2, 44100, self.buffer.clone());
+            self.sink.append(source);
+            self.buffer.clear();
+        }
     }
 }

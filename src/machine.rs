@@ -1,98 +1,60 @@
 use crate::cartridge;
 use crate::constants;
-use crate::debugmanager;
-use crate::display;
 use crate::eventhandler;
 use crate::instruction;
 use crate::memory;
 use crate::registers;
 
-use crate::ui::uimanager::UIState;
+use crate::debugmanager::DebugManager;
 use cartridge::Cartridge;
-use colored::Colorize;
-use debugmanager::DebugManager;
-use display::Display;
-use eventhandler::EventHandler;
-use instruction::{Instruction, RunInstr, CC, R16, R16EXT, R16LD, R8, TGT3};
+use instruction::{CC, Instruction, R8, R16, R16EXT, R16LD, RunInstr, TGT3};
 use memory::Memory;
 use registers::Registers;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use sdl2::{EventPump, Sdl};
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::thread;
-
-/// Spin threshold in milliseconds. Minimum time to sleep until next frame.
-const SPIN_THRESHOLD: std::time::Duration = std::time::Duration::from_millis(2);
+use winit_input_helper::WinitInputHelper;
 
 /// # Machine
 /// The machine contains the registers, the memory, and the display, and
 /// controls the execution and CPU state. It also implements the CPU, which
 /// decodes and executes instructions.
 
-pub struct Machine<'a, 'b> {
+pub struct Machine<'a> {
     /// The registers.
     pub registers: Registers,
     /// The main memory.
     pub memory: Memory<'a>,
-    /// The display.
-    display: Display<'b>,
-    /// The UI state.
-    ui_state: Rc<RefCell<UIState>>,
     /// Interrupt master enable flag.
     ime: bool,
     /// EI operation is delayed by one instruction, so we use this counter.
     ei: u8,
     /// DI operation is delayed by one instruction, so we use this counter.
     di: u8,
-    /// Flag that holds the running status.
-    running: bool,
     /// CPU halted.
-    halted: bool,
+    pub halted: bool,
     /// T-states, basic unit of time, and 1:1 with the clock.
-    t_cycles: u64,
+    pub t_cycles: u64,
     /// M-cycles, base unit for CPU instructions, and 1:4 with the clock.
-    m_cycles: u64,
+    pub m_cycles: u64,
     /// T-cycles since the last SRAM save operation.
     last_save_cycles: u64,
     /// The debug manager.
-    debug: DebugManager,
-    /// Print FPS every second.
-    fps: bool,
-    /// The event pump.
-    event_pump: EventPump,
+    pub debug: DebugManager,
 }
 
-impl<'a, 'b> Machine<'a, 'b> {
+impl<'a> Machine<'a> {
     /// Create a new instance of the Game Boy.
-    pub fn new(
-        cart: &'a mut Cartridge,
-        sdl: &'b Sdl,
-        ttf: &'b sdl2::ttf::Sdl2TtfContext,
-        scale: u8,
-        debug: bool,
-        fps: bool,
-    ) -> Self {
+    pub fn new(cart: &'a mut Cartridge, debug: bool) -> Self {
         // UI state object.
-        let ui_state = Rc::new(RefCell::new(UIState::new()));
         Machine {
             registers: Registers::new(),
-            memory: Memory::new(cart, sdl),
-            display: Display::new("Play Kid", sdl, ttf, scale, debug, Rc::clone(&ui_state))
-                .expect("Error creating display"),
-            ui_state: Rc::clone(&ui_state),
+            memory: Memory::new(cart),
             ime: false,
             ei: 0,
             di: 0,
-            running: false,
             halted: false,
             t_cycles: 324,
             m_cycles: 0,
             last_save_cycles: 0,
             debug: DebugManager::new(debug),
-            fps,
-            event_pump: sdl.event_pump().unwrap(),
         }
     }
 
@@ -103,14 +65,9 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.ime = false;
         self.ei = 0;
         self.di = 0;
-        self.running = true;
         self.halted = false;
         self.t_cycles = 324;
         self.m_cycles = 0;
-
-        // Clear the display
-        self.display.clear();
-        self.display.present();
     }
 
     /// Initialize the Game Boy.
@@ -118,112 +75,38 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.memory.initialize_hw_registers();
     }
 
-    /// Starts the execution of the machine.
-    pub fn start(&mut self) {
-        self.running = true;
-        self.display.clear();
-        self.display.present();
-
-        if self.fps {
-            println!("Target FPS: {}", constants::TARGET_FPS);
+    /// Update the state of the machine with a cycle.
+    pub fn update(&mut self) {
+        // Check for breakpoints.
+        if self.debug.is_debugging() && !self.debug.is_paused() {
+            if self.debug.has_breakpoint(self.registers.pc) {
+                self.debug.set_paused(true);
+            }
         }
 
-        // FPS tracking.
-        let mut frame_count = 0u32;
-        let mut fps_timer = std::time::Instant::now();
-        const FPS_LOG_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
-
-        while self.running {
-            let frame_start_time = std::time::Instant::now();
-
-            // Handle events.
-            self.handle_events();
-
-            // Check UI state.
-            self.handle_ui_commands();
-
-            // Breakpoint check:
-            // We are in debug mode, and we are not paused, and we've hit a breakpoint.
-            if self.debug.is_debugging()
-                && !self.debug.is_paused()
-                && self.debug.has_breakpoint(self.registers.pc)
-            {
-                self.debug.set_paused(true);
-                // Force the UI to show if we hit a breakpoint
-                self.debug.set_debugging(true);
-                self.display.set_debug(true);
-            }
-
-            // Execute cycles for one full frame.
-            if self.debug.is_paused() {
-                // Paused mode (step/scanline).
-                if self.debug.take_step_instruction() {
-                    // Handle single instruction step.
-                    let (t, m, _) = self.machine_cycle();
-                    self.m_cycles += m;
-                    self.t_cycles += t;
-                    self.display.render_lcd(&mut self.memory);
-                } else if self.debug.take_step_line() {
-                    // Handle single scanline step.
-                    let current_ly = self.memory.ppu().ly;
-                    // Loop until LY changes (or wraps around)
-                    while self.memory.ppu().ly == current_ly {
-                        let (t, m, _) = self.machine_cycle();
-                        self.m_cycles += m;
-                        self.t_cycles += t;
-                        self.display.render_lcd(&mut self.memory);
-                    }
-                }
-            } else {
-                // Normal full-speed execution.
-                let mut cycles_this_frame: usize = 0;
-                while cycles_this_frame < constants::CYCLES_PER_FRAME {
-                    let (t, m, r) = self.machine_cycle();
-                    if !r {
-                        // Early exit due to joypad.
-                        break;
-                    }
-                    self.m_cycles += m;
-                    self.t_cycles += t;
-                    cycles_this_frame += t as usize;
-
-                    self.display.render_lcd(&mut self.memory);
+        // Step instruction or line.
+        if self.debug.is_paused() {
+            if self.debug.take_step_instruction() {
+                self.machine_cycle(); // Execute just one
+            } else if self.debug.take_step_line() {
+                let current_ly = self.memory.ppu().ly;
+                while self.memory.ppu().ly == current_ly {
+                    self.machine_cycle();
                 }
             }
-            // Update debug UI.
-            if self.debug.is_debugging() {
-                let pc = self.registers.pc;
-                let opcode = self.memory.read8(pc);
-                let run_instr = RunInstr::new(opcode, &self.memory, &self.registers);
-                self.display.machine_state_update(
-                    pc,
-                    &self.registers,
-                    &self.memory,
-                    &run_instr,
-                    &self.debug,
-                    opcode,
-                    self.t_cycles,
-                    self.m_cycles,
-                    self.halted,
-                );
+        } else {
+            // Normal full-speed execution.
+            let mut cycles_this_frame: usize = 0;
+            while cycles_this_frame < constants::CYCLES_PER_FRAME {
+                let (t, m, r) = self.machine_cycle();
+                if !r {
+                    // Early exit due to joypad.
+                    break;
+                }
+                self.m_cycles += m;
+                self.t_cycles += t;
+                cycles_this_frame += t as usize;
             }
-
-            // Rendering.
-            self.display.canvas.flush(self.debug.is_debugging());
-            self.display.render_ui();
-            self.display.present();
-
-            frame_count += 1;
-
-            // FPS counter.
-            self.display.visible_fps(self.fps);
-            if self.fps && fps_timer.elapsed() >= FPS_LOG_INTERVAL {
-                let actual_fps = frame_count as f64 / fps_timer.elapsed().as_secs_f64();
-                self.display.update_fps(actual_fps);
-                frame_count = 0;
-                fps_timer = std::time::Instant::now();
-            }
-
             // If SRAM is dirty, save it. Check every minute.
             let cycles_since_save = self.t_cycles - self.last_save_cycles;
             if cycles_since_save >= 6 * 41_943_040 {
@@ -233,24 +116,9 @@ impl<'a, 'b> Machine<'a, 'b> {
                 }
                 self.last_save_cycles = self.t_cycles;
             }
-
-            // Now, sleep for the remaining time in the frame.
-            self.sleep_next_frame(frame_start_time);
         }
-    }
-
-    /// Sleeps until next frame, given a start time.
-    fn sleep_next_frame(&self, frame_start_time: std::time::Instant) {
-        // Now, sleep for the remaining time in the frame.
-        let elapsed = frame_start_time.elapsed();
-        if elapsed < constants::TARGET_FRAME_DURATION {
-            let remaining = constants::TARGET_FRAME_DURATION - elapsed;
-            if remaining > SPIN_THRESHOLD {
-                thread::sleep(remaining - SPIN_THRESHOLD);
-            }
-            // Busy spin for remaining small amount.
-            while frame_start_time.elapsed() < constants::TARGET_FRAME_DURATION {}
-        }
+        // Flush APU.
+        self.memory.apu.flush();
     }
 
     /// Updates the IME (Interrupt Master Enable) flag.
@@ -328,17 +196,12 @@ impl<'a, 'b> Machine<'a, 'b> {
     fn machine_cycle(&mut self) -> (u64, u64, bool) {
         // CPU instruction.
         // One machine cycle (M-cycle) is 4 clock cycles.
-        let mut m_cycles = if self.running {
-            if self.halted {
-                // CPU is halted, don't execute instructions but still consume 1 M-cycle.
-                1
-            } else {
-                // Run next CPU instruction.
-                self.cycle() as u64
-            }
-        } else {
-            // NOOP instruction.
+        let mut m_cycles = if self.halted {
+            // CPU is halted, don't execute instructions but still consume 1 M-cycle.
             1
+        } else {
+            // Run next CPU instruction.
+            self.cycle() as u64
         };
         let mut t_cycles = m_cycles * 4;
 
@@ -362,222 +225,6 @@ impl<'a, 'b> Machine<'a, 'b> {
             (interrupt_m_cycles * 4, interrupt_m_cycles, true)
         } else {
             (t_cycles, m_cycles, true)
-        }
-    }
-
-    /// Checks for commands sent from the UI widgets.
-    pub fn handle_ui_commands(&mut self) {
-        // Step instruction.
-        let step_needed = {
-            let mut state = self.ui_state.borrow_mut();
-            if state.step_requested {
-                state.step_requested = false;
-                true
-            } else {
-                false
-            }
-        };
-        if step_needed {
-            self.debug.request_step_instruction();
-        }
-        // Step line.
-        let line_needed = {
-            let mut state = self.ui_state.borrow_mut();
-            if state.scanline_requested {
-                state.scanline_requested = false;
-                true
-            } else {
-                false
-            }
-        };
-        if line_needed {
-            self.debug.request_step_scanline();
-        }
-        // Continue.
-        let continue_needed = {
-            let mut state = self.ui_state.borrow_mut();
-            if state.continue_requested {
-                state.continue_requested = false;
-                true
-            } else {
-                false
-            }
-        };
-        if continue_needed {
-            self.debug.toggle_paused();
-        }
-        // Debug toggle.
-        let debug_needed = {
-            let mut state = self.ui_state.borrow_mut();
-            if state.debug_requested {
-                state.debug_requested = false;
-                true
-            } else {
-                false
-            }
-        };
-        if debug_needed {
-            self.debug.toggle_debugging();
-            self.display.set_debug(self.debug.is_debugging());
-        }
-        // Add breakpoint.
-        let (br_add_needed, br_addr) = {
-            let mut state = self.ui_state.borrow_mut();
-            (
-                if state.br_add_requested {
-                    state.br_add_requested = false;
-                    true
-                } else {
-                    false
-                },
-                state.br_addr,
-            )
-        };
-        if br_add_needed {
-            self.debug.add_breakpoint(br_addr);
-        }
-        // Remove breakpoint.
-        let (br_remove_needed, br_addr) = {
-            let mut state = self.ui_state.borrow_mut();
-            (
-                if state.br_remove_requested {
-                    state.br_remove_requested = false;
-                    true
-                } else {
-                    false
-                },
-                state.br_addr,
-            )
-        };
-        if br_remove_needed {
-            self.debug.delete_breakpoint(br_addr);
-        }
-        // Clear breakpoints.
-        let br_clear_needed = {
-            let mut state = self.ui_state.borrow_mut();
-            if state.br_clear_requested {
-                state.br_clear_requested = false;
-                true
-            } else {
-                false
-            }
-        };
-        if br_clear_needed {
-            self.debug.clear_breakpoints();
-        }
-        // Reset CPU.
-        let reset_needed = {
-            let mut state = self.ui_state.borrow_mut();
-            if state.reset_requested {
-                state.reset_requested = false;
-                true
-            } else {
-                false
-            }
-        };
-        if reset_needed {
-            self.reset();
-        }
-        // Quit.
-        let exit_needed = {
-            let mut state = self.ui_state.borrow_mut();
-            if state.exit_requested {
-                state.exit_requested = false;
-                true
-            } else {
-                false
-            }
-        };
-        if exit_needed {
-            self.running = false;
-            println!("{}: Bye bye!", "OK".green());
-        }
-        // FPS.
-        let fps_needed = {
-            let mut state = self.ui_state.borrow_mut();
-            if state.fps_requested {
-                state.fps_requested = false;
-                true
-            } else {
-                false
-            }
-        };
-        if fps_needed {
-            self.fps = !self.fps;
-        }
-    }
-
-    /// Polls the events in the queue of the event pump and redirects them to the
-    /// interested partners ;).
-    fn handle_events(&mut self) {
-        // Reset cycles.
-        for event in self.event_pump.poll_iter() {
-            let mut handled = false;
-            // Forward to display/UI first.
-            // Generally necessary because text fields capture focus.
-            if !handled {
-                handled = self.display.handle_event(&event);
-            }
-            // Handle quit events here.
-            if !handled {
-                handled = match event {
-                    // Quit with `Esc` or `CapsLock`.
-                    Event::Quit { .. }
-                    | Event::KeyDown {
-                        keycode: Some(Keycode::Escape),
-                        ..
-                    }
-                    | Event::KeyDown {
-                        keycode: Some(Keycode::CapsLock),
-                        ..
-                    } => {
-                        self.running = false;
-                        println!("{}: Bye bye!", "OK".green());
-                        true
-                    }
-                    // FPS flag (`f` for FPS).
-                    Event::KeyDown {
-                        keycode: Some(Keycode::F),
-                        ..
-                    } => {
-                        self.fps = !self.fps;
-                        true
-                    }
-                    // Palette change `p`.
-                    Event::KeyDown {
-                        keycode: Some(Keycode::P),
-                        ..
-                    } => {
-                        self.memory.ppu.cycle_palette();
-                        true
-                    }
-                    // Screenshot `s`.
-                    Event::KeyDown {
-                        keycode: Some(Keycode::S),
-                        ..
-                    } => {
-                        self.display.save_screenshot();
-                        true
-                    }
-                    _ => false,
-                }
-            }
-            // Handle general emulator events.
-            if !handled {
-                handled = self.memory.joypad.handle_event(&event)
-            }
-            // Cartridge key bindings (like write SRAM).
-            if !handled {
-                handled = self.memory.cart.handle_event(&event);
-            }
-            // Debug monitor events (step, continue, etc.).
-            if !handled {
-                let d = self.debug.is_debugging();
-                self.debug.handle_event(&event);
-                if d != self.debug.is_debugging() {
-                    self.display.set_debug(self.debug.is_debugging());
-                }
-            }
         }
     }
 
@@ -3049,11 +2696,10 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.halted = true;
     }
 
-    /// Stop the machine by setting the `running` flag to false.
+    /// Stop the machine.
     fn stop(&mut self) {
         // Reset DIV register.
         self.memory.write8(0xFF04, 0x00);
-        self.running = false;
     }
 
     /// Reads the next byte in memory at the location of `pc`, and
@@ -3319,5 +2965,26 @@ impl<'a, 'b> Machine<'a, 'b> {
         self.sub(value, false);
         // Do not store the value.
         self.registers.a = backup;
+    }
+}
+
+impl<'a> eventhandler::EventHandler for Machine<'a> {
+    /// Polls the events in the queue of the event pump and redirects them to the
+    /// interested partners ;).
+    fn handle_event(&mut self, event: &WinitInputHelper) -> bool {
+        // Reset cycles.
+        let mut handled = false;
+
+        // Handle general emulator events.
+        if !handled {
+            handled = self.memory.joypad.handle_event(&event);
+        }
+
+        // Debug events.
+        if !handled {
+            handled = self.debug.handle_event(&event);
+        }
+
+        handled
     }
 }

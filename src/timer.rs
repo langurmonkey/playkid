@@ -1,3 +1,4 @@
+
 /// # Timer
 /// The timer registers and logic.
 pub struct Timer {
