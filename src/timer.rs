@@ -1,4 +1,3 @@
-
 /// # Timer
 /// The timer registers and logic.
 pub struct Timer {
@@ -133,9 +132,6 @@ impl Timer {
         }
     }
 
-    pub fn div(&self) -> u8 {
-        (self.divider >> 8) as u8
-    }
     pub fn div16(&self) -> u16 {
         self.divider
     }

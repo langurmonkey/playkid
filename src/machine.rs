@@ -44,7 +44,7 @@ impl<'a> Machine<'a> {
     /// Create a new instance of the Game Boy.
     pub fn new(cart: &'a mut Cartridge, debug: bool) -> Self {
         // UI state object.
-        Machine {
+        let mut machine = Machine {
             registers: Registers::new(),
             memory: Memory::new(cart),
             ime: false,
@@ -55,7 +55,10 @@ impl<'a> Machine<'a> {
             m_cycles: 0,
             last_save_cycles: 0,
             debug: DebugManager::new(debug),
-        }
+        };
+        machine.init();
+
+        machine
     }
 
     /// Resets the state of the machine and all its components.
