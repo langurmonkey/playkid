@@ -3,8 +3,8 @@ use crate::instruction::RunInstr;
 use crate::machine::Machine;
 use crate::uistate::UIState;
 use egui::{
-    ClippedPrimitive, Color32, Context, FontFamily, FontId, RichText, TexturesDelta, ViewportId,
-    text::LayoutJob,
+    ClippedPrimitive, CollapsingHeader, Color32, Context, FontFamily, FontId, RichText, ScrollArea,
+    TexturesDelta, ViewportId, text::LayoutJob, vec2,
 };
 use egui_wgpu::{Renderer, ScreenDescriptor};
 use pixels::{PixelsContext, wgpu};
@@ -56,6 +56,8 @@ pub struct Gui {
     breakpoint_error: bool,
     /// Logo texture.
     logo_texture: Option<egui::TextureHandle>,
+    /// Last PC.
+    last_pc: u16,
 }
 
 impl Framework {
@@ -208,6 +210,7 @@ impl Gui {
             breakpoint_input: String::new(),
             breakpoint_error: false,
             logo_texture: None,
+            last_pc: 0,
         }
     }
 
@@ -449,248 +452,327 @@ impl Gui {
                         });
 
                         ui.separator();
-                        ui.add_space(10.0);
+                        ui.add_space(8.0);
 
-                        // Current instruction.
-                        ui.vertical(|ui| {
-                            let run_instr =
-                                RunInstr::new(opcode, &machine.memory, &machine.registers);
-                            let mut instr = LayoutJob::default();
-                            RichText::new(format!("${:04x}:", pc))
-                                .color(GRAY)
-                                .font(FontId::new(18.0, FontFamily::Monospace))
-                                .strong()
-                                .append_to(
-                                    &mut instr,
-                                    ui.style(),
-                                    egui::FontSelection::Default,
-                                    egui::Align::Center,
-                                );
-                            RichText::new(format!(" {}", run_instr.instruction_str()))
-                                .color(ORANGE)
-                                .font(FontId::new(18.0, FontFamily::Monospace))
-                                .strong()
-                                .append_to(
-                                    &mut instr,
-                                    ui.style(),
-                                    egui::FontSelection::Default,
-                                    egui::Align::Center,
-                                );
-                            RichText::new(format!("  {}", run_instr.operand_str()))
-                                .color(WHITE)
-                                .font(FontId::new(18.0, FontFamily::Monospace))
-                                .strong()
-                                .append_to(
-                                    &mut instr,
-                                    ui.style(),
-                                    egui::FontSelection::Default,
-                                    egui::Align::Center,
-                                );
-                            ui.label(instr)
-                                .on_hover_text("Current PC address, instruction, and operand.");
-
-                            ui.add_space(20.0);
-
-                            // CPU state.
-                            let mut state = LayoutJob::default();
-                            RichText::new("CPU state:  ")
-                                .color(GRAY)
-                                .font(FontId::new(12.0, FontFamily::Monospace))
-                                .strong()
-                                .append_to(
-                                    &mut state,
-                                    ui.style(),
-                                    egui::FontSelection::Default,
-                                    egui::Align::Center,
-                                );
-                            RichText::new(format!(
-                                "{}",
-                                if machine.halted { "HALTED" } else { "RUNNING" }
-                            ))
-                            .color(if machine.halted { RED } else { GREEN })
-                            .font(FontId::new(16.0, FontFamily::Monospace))
-                            .strong()
-                            .append_to(
-                                &mut state,
-                                ui.style(),
-                                egui::FontSelection::Default,
-                                egui::Align::Center,
-                            );
-                            ui.label(state);
-                            // Timing Stats
-                            ui.monospace(format!("T-cycles:   {}", machine.t_cycles));
-                            ui.monospace(format!("M-cycles:   {}", machine.m_cycles));
-
-                            ui.add_space(8.0);
-                            ui.separator();
-                        });
-
-                        // Registers Display.
-                        egui::Grid::new("registers_grid")
-                            .num_columns(2)
-                            .spacing([10.0, 4.0])
-                            .show(ui, |ui| {
-                                // Registers
-                                ui.monospace("Registers: ");
-                                ui.vertical(|ui| {
-                                    // AF.
-                                    let mut af = LayoutJob::default();
-                                    RichText::new("AF ")
-                                        .color(WHITE)
-                                        .font(FontId::new(12.0, FontFamily::Monospace))
-                                        .strong()
-                                        .append_to(
-                                            &mut af,
-                                            ui.style(),
-                                            egui::FontSelection::Default,
-                                            egui::Align::Center,
-                                        );
-                                    RichText::new(format!(
-                                        "{:02x} {:02x}",
-                                        machine.registers.a, machine.registers.f
-                                    ))
-                                    .color(MAGENTA)
-                                    .font(FontId::new(12.0, FontFamily::Monospace))
+                        // Main horizontal pane.
+                        ui.columns(2, |columns| {
+                            // LEFT: Instruction, CPU, PPU, JOYP, BREAKP.
+                            columns[0].vertical(|ui| {
+                                ui.allocate_space(vec2(320.0, 0.0));
+                                // Current instruction.
+                                let run_instr =
+                                    RunInstr::new(opcode, &machine.memory, &machine.registers);
+                                let mut instr = LayoutJob::default();
+                                RichText::new(format!("${:04x}:", pc))
+                                    .color(GRAY)
+                                    .font(FontId::new(18.0, FontFamily::Monospace))
                                     .strong()
                                     .append_to(
-                                        &mut af,
+                                        &mut instr,
                                         ui.style(),
                                         egui::FontSelection::Default,
                                         egui::Align::Center,
                                     );
-                                    ui.label(af);
-                                    // BC.
-                                    let mut bc = LayoutJob::default();
-                                    RichText::new("BC ")
-                                        .color(WHITE)
-                                        .font(FontId::new(12.0, FontFamily::Monospace))
-                                        .strong()
-                                        .append_to(
-                                            &mut bc,
-                                            ui.style(),
-                                            egui::FontSelection::Default,
-                                            egui::Align::Center,
-                                        );
-                                    RichText::new(format!(
-                                        "{:02x} {:02x}",
-                                        machine.registers.b, machine.registers.c
-                                    ))
-                                    .color(MAGENTA)
-                                    .font(FontId::new(12.0, FontFamily::Monospace))
+                                RichText::new(format!(" {}", run_instr.instruction_str()))
+                                    .color(ORANGE)
+                                    .font(FontId::new(18.0, FontFamily::Monospace))
                                     .strong()
                                     .append_to(
-                                        &mut bc,
+                                        &mut instr,
                                         ui.style(),
                                         egui::FontSelection::Default,
                                         egui::Align::Center,
                                     );
-                                    ui.label(bc);
-                                    // DE.
-                                    let mut de = LayoutJob::default();
-                                    RichText::new("DE ")
-                                        .color(WHITE)
-                                        .font(FontId::new(12.0, FontFamily::Monospace))
-                                        .strong()
-                                        .append_to(
-                                            &mut de,
-                                            ui.style(),
-                                            egui::FontSelection::Default,
-                                            egui::Align::Center,
-                                        );
-                                    RichText::new(format!(
-                                        "{:02x} {:02x}",
-                                        machine.registers.d, machine.registers.e
-                                    ))
-                                    .color(MAGENTA)
-                                    .font(FontId::new(12.0, FontFamily::Monospace))
+                                RichText::new(format!("  {}", run_instr.operand_str()))
+                                    .color(WHITE)
+                                    .font(FontId::new(18.0, FontFamily::Monospace))
                                     .strong()
                                     .append_to(
-                                        &mut de,
+                                        &mut instr,
                                         ui.style(),
                                         egui::FontSelection::Default,
                                         egui::Align::Center,
                                     );
-                                    ui.label(de);
-                                    // HL.
-                                    let mut hl = LayoutJob::default();
-                                    RichText::new("HL ")
-                                        .color(WHITE)
-                                        .font(FontId::new(12.0, FontFamily::Monospace))
-                                        .strong()
-                                        .append_to(
-                                            &mut hl,
-                                            ui.style(),
-                                            egui::FontSelection::Default,
-                                            egui::Align::Center,
-                                        );
-                                    RichText::new(format!(
-                                        "{:02x} {:02x}",
-                                        machine.registers.h, machine.registers.l
-                                    ))
-                                    .color(MAGENTA)
-                                    .font(FontId::new(12.0, FontFamily::Monospace))
-                                    .strong()
-                                    .append_to(
-                                        &mut hl,
-                                        ui.style(),
-                                        egui::FontSelection::Default,
-                                        egui::Align::Center,
-                                    );
-                                    ui.label(hl);
-                                });
-                                ui.end_row();
+                                ui.label(instr)
+                                    .on_hover_text("Current PC address, instruction, and operand.");
 
-                                // Flags
-                                ui.monospace("Flags:");
-                                let f = machine.registers.f;
-                                // Format: Z N H C (matches standard GB nomenclature)
-                                let z = if f & 0x80 != 0 { "Z" } else { "_" };
-                                let n = if f & 0x40 != 0 { "N" } else { "_" };
-                                let h = if f & 0x20 != 0 { "H" } else { "_" };
-                                let c = if f & 0x10 != 0 { "C" } else { "_" };
+                                ui.add_space(8.0);
 
-                                let mut flags = LayoutJob::default();
-                                RichText::new(format!("{} {} {} {}", z, n, h, c))
-                                    .color(CYAN)
-                                    .font(FontId::new(12.0, FontFamily::Monospace))
-                                    .strong()
-                                    .append_to(
-                                        &mut flags,
-                                        ui.style(),
-                                        egui::FontSelection::Default,
-                                        egui::Align::Center,
-                                    );
-                                ui.label(flags);
-                                ui.end_row();
+                                CollapsingHeader::new("CPU")
+                                    .default_open(true)
+                                    .show(ui, |ui| {
+                                        ui.vertical(|ui| {
+                                            ui.add_space(8.0);
+                                            // Registers Display.
+                                            egui::Grid::new("registers_grid")
+                                                .num_columns(2)
+                                                .min_col_width(100.0)
+                                                .spacing([10.0, 4.0])
+                                                .show(ui, |ui| {
+                                                    // CPU state.
+                                                    let mut state = LayoutJob::default();
+                                                    RichText::new("State:")
+                                                        .color(GRAY)
+                                                        .font(FontId::new(
+                                                            12.0,
+                                                            FontFamily::Monospace,
+                                                        ))
+                                                        .strong()
+                                                        .append_to(
+                                                            &mut state,
+                                                            ui.style(),
+                                                            egui::FontSelection::Default,
+                                                            egui::Align::Center,
+                                                        );
+                                                    let mut state_val = LayoutJob::default();
+                                                    RichText::new(format!(
+                                                        "{}",
+                                                        if machine.halted {
+                                                            "HALTED"
+                                                        } else {
+                                                            "RUNNING"
+                                                        }
+                                                    ))
+                                                    .color(if machine.halted { RED } else { GREEN })
+                                                    .font(FontId::new(16.0, FontFamily::Monospace))
+                                                    .strong()
+                                                    .append_to(
+                                                        &mut state_val,
+                                                        ui.style(),
+                                                        egui::FontSelection::Default,
+                                                        egui::Align::Center,
+                                                    );
+                                                    ui.label(state);
+                                                    ui.label(state_val);
+                                                    ui.end_row();
 
-                                let mem = &machine.memory;
+                                                    // Timing Stats
+                                                    ui.monospace("T-cycles:");
+                                                    ui.monospace(format!("{}", machine.t_cycles));
+                                                    ui.end_row();
 
-                                ui.monospace("SP:");
-                                ui.monospace(format!("{:#04x}", machine.registers.sp));
-                                ui.end_row();
-                                ui.monospace("DIV:");
-                                ui.monospace(format!("{:#06x}", mem.timer.div16()));
-                                ui.end_row();
-                                ui.monospace("LCDC:");
-                                ui.monospace(format!("{:#02x}", mem.ppu.lcdc));
-                                ui.end_row();
-                                ui.monospace("STAT:");
-                                ui.monospace(format!("{:#02x}", mem.ppu.stat));
-                                ui.end_row();
-                                ui.monospace("LYC:");
-                                ui.monospace(format!("{:#02x}", mem.ppu.lyc));
-                                ui.end_row();
-                                ui.monospace("LY:");
-                                ui.monospace(format!("{:#02x}", mem.ppu.ly));
-                                ui.end_row();
-                                ui.monospace("LX:");
-                                ui.monospace(format!("{:#02x}", mem.ppu.lx));
-                                ui.end_row();
-                                ui.monospace("Opcode:");
-                                ui.monospace(format!("{:#02x}", opcode));
-                                ui.end_row();
+                                                    ui.monospace("M-cycles:");
+                                                    ui.monospace(format!("{}", machine.m_cycles));
+                                                    ui.end_row();
+
+                                                    // Registers
+                                                    ui.monospace("Registers: ");
+                                                    ui.vertical(|ui| {
+                                                        // AF.
+                                                        let mut af = LayoutJob::default();
+                                                        RichText::new("AF ")
+                                                            .color(WHITE)
+                                                            .font(FontId::new(
+                                                                12.0,
+                                                                FontFamily::Monospace,
+                                                            ))
+                                                            .strong()
+                                                            .append_to(
+                                                                &mut af,
+                                                                ui.style(),
+                                                                egui::FontSelection::Default,
+                                                                egui::Align::Center,
+                                                            );
+                                                        RichText::new(format!(
+                                                            "{:02x} {:02x}",
+                                                            machine.registers.a,
+                                                            machine.registers.f
+                                                        ))
+                                                        .color(MAGENTA)
+                                                        .font(FontId::new(
+                                                            12.0,
+                                                            FontFamily::Monospace,
+                                                        ))
+                                                        .strong()
+                                                        .append_to(
+                                                            &mut af,
+                                                            ui.style(),
+                                                            egui::FontSelection::Default,
+                                                            egui::Align::Center,
+                                                        );
+                                                        ui.label(af);
+                                                        // BC.
+                                                        let mut bc = LayoutJob::default();
+                                                        RichText::new("BC ")
+                                                            .color(WHITE)
+                                                            .font(FontId::new(
+                                                                12.0,
+                                                                FontFamily::Monospace,
+                                                            ))
+                                                            .strong()
+                                                            .append_to(
+                                                                &mut bc,
+                                                                ui.style(),
+                                                                egui::FontSelection::Default,
+                                                                egui::Align::Center,
+                                                            );
+                                                        RichText::new(format!(
+                                                            "{:02x} {:02x}",
+                                                            machine.registers.b,
+                                                            machine.registers.c
+                                                        ))
+                                                        .color(MAGENTA)
+                                                        .font(FontId::new(
+                                                            12.0,
+                                                            FontFamily::Monospace,
+                                                        ))
+                                                        .strong()
+                                                        .append_to(
+                                                            &mut bc,
+                                                            ui.style(),
+                                                            egui::FontSelection::Default,
+                                                            egui::Align::Center,
+                                                        );
+                                                        ui.label(bc);
+                                                        // DE.
+                                                        let mut de = LayoutJob::default();
+                                                        RichText::new("DE ")
+                                                            .color(WHITE)
+                                                            .font(FontId::new(
+                                                                12.0,
+                                                                FontFamily::Monospace,
+                                                            ))
+                                                            .strong()
+                                                            .append_to(
+                                                                &mut de,
+                                                                ui.style(),
+                                                                egui::FontSelection::Default,
+                                                                egui::Align::Center,
+                                                            );
+                                                        RichText::new(format!(
+                                                            "{:02x} {:02x}",
+                                                            machine.registers.d,
+                                                            machine.registers.e
+                                                        ))
+                                                        .color(MAGENTA)
+                                                        .font(FontId::new(
+                                                            12.0,
+                                                            FontFamily::Monospace,
+                                                        ))
+                                                        .strong()
+                                                        .append_to(
+                                                            &mut de,
+                                                            ui.style(),
+                                                            egui::FontSelection::Default,
+                                                            egui::Align::Center,
+                                                        );
+                                                        ui.label(de);
+                                                        // HL.
+                                                        let mut hl = LayoutJob::default();
+                                                        RichText::new("HL ")
+                                                            .color(WHITE)
+                                                            .font(FontId::new(
+                                                                12.0,
+                                                                FontFamily::Monospace,
+                                                            ))
+                                                            .strong()
+                                                            .append_to(
+                                                                &mut hl,
+                                                                ui.style(),
+                                                                egui::FontSelection::Default,
+                                                                egui::Align::Center,
+                                                            );
+                                                        RichText::new(format!(
+                                                            "{:02x} {:02x}",
+                                                            machine.registers.h,
+                                                            machine.registers.l
+                                                        ))
+                                                        .color(MAGENTA)
+                                                        .font(FontId::new(
+                                                            12.0,
+                                                            FontFamily::Monospace,
+                                                        ))
+                                                        .strong()
+                                                        .append_to(
+                                                            &mut hl,
+                                                            ui.style(),
+                                                            egui::FontSelection::Default,
+                                                            egui::Align::Center,
+                                                        );
+                                                        ui.label(hl);
+                                                    });
+                                                    ui.end_row();
+
+                                                    // Flags
+                                                    ui.monospace("Flags:");
+                                                    let f = machine.registers.f;
+                                                    // Format: Z N H C (matches standard GB nomenclature)
+                                                    let z = if f & 0x80 != 0 { "Z" } else { "_" };
+                                                    let n = if f & 0x40 != 0 { "N" } else { "_" };
+                                                    let h = if f & 0x20 != 0 { "H" } else { "_" };
+                                                    let c = if f & 0x10 != 0 { "C" } else { "_" };
+
+                                                    let mut flags = LayoutJob::default();
+                                                    RichText::new(format!(
+                                                        "{} {} {} {}",
+                                                        z, n, h, c
+                                                    ))
+                                                    .color(CYAN)
+                                                    .font(FontId::new(12.0, FontFamily::Monospace))
+                                                    .strong()
+                                                    .append_to(
+                                                        &mut flags,
+                                                        ui.style(),
+                                                        egui::FontSelection::Default,
+                                                        egui::Align::Center,
+                                                    );
+                                                    ui.label(flags);
+
+                                                    let mem = &machine.memory;
+
+                                                    ui.end_row();
+                                                    ui.monospace("Opcode:");
+                                                    ui.monospace(format!("{:#02x}", opcode));
+                                                    ui.end_row();
+                                                    ui.monospace("SP:");
+                                                    ui.monospace(format!(
+                                                        "{:#04x}",
+                                                        machine.registers.sp
+                                                    ));
+                                                    ui.end_row();
+                                                    ui.monospace("DIV:");
+                                                    ui.monospace(format!(
+                                                        "{:#06x}",
+                                                        mem.timer.div16()
+                                                    ));
+                                                    ui.end_row();
+                                                });
+                                        });
+                                    });
+
+                                CollapsingHeader::new("PPU")
+                                    .default_open(true)
+                                    .show(ui, |ui| {
+                                        egui::Grid::new("ppu_grid")
+                                            .num_columns(2)
+                                            .min_col_width(100.0)
+                                            .spacing([10.0, 4.0])
+                                            .show(ui, |ui| {
+                                                let mem = &machine.memory;
+                                                ui.monospace("LCDC:");
+                                                ui.monospace(format!("{:#02x}", mem.ppu.lcdc));
+                                                ui.end_row();
+                                                ui.monospace("STAT:");
+                                                ui.monospace(format!("{:#02x}", mem.ppu.stat));
+                                                ui.end_row();
+                                                ui.monospace("LYC:");
+                                                ui.monospace(format!("{:#02x}", mem.ppu.lyc));
+                                                ui.end_row();
+                                                ui.monospace("LY:");
+                                                ui.monospace(format!("{:#02x}", mem.ppu.ly));
+                                                ui.end_row();
+                                                ui.monospace("LX:");
+                                                ui.monospace(format!("{:#02x}", mem.ppu.lx));
+                                                ui.end_row();
+                                            });
+                                    });
+
+                                ui.separator();
+
+                                // JOYPAD.
                                 ui.monospace("Joypad:");
 
+                                let mem = &machine.memory;
                                 let mut joypad = LayoutJob::default();
                                 RichText::new(&format!(
                                     "{} {} {} {} {} {} {} {}",
@@ -713,67 +795,129 @@ impl Gui {
                                     egui::Align::Center,
                                 );
                                 ui.label(joypad);
-                                ui.end_row();
+                                ui.separator();
+
+                                // Breakpoints section.
+                                ui.horizontal(|ui| {
+                                    ui.label("Breakpoints:");
+                                    ui.visuals_mut().override_text_color = Some(YELLOW);
+                                    ui.label(format!("{}", machine.debug.get_breakpoints_str()));
+                                    ui.visuals_mut().override_text_color = None;
+                                });
+                                // Simple input for new breakpoint.
+                                ui.horizontal(|ui| {
+                                    ui.label("Add (Hex):");
+
+                                    if self.breakpoint_error {
+                                        ui.visuals_mut().override_text_color = Some(RED);
+                                    }
+                                    let br_input =
+                                        egui::TextEdit::singleline(&mut self.breakpoint_input)
+                                            .hint_text("$0123")
+                                            .font(egui::TextStyle::Monospace)
+                                            .desired_width(60.0);
+                                    let response = ui.add(br_input);
+                                    if response.changed() {
+                                        self.breakpoint_error = false;
+                                    }
+                                    ui.visuals_mut().override_text_color = None;
+
+                                    if ui.button("+").clicked() {
+                                        let text = &self
+                                            .breakpoint_input
+                                            .strip_prefix("$")
+                                            .unwrap_or(&self.breakpoint_input);
+                                        if let Ok(addr) = u16::from_str_radix(text, 16) {
+                                            machine.debug.add_breakpoint(addr);
+                                            self.breakpoint_error = false;
+                                        } else {
+                                            self.breakpoint_error = true;
+                                        }
+                                    }
+                                    if ui.button("-").clicked() {
+                                        let text = &self
+                                            .breakpoint_input
+                                            .strip_prefix("$")
+                                            .unwrap_or(&self.breakpoint_input);
+
+                                        if let Ok(addr) = u16::from_str_radix(text, 16) {
+                                            machine.debug.delete_breakpoint(addr);
+                                        }
+                                    }
+                                    if ui.button("Clear all").clicked() {
+                                        machine.debug.clear_breakpoints();
+                                    }
+                                });
                             });
+                            // RIGHT: Disassembly.
+                            columns[1].vertical(|ui| {
+                                ui.allocate_space(vec2(290.0, 0.0));
+                                ui.heading("Disassembly");
+                                ui.separator();
 
-                        ui.separator();
+                                // Get the EXACT spacing egui uses between labels.
+                                let spacing_y = ui.spacing().item_spacing.y;
+                                let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
+                                // The "True" height of one line entry.
+                                let line_height = row_height + spacing_y;
 
-                        // Breakpoints section.
-                        ui.horizontal(|ui| {
-                            ui.label("Breakpoints:");
-                            ui.visuals_mut().override_text_color = Some(YELLOW);
-                            ui.label(format!("{}", machine.debug.get_breakpoints_str()));
-                            ui.visuals_mut().override_text_color = None;
-                        });
-                        // Simple input for new breakpoint.
-                        ui.horizontal(|ui| {
-                            ui.label("Add (Hex):");
+                                let current_pc = machine.registers.pc;
 
-                            if self.breakpoint_error {
-                                ui.visuals_mut().override_text_color = Some(RED);
-                            }
-                            let br_input = egui::TextEdit::singleline(&mut self.breakpoint_input)
-                                .hint_text("$0123")
-                                .font(egui::TextStyle::Monospace)
-                                .desired_width(60.0);
-                            let response = ui.add(br_input);
-                            if response.changed() {
-                                self.breakpoint_error = false;
-                            }
-                            ui.visuals_mut().override_text_color = None;
+                                let mut scroll_area =
+                                    ScrollArea::vertical().auto_shrink([false; 2]);
 
-                            if ui.button("+").clicked() {
-                                let text = &self
-                                    .breakpoint_input
-                                    .strip_prefix("$")
-                                    .unwrap_or(&self.breakpoint_input);
-                                if let Ok(addr) = u16::from_str_radix(text, 16) {
-                                    machine.debug.add_breakpoint(addr);
-                                    self.breakpoint_error = false;
-                                } else {
-                                    self.breakpoint_error = true;
+                                if current_pc != self.last_pc {
+                                    // We calculate the offset based on the spacing-adjusted height.
+                                    let target_y = current_pc as f32 * line_height;
+
+                                    let center_offset = target_y - (ui.available_height() / 2.0);
+
+                                    scroll_area =
+                                        scroll_area.vertical_scroll_offset(center_offset.max(0.0));
+                                    self.last_pc = current_pc;
                                 }
-                            }
-                            if ui.button("-").clicked() {
-                                let text = &self
-                                    .breakpoint_input
-                                    .strip_prefix("$")
-                                    .unwrap_or(&self.breakpoint_input);
 
-                                if let Ok(addr) = u16::from_str_radix(text, 16) {
-                                    machine.debug.delete_breakpoint(addr);
-                                }
-                            }
-                            if ui.button("Clear all").clicked() {
-                                machine.debug.clear_breakpoints();
-                            }
+                                scroll_area.show_rows(ui, row_height, 0xFFFF, |ui, row_range| {
+                                    for addr in row_range {
+                                        let is_current_pc = addr == current_pc as usize;
+
+                                        let opcode = machine.memory.read8(addr as u16);
+                                        let i = RunInstr::new(
+                                            opcode,
+                                            &machine.memory,
+                                            &machine.registers,
+                                        );
+
+                                        let text = format!(
+                                            "{:#06X}: {:02X} {:<4} {}",
+                                            addr,
+                                            opcode,
+                                            i.instruction_str(),
+                                            i.operand_str()
+                                        );
+
+                                        let mut label = RichText::new(text).monospace();
+                                        if is_current_pc {
+                                            label = label
+                                                .color(egui::Color32::BLACK)
+                                                .background_color(egui::Color32::YELLOW);
+                                        }
+
+                                        let response = ui.selectable_label(is_current_pc, label);
+
+                                        if is_current_pc {
+                                            response.scroll_to_me(Some(egui::Align::Center));
+                                        }
+                                    }
+                                });
+                            });
                         });
                     });
                 });
         }
 
         if self.show_fps {
-            // Area allows us to place things freely on the screen
+            // Area allows us to place things freely on the screen.
             egui::Area::new(egui::Id::new("fps_counter"))
                 .anchor(egui::Align2::LEFT_TOP, egui::vec2(10.0, 10.0))
                 .show(ctx, |ui| {
