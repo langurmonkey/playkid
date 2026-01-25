@@ -862,11 +862,12 @@ impl Gui {
                                 let line_height = row_height + spacing_y;
 
                                 let current_pc = machine.registers.pc;
+                                let pc_moved = current_pc != self.last_pc;
 
                                 let mut scroll_area =
                                     ScrollArea::vertical().auto_shrink([false; 2]);
 
-                                if current_pc != self.last_pc {
+                                if pc_moved {
                                     // We calculate the offset based on the spacing-adjusted height.
                                     let target_y = current_pc as f32 * line_height;
 
@@ -888,26 +889,74 @@ impl Gui {
                                             &machine.registers,
                                         );
 
-                                        let text = format!(
-                                            "{:#06X}: {:02X} {:<4} {}",
-                                            addr,
-                                            opcode,
-                                            i.instruction_str(),
-                                            i.operand_str()
+                                        let mut instruction = LayoutJob::default();
+                                        RichText::new(format!("{:#06x} ", addr))
+                                            .color(if machine.debug.has_breakpoint(addr as u16) {
+                                                RED
+                                            } else {
+                                                WHITE
+                                            })
+                                            .font(FontId::new(12.0, FontFamily::Monospace))
+                                            .strong()
+                                            .append_to(
+                                                &mut instruction,
+                                                ui.style(),
+                                                egui::FontSelection::Default,
+                                                egui::Align::Center,
+                                            );
+                                        RichText::new(format!("{:#04x} ", opcode))
+                                            .color(GRAY)
+                                            .font(FontId::new(12.0, FontFamily::Monospace))
+                                            .strong()
+                                            .append_to(
+                                                &mut instruction,
+                                                ui.style(),
+                                                egui::FontSelection::Default,
+                                                egui::Align::Center,
+                                            );
+                                        RichText::new(format!("{:<4} ", i.instruction_str()))
+                                            .color(YELLOW)
+                                            .font(FontId::new(12.0, FontFamily::Monospace))
+                                            .strong()
+                                            .append_to(
+                                                &mut instruction,
+                                                ui.style(),
+                                                egui::FontSelection::Default,
+                                                egui::Align::Center,
+                                            );
+                                        RichText::new(format!("{}", i.operand_str()))
+                                            .color(BLUE)
+                                            .font(FontId::new(12.0, FontFamily::Monospace))
+                                            .strong()
+                                            .append_to(
+                                                &mut instruction,
+                                                ui.style(),
+                                                egui::FontSelection::Default,
+                                                egui::Align::Center,
+                                            );
+                                        let galley = ui.fonts(|f| f.layout_job(instruction));
+                                        let (rect, _) = ui.allocate_exact_size(
+                                            egui::vec2(ui.available_width(), row_height),
+                                            egui::Sense::click(),
                                         );
-
-                                        let mut label = RichText::new(text).monospace();
                                         if is_current_pc {
-                                            label = label
-                                                .color(egui::Color32::BLACK)
-                                                .background_color(egui::Color32::YELLOW);
-                                        }
+                                            ui.painter().rect_filled(
+                                                rect,
+                                                0.0,
+                                                egui::Color32::from_rgba_unmultiplied(
+                                                    255, 255, 0, 100,
+                                                ),
+                                            );
 
-                                        let response = ui.selectable_label(is_current_pc, label);
-
-                                        if is_current_pc {
-                                            response.scroll_to_me(Some(egui::Align::Center));
+                                            if pc_moved {
+                                                ui.scroll_to_rect(rect, Some(egui::Align::Center));
+                                            }
                                         }
+                                        ui.painter().galley(
+                                            rect.min,
+                                            galley,
+                                            ui.visuals().text_color(),
+                                        );
                                     }
                                 });
                             });

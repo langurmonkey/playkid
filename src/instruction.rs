@@ -1,6 +1,5 @@
 use crate::memory::Memory;
 use crate::registers::Registers;
-use colored::Colorize;
 use std::fmt;
 
 /// # Instructions
@@ -557,14 +556,7 @@ impl Instruction {
             0xCB => Some(Instruction::OPCODE16()),
 
             // Undocumented OPCODE
-            _ => {
-                println!(
-                    "{}: Unimplemented instruction {:#02x}, treating as NOP",
-                    "WARN".yellow(),
-                    byte
-                );
-                Some(Instruction::NOP())
-            }
+            _ => Some(Instruction::NOP()),
         }
     }
 
