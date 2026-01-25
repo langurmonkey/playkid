@@ -4,7 +4,7 @@ use crate::machine::Machine;
 use crate::uistate::UIState;
 use egui::{
     ClippedPrimitive, CollapsingHeader, Color32, Context, FontFamily, FontId, RichText, ScrollArea,
-    TexturesDelta, ViewportId, text::LayoutJob, vec2,
+    Sense, TexturesDelta, ViewportId, text::LayoutJob, vec2,
 };
 use egui_wgpu::{Renderer, ScreenDescriptor};
 use pixels::{PixelsContext, wgpu};
@@ -741,7 +741,7 @@ impl Gui {
                                     });
 
                                 CollapsingHeader::new("PPU")
-                                    .default_open(true)
+                                    .default_open(false)
                                     .show(ui, |ui| {
                                         egui::Grid::new("ppu_grid")
                                             .num_columns(2)
@@ -800,7 +800,7 @@ impl Gui {
                                 // Breakpoints section.
                                 ui.horizontal(|ui| {
                                     ui.label("Breakpoints:");
-                                    ui.visuals_mut().override_text_color = Some(YELLOW);
+                                    ui.visuals_mut().override_text_color = Some(RED);
                                     ui.label(format!("{}", machine.debug.get_breakpoints_str()));
                                     ui.visuals_mut().override_text_color = None;
                                 });
@@ -935,16 +935,19 @@ impl Gui {
                                                 egui::Align::Center,
                                             );
                                         let galley = ui.fonts(|f| f.layout_job(instruction));
-                                        let (rect, _) = ui.allocate_exact_size(
-                                            egui::vec2(ui.available_width(), row_height),
-                                            egui::Sense::click(),
+                                        let (rect, response) = ui.allocate_exact_size(
+                                            vec2(ui.available_width(), row_height),
+                                            Sense::click(),
                                         );
+                                        if response.clicked() {
+                                            machine.debug.toggle_breakpoint(addr as u16);
+                                        }
                                         if is_current_pc {
                                             ui.painter().rect_filled(
                                                 rect,
                                                 0.0,
                                                 egui::Color32::from_rgba_unmultiplied(
-                                                    255, 255, 0, 100,
+                                                    127, 127, 0, 100,
                                                 ),
                                             );
 

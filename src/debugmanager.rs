@@ -93,11 +93,18 @@ impl DebugManager {
             self.breakpoints.push(addr);
         }
     }
-
     pub fn delete_breakpoint(&mut self, addr: u16) {
         if self.has_breakpoint(addr) {
             println!("{}: Remove breakpoint: {:#04x}", "OK".green(), addr);
             self.breakpoints.retain(|&x| x != addr);
+        }
+    }
+
+    pub fn toggle_breakpoint(&mut self, addr: u16) {
+        if self.has_breakpoint(addr) {
+            self.delete_breakpoint(addr);
+        } else {
+            self.add_breakpoint(addr);
         }
     }
 
