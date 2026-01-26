@@ -42,7 +42,7 @@ pub struct Gui {
     /// Show about window.
     show_about: bool,
     /// Show debugger.
-    show_debugger: bool,
+    pub show_debugger: bool,
     /// Show FPS.
     show_fps: bool,
     /// The menu timer.
@@ -341,6 +341,13 @@ impl Gui {
         // Debugger.
         if self.show_debugger {
             egui::Window::new("🐛 Debug Panel")
+                .default_width(400.0)
+                .resizable(false)
+                .collapsible(true)
+                .frame(
+                    egui::Frame::window(&ctx.style())
+                        .fill(egui::Color32::from_rgba_unmultiplied(40, 40, 40, 253)),
+                )
                 .open(&mut self.show_debugger)
                 .show(ctx, |ui| {
                     let pc = machine.registers.pc;

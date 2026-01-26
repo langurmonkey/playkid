@@ -147,6 +147,14 @@ fn main() -> Result<(), Error> {
                     let d = machine.debug.toggle_debugging();
                     machine.debug.set_paused(d);
                     framework.gui.show_debugger(d);
+
+                    // Resize window.
+                    if d {
+                        let _ = window.request_inner_size(winit::dpi::LogicalSize::new(1100, 800));
+                    } else {
+                        let _ = window.request_inner_size(winit::dpi::LogicalSize::new(500, 500));
+                    }
+
                     handled = true;
                 } else if input.key_released(KeyCode::KeyF) {
                     // FPS.

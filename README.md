@@ -18,14 +18,14 @@ Here are the main features of Play Kid:
 - Supports game controllers.
 - Multiple color palettes.
 - Save screenshot of current frame buffer.
+- FPS counter.
 - Respects 160:144 aspect ratio by letter-boxing.
-- Debug mode:
+- Debug panel:
   - Step instruction.
   - Step scanline.
   - Pause/continue current execution.
-  - FPS counter.
-  - Displays internal state.
-  - Breakpoints.
+  - Displays internal state of CPU, PPU, and Joypad.
+  - Full program disassembly, with breakpoints.
 - Save RAM to `.sav` files to emulate the battery-backed SRAM. Those are saved every minute.
 - Automatically adapts to multi-DPI setups by scaling the UI.
 - Working games/roms:
@@ -76,7 +76,7 @@ Here are the Joypad keyboard mappings:
 - <kbd>a</kbd> - A button
 - <kbd>b</kbd> - B button
 
-The kebyoard is clumsy for playing Game Boy games, so you can use any game controller. Controllers are detected when hot-plugged.
+The keyboard is clumsy for playing Game Boy games, so you can use any game controller. Controllers are detected when hot-plugged.
 
 Additionally, there are some more actions available:
 
@@ -89,9 +89,14 @@ Additionally, there are some more actions available:
 
 You can also use the provided UI.
 
-# Debug mode
+# Debug panel
 
-You can enter the debug mode any time by pressing <kbd>d</kbd>, by clikcing on `Machine` > `Debug panel...`, or activate it at launch with the `-d`/`--debug` flag.
+You can open the debug panel any time by pressing <kbd>d</kbd>, by clikcing on `Machine` > `Debug panel...`, or activate it at launch with the `-d`/`--debug` flag. The debug panel shows up in a translucent window. It provides a view of the internal state of the emulator, with:
+
+- Current address, instruction, operands, and opcode, to the top.
+- Internal state of CPU, PPU, and JOYP, to the left.
+- Disassembly of the program, to the right.
+- Breakpoints.
 
 <p align="center">
   <img src="assets/img/debug-mode.avif" />
@@ -106,7 +111,7 @@ You can use the provided UI controls to work with debug mode. You can also use t
 - <kbd>d</kbd> - exit debug mode and go back to normal full-speed emulation
 - <kbd>Esc</kbd> - exit the emulator
 
-You can also use breakpoints. A list with the current breakpoint addresses is provided at the bottom. To create a breakpoint, enter the desired address (in `$abcd` format) into the text field and click <kbd>+</kbd>. Remove a breakpoint with <kbd>-</kbd>. Clear all current breakpoints with <kbd>Clear all</kbd>.
+You can also use breakpoints. A list with the current breakpoint addresses is provided at the bottom. To create a breakpoint, either **click on the address** in the disassembly panel, or enter it (in `$abcd` format) into the text field and click <kbd>+</kbd>. Remove a breakpoint by clicking the <kbd>×</kbd> in the breakpoints list. Clear all current breakpoints with <kbd>Clear all</kbd>.
 
 # CLI args
 
