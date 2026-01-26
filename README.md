@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="assets/img/logo-3x.avif" />
+  <img src="img/logo-3x.avif" />
 </p>
 
 **Play Kid** is yet another Game Boy emulator, written in Rust. But hey, it is MY Game Boy emulator, and I'm proud of it.
 
 
 <p align="center">
-  <img src="assets/img/grid.avif" />
+  <img src="img/grid.avif" />
 </p>
 
 Here are the main features of Play Kid:
@@ -99,7 +99,7 @@ You can open the debug panel any time by pressing <kbd>d</kbd>, by clikcing on `
 - Breakpoints.
 
 <p align="center">
-  <img src="assets/img/debug-mode.avif" />
+  <img src="img/debug-mode.avif" />
 </p>
 
 You can use the provided UI controls to work with debug mode. You can also use the keyboard. These are the key bindings:
@@ -141,7 +141,7 @@ Options:
 Play Kid started as an SDL2 application, but it was moved to a pure Rust tech stack using `pixels`, `winit`, `egui`, and `rodio`. This makes it much easier to build for different targets (including WASM!). Additionally, the SDL2 version contains a minimalist homegrown UI library that I'm particularly proud about, but it can't hold a candle to `egui`. It looks like this:
 
 <p align="center">
-  <img src="assets/img/debug-mode-sdl2.avif" />
+  <img src="img/debug-mode-sdl2.avif" />
 </p>
 
 The SDL2 version is forever tagged `playkid-sdl2` ([playkid-sdl2@codeberg](https://codeberg.org/langurmonkey/playkid/src/tag/playkid-sdl2), [playkid-sdl2@github](https://github.com/langurmonkey/playkid/tree/playkid-sdl2)).
