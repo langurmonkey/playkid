@@ -69,18 +69,8 @@ impl DebugManager {
         self.paused
     }
 
-    pub fn get_breakpoints_str(&self) -> String {
-        if self.breakpoints.is_empty() {
-            return "-".to_string();
-        }
-
-        let formatted_breakpoints: Vec<String> = self
-            .breakpoints
-            .iter()
-            .map(|&addr| format!("${:04x}", addr))
-            .collect();
-
-        format!("{}", formatted_breakpoints.join(","))
+    pub fn get_breakpoints_vec(&self) -> &Vec<u16> {
+        &self.breakpoints
     }
 
     pub fn has_breakpoint(&self, addr: u16) -> bool {

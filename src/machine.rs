@@ -87,11 +87,13 @@ impl<'a> Machine<'a> {
             }
         }
 
-        // Step instruction or line.
-        if self.debug.is_paused() {
+        if self.debug.is_paused() && !self.halted {
+            // Debug branch, we skip HALTED state.
             if self.debug.take_step_instruction() {
-                self.machine_cycle(); // Execute just one
+                // Step one instruction.
+                self.machine_cycle();
             } else if self.debug.take_step_line() {
+                // Step one line.
                 let current_ly = self.memory.ppu().ly;
                 while self.memory.ppu().ly == current_ly {
                     self.machine_cycle();

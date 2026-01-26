@@ -3,8 +3,8 @@ use crate::instruction::RunInstr;
 use crate::machine::Machine;
 use crate::uistate::UIState;
 use egui::{
-    ClippedPrimitive, CollapsingHeader, Color32, Context, FontFamily, FontId, RichText, ScrollArea,
-    Sense, TexturesDelta, ViewportId, text::LayoutJob, vec2,
+    ClippedPrimitive, CollapsingHeader, Color32, Context, FontFamily, FontId, Frame, RichText,
+    ScrollArea, Sense, TextEdit, TexturesDelta, ViewportId, text::LayoutJob, vec2,
 };
 use egui_wgpu::{Renderer, ScreenDescriptor};
 use pixels::{PixelsContext, wgpu};
@@ -13,13 +13,14 @@ use winit::window::Window;
 
 pub const BLUE: Color32 = Color32::from_rgb(66, 133, 244);
 pub const GRAY: Color32 = Color32::from_rgb(127, 127, 127);
+pub const DARKGRAY: Color32 = Color32::from_rgb(10, 10, 10);
 pub const WHITE: Color32 = Color32::from_rgb(255, 255, 255);
 pub const CYAN: Color32 = Color32::from_rgb(0, 188, 212);
 pub const MAGENTA: Color32 = Color32::from_rgb(233, 30, 99);
-pub const YELLOW: Color32 = Color32::from_rgb(244, 180, 0);
 pub const GREEN: Color32 = Color32::from_rgb(15, 157, 88);
 pub const RED: Color32 = Color32::from_rgb(219, 68, 55);
-pub const ORANGE: Color32 = Color32::from_rgb(255, 152, 0);
+pub const YELLOW: Color32 = Color32::from_rgb(60, 52, 0);
+pub const ORANGE: Color32 = Color32::from_rgb(255, 132, 0);
 
 /// Manages all state required for rendering egui over `Pixels`.
 pub(crate) struct Framework {
@@ -285,13 +286,13 @@ impl Gui {
                             machine.reset();
                             ui.close_menu();
                         }
-                        if ui.checkbox(&mut self.show_fps, "Show FPS").clicked() {
-                            ui.close_menu();
-                        }
                         if ui.button("Debug panel...").clicked() {
                             self.show_debugger = true;
                             ui.close_menu();
                         };
+                        if ui.checkbox(&mut self.show_fps, "Show FPS").clicked() {
+                            ui.close_menu();
+                        }
                     })
                 });
             });
@@ -339,7 +340,7 @@ impl Gui {
 
         // Debugger.
         if self.show_debugger {
-            egui::Window::new("💻 CPU Debugger")
+            egui::Window::new("🐛 Debug Panel")
                 .open(&mut self.show_debugger)
                 .show(ctx, |ui| {
                     let pc = machine.registers.pc;
@@ -451,7 +452,6 @@ impl Gui {
                             }
                         });
 
-                        ui.separator();
                         ui.add_space(8.0);
 
                         // Main horizontal pane.
@@ -484,7 +484,7 @@ impl Gui {
                                         egui::Align::Center,
                                     );
                                 RichText::new(format!("  {}", run_instr.operand_str()))
-                                    .color(WHITE)
+                                    .color(BLUE)
                                     .font(FontId::new(18.0, FontFamily::Monospace))
                                     .strong()
                                     .append_to(
@@ -498,7 +498,8 @@ impl Gui {
 
                                 ui.add_space(8.0);
 
-                                CollapsingHeader::new("CPU")
+                                // CPU.
+                                CollapsingHeader::new("💻 CPU")
                                     .default_open(true)
                                     .show(ui, |ui| {
                                         ui.vertical(|ui| {
@@ -740,9 +741,12 @@ impl Gui {
                                         });
                                     });
 
-                                CollapsingHeader::new("PPU")
-                                    .default_open(false)
-                                    .show(ui, |ui| {
+                                ui.add_space(8.0);
+
+                                // PPU.
+                                CollapsingHeader::new("📋 PPU").default_open(false).show(
+                                    ui,
+                                    |ui| {
                                         egui::Grid::new("ppu_grid")
                                             .num_columns(2)
                                             .min_col_width(100.0)
@@ -765,95 +769,189 @@ impl Gui {
                                                 ui.monospace(format!("{:#02x}", mem.ppu.lx));
                                                 ui.end_row();
                                             });
-                                    });
+                                    },
+                                );
 
-                                ui.separator();
+                                ui.add_space(8.0);
 
                                 // JOYPAD.
-                                ui.monospace("Joypad:");
-
-                                let mem = &machine.memory;
-                                let mut joypad = LayoutJob::default();
-                                RichText::new(&format!(
-                                    "{} {} {} {} {} {} {} {}",
-                                    if mem.joypad.up { "↑" } else { "_" },
-                                    if mem.joypad.down { "↓" } else { "_" },
-                                    if mem.joypad.left { "←" } else { "_" },
-                                    if mem.joypad.right { "→" } else { "_" },
-                                    if mem.joypad.a { "A" } else { "_" },
-                                    if mem.joypad.b { "B" } else { "_" },
-                                    if mem.joypad.start { "S" } else { "_" },
-                                    if mem.joypad.select { "s" } else { "_" }
-                                ))
-                                .color(CYAN)
-                                .font(FontId::new(12.0, FontFamily::Monospace))
-                                .strong()
-                                .append_to(
-                                    &mut joypad,
-                                    ui.style(),
-                                    egui::FontSelection::Default,
-                                    egui::Align::Center,
+                                CollapsingHeader::new("🎮 Joypad").default_open(true).show(
+                                    ui,
+                                    |ui| {
+                                        let mem = &machine.memory;
+                                        let mut joypad = LayoutJob::default();
+                                        RichText::new(&format!(
+                                            "{} {} {} {} {} {} {} {}",
+                                            if mem.joypad.up { "↑" } else { "_" },
+                                            if mem.joypad.down { "↓" } else { "_" },
+                                            if mem.joypad.left { "←" } else { "_" },
+                                            if mem.joypad.right { "→" } else { "_" },
+                                            if mem.joypad.a { "A" } else { "_" },
+                                            if mem.joypad.b { "B" } else { "_" },
+                                            if mem.joypad.start { "S" } else { "_" },
+                                            if mem.joypad.select { "s" } else { "_" }
+                                        ))
+                                        .color(CYAN)
+                                        .font(FontId::new(12.0, FontFamily::Monospace))
+                                        .strong()
+                                        .append_to(
+                                            &mut joypad,
+                                            ui.style(),
+                                            egui::FontSelection::Default,
+                                            egui::Align::Center,
+                                        );
+                                        ui.label(joypad);
+                                    },
                                 );
-                                ui.label(joypad);
-                                ui.separator();
 
-                                // Breakpoints section.
-                                ui.horizontal(|ui| {
-                                    ui.label("Breakpoints:");
-                                    ui.visuals_mut().override_text_color = Some(RED);
-                                    ui.label(format!("{}", machine.debug.get_breakpoints_str()));
-                                    ui.visuals_mut().override_text_color = None;
-                                });
-                                // Simple input for new breakpoint.
-                                ui.horizontal(|ui| {
-                                    ui.label("Add (Hex):");
+                                ui.add_space(8.0);
 
-                                    if self.breakpoint_error {
-                                        ui.visuals_mut().override_text_color = Some(RED);
-                                    }
-                                    let br_input =
-                                        egui::TextEdit::singleline(&mut self.breakpoint_input)
-                                            .hint_text("$0123")
-                                            .font(egui::TextStyle::Monospace)
-                                            .desired_width(60.0);
-                                    let response = ui.add(br_input);
-                                    if response.changed() {
-                                        self.breakpoint_error = false;
-                                    }
-                                    ui.visuals_mut().override_text_color = None;
+                                // BREAKPOINTS.
+                                CollapsingHeader::new("○ Breakpoints")
+                                    .default_open(true)
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            // Breakpoint controls.
+                                            ui.allocate_ui(
+                                                egui::vec2(120.0, ui.available_height()),
+                                                |ui| {
+                                                    ui.vertical(|ui| {
+                                                        ui.label("Add (Hex):");
 
-                                    if ui.button("+").clicked() {
-                                        let text = &self
-                                            .breakpoint_input
-                                            .strip_prefix("$")
-                                            .unwrap_or(&self.breakpoint_input);
-                                        if let Ok(addr) = u16::from_str_radix(text, 16) {
-                                            machine.debug.add_breakpoint(addr);
-                                            self.breakpoint_error = false;
-                                        } else {
-                                            self.breakpoint_error = true;
-                                        }
-                                    }
-                                    if ui.button("-").clicked() {
-                                        let text = &self
-                                            .breakpoint_input
-                                            .strip_prefix("$")
-                                            .unwrap_or(&self.breakpoint_input);
+                                                        ui.horizontal(|ui| {
+                                                            let br_input = TextEdit::singleline(
+                                                                &mut self.breakpoint_input,
+                                                            )
+                                                            .hint_text("$0123")
+                                                            .font(egui::TextStyle::Monospace)
+                                                            .desired_width(60.0);
 
-                                        if let Ok(addr) = u16::from_str_radix(text, 16) {
-                                            machine.debug.delete_breakpoint(addr);
-                                        }
-                                    }
-                                    if ui.button("Clear all").clicked() {
-                                        machine.debug.clear_breakpoints();
-                                    }
-                                });
+                                                            // Use a conditional visual for errors
+                                                            if self.breakpoint_error {
+                                                                ui.visuals_mut()
+                                                                    .override_text_color =
+                                                                    Some(RED);
+                                                            }
+
+                                                            if ui.add(br_input).changed() {
+                                                                self.breakpoint_error = false;
+                                                            }
+                                                            ui.visuals_mut().override_text_color =
+                                                                None;
+
+                                                            if ui.button("+").clicked() {
+                                                                let text = &self
+                                                                    .breakpoint_input
+                                                                    .strip_prefix("$")
+                                                                    .unwrap_or(
+                                                                        &self.breakpoint_input,
+                                                                    );
+                                                                if let Ok(addr) =
+                                                                    u16::from_str_radix(text, 16)
+                                                                {
+                                                                    machine
+                                                                        .debug
+                                                                        .add_breakpoint(addr);
+                                                                    self.breakpoint_error = false;
+                                                                } else {
+                                                                    self.breakpoint_error = true;
+                                                                }
+                                                            }
+                                                            if ui.button("-").clicked() {
+                                                                let text = &self
+                                                                    .breakpoint_input
+                                                                    .strip_prefix("$")
+                                                                    .unwrap_or(
+                                                                        &self.breakpoint_input,
+                                                                    );
+
+                                                                if let Ok(addr) =
+                                                                    u16::from_str_radix(text, 16)
+                                                                {
+                                                                    machine
+                                                                        .debug
+                                                                        .delete_breakpoint(addr);
+                                                                }
+                                                            }
+                                                        });
+
+                                                        ui.add_space(4.0);
+                                                        if ui.button("Clear all").clicked() {
+                                                            machine.debug.clear_breakpoints();
+                                                        }
+                                                    });
+                                                },
+                                            );
+
+                                            ui.separator();
+
+                                            // Scrollable list of breakpoints.
+                                            Frame::none().fill(DARKGRAY).inner_margin(4.0).show(
+                                                ui,
+                                                |ui| {
+                                                    ui.vertical(|ui| {
+                                                        ui.label("Active:");
+                                                        let breakpoints: Vec<u16> = machine
+                                                            .debug
+                                                            .get_breakpoints_vec()
+                                                            .iter()
+                                                            .cloned()
+                                                            .collect();
+                                                        ScrollArea::vertical()
+                                                            .id_source("bp_list")
+                                                            .max_height(100.0)
+                                                            .min_scrolled_width(200.0)
+                                                            .auto_shrink([false; 2])
+                                                            .show(ui, |ui| {
+                                                                if breakpoints.is_empty() {
+                                                                    let none =
+                                                                        RichText::new("-empty-")
+                                                                            .color(BLUE)
+                                                                            .monospace();
+                                                                    ui.label(none);
+                                                                } else {
+                                                                    for bp in breakpoints {
+                                                                        ui.horizontal(|ui| {
+                                                                            let text =
+                                                                                RichText::new(
+                                                                                    format!(
+                                                                                        "${:04x}",
+                                                                                        bp
+                                                                                    ),
+                                                                                )
+                                                                                .color(RED)
+                                                                                .monospace();
+
+                                                                            ui.label(text);
+                                                                            if ui
+                                                                                .small_button("❌")
+                                                                                .on_hover_text(
+                                                                                    "Remove",
+                                                                                )
+                                                                                .clicked()
+                                                                            {
+                                                                                machine
+                                                                                .debug
+                                                                                .delete_breakpoint(
+                                                                                    bp,
+                                                                                );
+                                                                            }
+                                                                        });
+                                                                    }
+                                                                }
+                                                            });
+                                                    });
+                                                },
+                                            );
+                                        });
+                                    });
                             });
                             // RIGHT: Disassembly.
                             columns[1].vertical(|ui| {
                                 ui.allocate_space(vec2(290.0, 0.0));
-                                ui.heading("Disassembly");
-                                ui.separator();
+                                ui.heading("Code disassembly");
+
+                                ui.add_space(8.0);
 
                                 // Get the EXACT spacing egui uses between labels.
                                 let spacing_y = ui.spacing().item_spacing.y;
@@ -864,104 +962,121 @@ impl Gui {
                                 let current_pc = machine.registers.pc;
                                 let pc_moved = current_pc != self.last_pc;
 
-                                let mut scroll_area =
-                                    ScrollArea::vertical().auto_shrink([false; 2]);
+                                // Use frame to make the background dark.
+                                Frame::none()
+                                    .fill(DARKGRAY)
+                                    .rounding(8.0)
+                                    .inner_margin(5.0)
+                                    .show(ui, |ui| {
+                                        let mut scroll_area =
+                                            ScrollArea::vertical().auto_shrink([false; 2]);
 
-                                if pc_moved {
-                                    // We calculate the offset based on the spacing-adjusted height.
-                                    let target_y = current_pc as f32 * line_height;
+                                        if pc_moved {
+                                            // We calculate the offset based on the spacing-adjusted height.
+                                            let target_y = current_pc as f32 * line_height;
 
-                                    let center_offset = target_y - (ui.available_height() / 2.0);
+                                            let center_offset =
+                                                target_y - (ui.available_height() / 2.0);
 
-                                    scroll_area =
-                                        scroll_area.vertical_scroll_offset(center_offset.max(0.0));
-                                    self.last_pc = current_pc;
-                                }
-
-                                scroll_area.show_rows(ui, row_height, 0xFFFF, |ui, row_range| {
-                                    for addr in row_range {
-                                        let is_current_pc = addr == current_pc as usize;
-
-                                        let opcode = machine.memory.read8(addr as u16);
-                                        let i = RunInstr::new(
-                                            opcode,
-                                            &machine.memory,
-                                            &machine.registers,
-                                        );
-
-                                        let mut instruction = LayoutJob::default();
-                                        RichText::new(format!("{:#06x} ", addr))
-                                            .color(if machine.debug.has_breakpoint(addr as u16) {
-                                                RED
-                                            } else {
-                                                WHITE
-                                            })
-                                            .font(FontId::new(12.0, FontFamily::Monospace))
-                                            .strong()
-                                            .append_to(
-                                                &mut instruction,
-                                                ui.style(),
-                                                egui::FontSelection::Default,
-                                                egui::Align::Center,
-                                            );
-                                        RichText::new(format!("{:#04x} ", opcode))
-                                            .color(GRAY)
-                                            .font(FontId::new(12.0, FontFamily::Monospace))
-                                            .strong()
-                                            .append_to(
-                                                &mut instruction,
-                                                ui.style(),
-                                                egui::FontSelection::Default,
-                                                egui::Align::Center,
-                                            );
-                                        RichText::new(format!("{:<4} ", i.instruction_str()))
-                                            .color(YELLOW)
-                                            .font(FontId::new(12.0, FontFamily::Monospace))
-                                            .strong()
-                                            .append_to(
-                                                &mut instruction,
-                                                ui.style(),
-                                                egui::FontSelection::Default,
-                                                egui::Align::Center,
-                                            );
-                                        RichText::new(format!("{}", i.operand_str()))
-                                            .color(BLUE)
-                                            .font(FontId::new(12.0, FontFamily::Monospace))
-                                            .strong()
-                                            .append_to(
-                                                &mut instruction,
-                                                ui.style(),
-                                                egui::FontSelection::Default,
-                                                egui::Align::Center,
-                                            );
-                                        let galley = ui.fonts(|f| f.layout_job(instruction));
-                                        let (rect, response) = ui.allocate_exact_size(
-                                            vec2(ui.available_width(), row_height),
-                                            Sense::click(),
-                                        );
-                                        if response.clicked() {
-                                            machine.debug.toggle_breakpoint(addr as u16);
+                                            scroll_area = scroll_area
+                                                .vertical_scroll_offset(center_offset.max(0.0));
+                                            self.last_pc = current_pc;
                                         }
-                                        if is_current_pc {
-                                            ui.painter().rect_filled(
-                                                rect,
-                                                0.0,
-                                                egui::Color32::from_rgba_unmultiplied(
-                                                    127, 127, 0, 100,
-                                                ),
-                                            );
 
-                                            if pc_moved {
-                                                ui.scroll_to_rect(rect, Some(egui::Align::Center));
-                                            }
-                                        }
-                                        ui.painter().galley(
-                                            rect.min,
-                                            galley,
-                                            ui.visuals().text_color(),
+                                        scroll_area.show_rows(
+                                            ui,
+                                            row_height,
+                                            0xFFFF,
+                                            |ui, row_range| {
+                                                for addr in row_range {
+                                                    let is_current_pc = addr == current_pc as usize;
+
+                                                    let opcode = machine.memory.read8(addr as u16);
+                                                    let i = RunInstr::new(
+                                                        opcode,
+                                                        &machine.memory,
+                                                        &machine.registers,
+                                                    );
+
+                                                    let mut instruction = LayoutJob::default();
+                                                    RichText::new(format!("${:04x} ", addr))
+                                                        .color(
+                                                            if machine
+                                                                .debug
+                                                                .has_breakpoint(addr as u16)
+                                                            {
+                                                                RED
+                                                            } else {
+                                                                GRAY
+                                                            },
+                                                        )
+                                                        .font(FontId::new(
+                                                            12.0,
+                                                            FontFamily::Monospace,
+                                                        ))
+                                                        .strong()
+                                                        .append_to(
+                                                            &mut instruction,
+                                                            ui.style(),
+                                                            egui::FontSelection::Default,
+                                                            egui::Align::Center,
+                                                        );
+                                                    RichText::new(format!(
+                                                        "{:<4} ",
+                                                        i.instruction_str()
+                                                    ))
+                                                    .color(ORANGE)
+                                                    .font(FontId::new(12.0, FontFamily::Monospace))
+                                                    .strong()
+                                                    .append_to(
+                                                        &mut instruction,
+                                                        ui.style(),
+                                                        egui::FontSelection::Default,
+                                                        egui::Align::Center,
+                                                    );
+                                                    RichText::new(format!("{}", i.operand_str()))
+                                                        .color(BLUE)
+                                                        .font(FontId::new(
+                                                            12.0,
+                                                            FontFamily::Monospace,
+                                                        ))
+                                                        .strong()
+                                                        .append_to(
+                                                            &mut instruction,
+                                                            ui.style(),
+                                                            egui::FontSelection::Default,
+                                                            egui::Align::Center,
+                                                        );
+                                                    let galley =
+                                                        ui.fonts(|f| f.layout_job(instruction));
+                                                    let (rect, response) = ui.allocate_exact_size(
+                                                        vec2(ui.available_width(), row_height),
+                                                        Sense::click(),
+                                                    );
+                                                    if response.clicked() {
+                                                        machine
+                                                            .debug
+                                                            .toggle_breakpoint(addr as u16);
+                                                    }
+                                                    if is_current_pc {
+                                                        ui.painter().rect_filled(rect, 0.0, YELLOW);
+
+                                                        if pc_moved {
+                                                            ui.scroll_to_rect(
+                                                                rect,
+                                                                Some(egui::Align::Center),
+                                                            );
+                                                        }
+                                                    }
+                                                    ui.painter().galley(
+                                                        rect.min,
+                                                        galley,
+                                                        ui.visuals().text_color(),
+                                                    );
+                                                }
+                                            },
                                         );
-                                    }
-                                });
+                                    });
                             });
                         });
                     });
