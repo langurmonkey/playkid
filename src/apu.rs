@@ -2,7 +2,7 @@ use rodio::{OutputStream, Sink, buffer::SamplesBuffer};
 
 /// # APU
 /// The Audio Processing Unit, which manages the sound system.
-pub struct APU {
+pub struct Apu {
     /// APU Registers 0xFF10-0xFF3F.
     regs: [u8; 0x30],
     /// Internal Wave RAM 0xFF30-0xFF3F.
@@ -75,11 +75,12 @@ pub struct APU {
     accumulated_count: u32,
 }
 
-impl APU {
+impl Apu {
     pub fn new() -> Self {
         // Initialize Rodio.
-        let stream_handle =
+        let mut stream_handle =
             rodio::OutputStreamBuilder::open_default_stream().expect("open default audio stream");
+        stream_handle.log_on_drop(false);
         let sink = rodio::Sink::connect_new(stream_handle.mixer());
 
         Self {

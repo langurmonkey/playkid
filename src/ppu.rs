@@ -23,7 +23,7 @@ type SpriteTileKey = (u8, u8, bool, bool);
 ///   Tiles in a bank are typically grouped into blocks.
 /// - A **tile block** contains 128 tiles of 16 bytes each, so 2048 bytes.
 /// - A **map** contains 32x32=1024 bytes.
-pub struct PPU {
+pub struct Ppu {
     /// Object Attribute Memory.
     pub oam: [u8; constants::OAM_SIZE],
     /// Video RAM.
@@ -162,12 +162,12 @@ pub const PALETTES: [[u8; 12]; 18] = [
     [255, 240, 150, 255, 120, 30, 50, 60, 180, 10, 20, 60],
 ];
 
-impl PPU {
+impl Ppu {
     pub fn new(start_dot: u64) -> Self {
         // Default palette.
         let palette = PALETTES[0];
 
-        PPU {
+        Ppu {
             oam: [0xFF; constants::OAM_SIZE],
             vram: [0; constants::VRAM_SIZE],
             mode: 0,
@@ -492,9 +492,9 @@ impl PPU {
         let mut pixels = [0u8; 8];
 
         // Each bit pair in the bytes represents a pixel color ID.
-        for i in 0..8 {
+        for (i, item) in pixels.iter_mut().enumerate() {
             let color_id = ((high_byte >> (7 - i)) & 0x1) << 1 | ((low_byte >> (7 - i)) & 0x1);
-            pixels[i] = color_id;
+            *item = color_id;
         }
         pixels
     }
@@ -637,12 +637,10 @@ impl PPU {
                 } else {
                     (top_tile | 1, flipped_line - 8)
                 }
+            } else if line < 8 {
+                (top_tile, line)
             } else {
-                if line < 8 {
-                    (top_tile, line)
-                } else {
-                    (top_tile | 1, line - 8)
-                }
+                (top_tile | 1, line - 8)
             };
             (tile, line_in_tile)
         } else {
@@ -714,15 +712,14 @@ impl PPU {
             cache,
         );
 
-        for i in 0..8 {
+        for (i, color_idx) in pixels.iter().enumerate() {
             let x_pos = (sprite.x as i16) - 8 + (i as i16);
             if x_pos < 0 || x_pos >= constants::DISPLAY_WIDTH as i16 {
                 continue; // Ignore pixels outside screen bounds.
             }
             let x_pos = x_pos as usize;
 
-            let color_idx = pixels[i];
-            if color_idx == 0 {
+            if *color_idx == 0 {
                 continue; // Skip transparent pixels.
             }
 
@@ -762,7 +759,7 @@ impl PPU {
         let base = paletted_color as usize * 3;
 
         // RGBA, in order.
-        self.fb_back[pos * 4 + 0] = self.palette[base];
+        self.fb_back[pos * 4] = self.palette[base];
         self.fb_back[pos * 4 + 1] = self.palette[base + 1];
         self.fb_back[pos * 4 + 2] = self.palette[base + 2];
         self.fb_back[pos * 4 + 3] = 0xff;

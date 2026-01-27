@@ -15,7 +15,6 @@ use registers::Registers;
 /// The machine contains the [Registers], the [Memory], and the [Display], and
 /// controls the CPU state. It also implements the CPU itself, which
 /// decodes and executes instructions.
-
 pub struct Machine {
     /// The registers.
     pub registers: Registers,
@@ -80,10 +79,11 @@ impl Machine {
     /// Update the state of the machine with a cycle.
     pub fn update(&mut self) {
         // Check for breakpoints.
-        if self.debug.is_debugging() && !self.debug.is_paused() {
-            if self.debug.has_breakpoint(self.registers.pc) {
-                self.debug.set_paused(true);
-            }
+        if self.debug.is_debugging()
+            && !self.debug.is_paused()
+            && self.debug.has_breakpoint(self.registers.pc)
+        {
+            self.debug.set_paused(true);
         }
 
         if self.debug.is_paused() {
@@ -158,10 +158,8 @@ impl Machine {
         let pending = self.memory.ie & self.memory.iff;
 
         // Wake from HALT if any interrupt is pending (even if IME is disabled).
-        if pending != 0 {
-            if self.halted {
-                self.halted = false;
-            }
+        if pending != 0 && self.halted {
+            self.halted = false;
         }
 
         // If no interrupts are pending OR IME is disabled, return.
@@ -2118,27 +2116,27 @@ impl Machine {
             },
             Instruction::RES0(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b & 0xFE;
+                    self.registers.b &= 0xFE;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c & 0xFE;
+                    self.registers.c &= 0xFE;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d & 0xFE;
+                    self.registers.d &= 0xFE;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e & 0xFE;
+                    self.registers.e &= 0xFE;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h & 0xFE;
+                    self.registers.h &= 0xFE;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l & 0xFE;
+                    self.registers.l &= 0xFE;
                     2
                 }
                 R8::HL => {
@@ -2148,33 +2146,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a & 0xFE;
+                    self.registers.a &= 0xFE;
                     2
                 }
             },
             Instruction::RES1(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b & 0xFD;
+                    self.registers.b &= 0xFD;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c & 0xFD;
+                    self.registers.c &= 0xFD;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d & 0xFD;
+                    self.registers.d &= 0xFD;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e & 0xFD;
+                    self.registers.e &= 0xFD;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h & 0xFD;
+                    self.registers.h &= 0xFD;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l & 0xFD;
+                    self.registers.l &= 0xFD;
                     2
                 }
                 R8::HL => {
@@ -2184,33 +2182,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a & 0xFD;
+                    self.registers.a &= 0xFD;
                     2
                 }
             },
             Instruction::RES2(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b & 0xFB;
+                    self.registers.b &= 0xFB;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c & 0xFB;
+                    self.registers.c &= 0xFB;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d & 0xFB;
+                    self.registers.d &= 0xFB;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e & 0xFB;
+                    self.registers.e &= 0xFB;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h & 0xFB;
+                    self.registers.h &= 0xFB;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l & 0xFB;
+                    self.registers.l &= 0xFB;
                     2
                 }
                 R8::HL => {
@@ -2220,33 +2218,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a & 0xFB;
+                    self.registers.a &= 0xFB;
                     2
                 }
             },
             Instruction::RES3(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b & 0xF7;
+                    self.registers.b &= 0xF7;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c & 0xF7;
+                    self.registers.c &= 0xF7;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d & 0xF7;
+                    self.registers.d &= 0xF7;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e & 0xF7;
+                    self.registers.e &= 0xF7;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h & 0xF7;
+                    self.registers.h &= 0xF7;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l & 0xF7;
+                    self.registers.l &= 0xF7;
                     2
                 }
                 R8::HL => {
@@ -2256,33 +2254,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a & 0xF7;
+                    self.registers.a &= 0xF7;
                     2
                 }
             },
             Instruction::RES4(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b & 0xEF;
+                    self.registers.b &= 0xEF;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c & 0xEF;
+                    self.registers.c &= 0xEF;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d & 0xEF;
+                    self.registers.d &= 0xEF;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e & 0xEF;
+                    self.registers.e &= 0xEF;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h & 0xEF;
+                    self.registers.h &= 0xEF;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l & 0xEF;
+                    self.registers.l &= 0xEF;
                     2
                 }
                 R8::HL => {
@@ -2292,33 +2290,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a & 0xEF;
+                    self.registers.a &= 0xEF;
                     2
                 }
             },
             Instruction::RES5(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b & 0xDF;
+                    self.registers.b &= 0xDF;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c & 0xDF;
+                    self.registers.c &= 0xDF;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d & 0xDF;
+                    self.registers.d &= 0xDF;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e & 0xDF;
+                    self.registers.e &= 0xDF;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h & 0xDF;
+                    self.registers.h &= 0xDF;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l & 0xDF;
+                    self.registers.l &= 0xDF;
                     2
                 }
                 R8::HL => {
@@ -2328,33 +2326,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a & 0xDF;
+                    self.registers.a &= 0xDF;
                     2
                 }
             },
             Instruction::RES6(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b & 0xBF;
+                    self.registers.b &= 0xBF;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c & 0xBF;
+                    self.registers.c &= 0xBF;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d & 0xBF;
+                    self.registers.d &= 0xBF;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e & 0xBF;
+                    self.registers.e &= 0xBF;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h & 0xBF;
+                    self.registers.h &= 0xBF;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l & 0xBF;
+                    self.registers.l &= 0xBF;
                     2
                 }
                 R8::HL => {
@@ -2364,33 +2362,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a & 0xBF;
+                    self.registers.a &= 0xBF;
                     2
                 }
             },
             Instruction::RES7(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b & 0x7F;
+                    self.registers.b &= 0x7F;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c & 0x7F;
+                    self.registers.c &= 0x7F;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d & 0x7F;
+                    self.registers.d &= 0x7F;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e & 0x7F;
+                    self.registers.e &= 0x7F;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h & 0x7F;
+                    self.registers.h &= 0x7F;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l & 0x7F;
+                    self.registers.l &= 0x7F;
                     2
                 }
                 R8::HL => {
@@ -2400,33 +2398,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a & 0x7F;
+                    self.registers.a &= 0x7F;
                     2
                 }
             },
             Instruction::SET0(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b | 0x01;
+                    self.registers.b |= 0x01;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c | 0x01;
+                    self.registers.c |= 0x01;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d | 0x01;
+                    self.registers.d |= 0x01;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e | 0x01;
+                    self.registers.e |= 0x01;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h | 0x01;
+                    self.registers.h |= 0x01;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l | 0x01;
+                    self.registers.l |= 0x01;
                     2
                 }
                 R8::HL => {
@@ -2436,33 +2434,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a | 0x01;
+                    self.registers.a |= 0x01;
                     2
                 }
             },
             Instruction::SET1(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b | 0x02;
+                    self.registers.b |= 0x02;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c | 0x02;
+                    self.registers.c |= 0x02;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d | 0x02;
+                    self.registers.d |= 0x02;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e | 0x02;
+                    self.registers.e |= 0x02;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h | 0x02;
+                    self.registers.h |= 0x02;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l | 0x02;
+                    self.registers.l |= 0x02;
                     2
                 }
                 R8::HL => {
@@ -2472,33 +2470,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a | 0x02;
+                    self.registers.a |= 0x02;
                     2
                 }
             },
             Instruction::SET2(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b | 0x04;
+                    self.registers.b |= 0x04;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c | 0x04;
+                    self.registers.c |= 0x04;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d | 0x04;
+                    self.registers.d |= 0x04;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e | 0x04;
+                    self.registers.e |= 0x04;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h | 0x04;
+                    self.registers.h |= 0x04;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l | 0x04;
+                    self.registers.l |= 0x04;
                     2
                 }
                 R8::HL => {
@@ -2508,33 +2506,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a | 0x04;
+                    self.registers.a |= 0x04;
                     2
                 }
             },
             Instruction::SET3(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b | 0x08;
+                    self.registers.b |= 0x08;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c | 0x08;
+                    self.registers.c |= 0x08;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d | 0x08;
+                    self.registers.d |= 0x08;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e | 0x08;
+                    self.registers.e |= 0x08;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h | 0x08;
+                    self.registers.h |= 0x08;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l | 0x08;
+                    self.registers.l |= 0x08;
                     2
                 }
                 R8::HL => {
@@ -2544,21 +2542,21 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a | 0x08;
+                    self.registers.a |= 0x08;
                     2
                 }
             },
             Instruction::SET4(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b | 0x10;
+                    self.registers.b |= 0x10;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c | 0x10;
+                    self.registers.c |= 0x10;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d | 0x10;
+                    self.registers.d |= 0x10;
                     2
                 }
                 R8::E => {
@@ -2566,11 +2564,11 @@ impl Machine {
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h | 0x10;
+                    self.registers.h |= 0x10;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l | 0x10;
+                    self.registers.l |= 0x10;
                     2
                 }
                 R8::HL => {
@@ -2580,33 +2578,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a | 0x10;
+                    self.registers.a |= 0x10;
                     2
                 }
             },
             Instruction::SET5(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b | 0x20;
+                    self.registers.b |= 0x20;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c | 0x20;
+                    self.registers.c |= 0x20;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d | 0x20;
+                    self.registers.d |= 0x20;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e | 0x20;
+                    self.registers.e |= 0x20;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h | 0x20;
+                    self.registers.h |= 0x20;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l | 0x20;
+                    self.registers.l |= 0x20;
                     2
                 }
                 R8::HL => {
@@ -2616,33 +2614,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a | 0x20;
+                    self.registers.a |= 0x20;
                     2
                 }
             },
             Instruction::SET6(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b | 0x40;
+                    self.registers.b |= 0x40;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c | 0x40;
+                    self.registers.c |= 0x40;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d | 0x40;
+                    self.registers.d |= 0x40;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e | 0x40;
+                    self.registers.e |= 0x40;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h | 0x40;
+                    self.registers.h |= 0x40;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l | 0x40;
+                    self.registers.l |= 0x40;
                     2
                 }
                 R8::HL => {
@@ -2652,33 +2650,33 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a | 0x40;
+                    self.registers.a |= 0x40;
                     2
                 }
             },
             Instruction::SET7(r8) => match r8 {
                 R8::B => {
-                    self.registers.b = self.registers.b | 0x80;
+                    self.registers.b |= 0x80;
                     2
                 }
                 R8::C => {
-                    self.registers.c = self.registers.c | 0x80;
+                    self.registers.c |= 0x80;
                     2
                 }
                 R8::D => {
-                    self.registers.d = self.registers.d | 0x80;
+                    self.registers.d |= 0x80;
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e | 0x80;
+                    self.registers.e |= 0x80;
                     2
                 }
                 R8::H => {
-                    self.registers.h = self.registers.h | 0x80;
+                    self.registers.h |= 0x80;
                     2
                 }
                 R8::L => {
-                    self.registers.l = self.registers.l | 0x80;
+                    self.registers.l |= 0x80;
                     2
                 }
                 R8::HL => {
@@ -2688,7 +2686,7 @@ impl Machine {
                     4
                 }
                 R8::A => {
-                    self.registers.a = self.registers.a | 0x80;
+                    self.registers.a |= 0x80;
                     2
                 }
             },
@@ -2836,7 +2834,7 @@ impl Machine {
         self.registers.c(false);
         self.registers.h(false);
         self.registers.n(false);
-        (val >> 4) | (val << 4)
+        val.rotate_left(4)
     }
 
     /// SRL operation: shift the contents of `val` to the

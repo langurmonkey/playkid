@@ -114,11 +114,10 @@ impl Timer {
             let new_bit = (self.divider >> self.timer_bit) & 1 != 0;
 
             // Update TIMA on falling edge of selected bit
-            if self.enabled {
-                if self.last_div_bit && !new_bit {
+            if self.enabled
+                && self.last_div_bit && !new_bit {
                     self.increment_tima();
                 }
-            }
             self.last_div_bit = new_bit;
         }
     }

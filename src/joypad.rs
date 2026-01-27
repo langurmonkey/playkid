@@ -108,7 +108,9 @@ impl eventhandler::EventHandler for Joypad {
 
 impl Joypad {
     pub fn new() -> Self {
-        let joypad = Joypad {
+        
+
+        Joypad {
             joyp: 0xFF,
             select_buttons: false,
             select_dpad: false,
@@ -123,9 +125,7 @@ impl Joypad {
             request_interrupt: false,
             i_mask: 0,
             cycles: 0,
-        };
-
-        joypad
+        }
     }
 
     /// Resets the state of the joypad.

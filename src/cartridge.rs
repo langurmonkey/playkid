@@ -64,8 +64,8 @@ impl Cartridge {
 
         // Get title.
         let slice = &data[0x134..0x142];
-        let title =
-            str::from_utf8(slice).expect(&format!("{}: Error getting ROM title", "ERR".red()));
+        let title = str::from_utf8(slice)
+            .unwrap_or_else(|_| panic!("{}: Error getting ROM title", "ERR".red()));
         println!("{}: Title: {}", "OK".green(), title.bright_blue());
 
         // Color or not color.
@@ -155,16 +155,16 @@ impl Cartridge {
                     hc, cs as u8
                 );
             } else {
-                println!("{}: {}: {:#04x}", "OK".green(), "Header checksum", cs as u8);
+                println!("{}: Header checksum: {:#04x}", "OK".green(), cs as u8);
             }
         }
         // Global checksum.
         if !skip_checksum {
             let gc: u16 = ((data[0x14E] as u16) << 8) | (data[0x14F] as u16);
             let mut cs: u32 = 0;
-            for address in 0..data.len() {
+            for (address, _) in data.iter().enumerate() {
                 if address != 0x14E && address != 0x14F {
-                    cs += data[address as usize] as u32;
+                    cs += data[address] as u32;
                 }
             }
             if gc != cs as u16 {
@@ -185,7 +185,7 @@ impl Cartridge {
                 println!("{}: Using ROM ONLY mode", "OK".green());
                 CartridgeType::RomOnly
             }
-            0x01 | 0x02 | 0x03 => {
+            0x01..=0x03 => {
                 println!("{}: Using MBC1 mode", "OK".green());
                 let rom_size_code = data[0x148];
                 let ram_size_code = data[0x149];
@@ -338,15 +338,15 @@ impl Cartridge {
             _ => return,
         };
 
-        if !ram_data.is_empty() || matches!(self.cart_type, CartridgeType::MBC2(_)) {
-            if let Ok(mut file) = File::create(&save_path) {
-                let _ = file.write_all(ram_data);
-                println!(
-                    "{}: SRAM written to disk: {}",
-                    "WR".magenta(),
-                    save_path.display()
-                );
-            }
+        if (!ram_data.is_empty() || matches!(self.cart_type, CartridgeType::MBC2(_)))
+            && let Ok(mut file) = File::create(&save_path)
+        {
+            let _ = file.write_all(ram_data);
+            println!(
+                "{}: SRAM written to disk: {}",
+                "WR".magenta(),
+                save_path.display()
+            );
         }
     }
 

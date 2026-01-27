@@ -1,14 +1,14 @@
-use crate::apu::APU;
+use crate::apu::Apu;
 use crate::cartridge::Cartridge;
 use crate::constants;
 use crate::joypad::Joypad;
-use crate::ppu::PPU;
+use crate::ppu::Ppu;
 use crate::timer::Timer;
 
 /// # Memory
 /// The Game Boy uses a 2-byte address space (0x0000 to 0xFFFF) to map the different
 /// types of memory (RAM, VRAM, [Cartridge] memory, etc.)
-
+///
 /// ## Memory map
 /// 0x0000-0x3FFF: 16 KiB bank #0                 (cartridge)
 /// 0x4000-0x7FFF: 16 KiB switchable ROM bank     (cartridge)
@@ -36,13 +36,13 @@ pub struct Memory {
     // Cartridge reference.
     pub cart: Cartridge,
     /// The PPU, Picture Processing Unit.
-    pub ppu: PPU,
+    pub ppu: Ppu,
     /// The timer.
     pub timer: Timer,
     /// The joypad.
     pub joypad: Joypad,
     // The APU, Audio Processing Unit.
-    pub apu: APU,
+    pub apu: Apu,
 }
 
 impl Memory {
@@ -55,14 +55,14 @@ impl Memory {
             iff: 0,
             ie: 0,
             cart,
-            ppu: PPU::new(0x194),
+            ppu: Ppu::new(0x194),
             timer: Timer::new(),
             joypad: Joypad::new(),
-            apu: APU::new(),
+            apu: Apu::new(),
         }
     }
 
-    pub fn ppu(&self) -> &PPU {
+    pub fn ppu(&self) -> &Ppu {
         &self.ppu
     }
 
@@ -318,7 +318,7 @@ impl Memory {
             }
             // VRAM registers.
             0xFF40..=0xFF4F => self.ppu.write(address, value),
-            0xFF00..=0xFF7F => {
+            0xFF50..=0xFF7F => {
                 // I/O registers.
                 self.io[(address - 0xFF00) as usize] = value;
             }
@@ -328,6 +328,8 @@ impl Memory {
             }
             // IE: interrupt enable.
             0xFFFF => self.ie = value,
+            // Default.
+            _ => (),
         }
     }
     /// Write the given word `value` at the given `address`.

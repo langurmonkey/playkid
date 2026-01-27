@@ -91,11 +91,11 @@ impl Gui {
             false
         };
         // Check sensors.
-        let mouse_at_top = mouse_pos.map_or(false, |pos| pos.y < 30.0);
+        let mouse_at_top = mouse_pos.is_some_and(|pos| pos.y < 30.0);
         let menu_in_use = ctx.input(|i| i.pointer.has_pointer())
             && ctx
                 .layer_id_at(mouse_pos.unwrap_or_default())
-                .map_or(false, |l| {
+                .is_some_and(|l| {
                     l.order == egui::Order::Foreground || l.order == egui::Order::Tooltip
                 });
 
@@ -373,14 +373,11 @@ impl Gui {
                                                             .strong(),
                                                     );
                                                     ui.label(
-                                                        RichText::new(format!(
-                                                            "{}",
-                                                            if machine.halted {
+                                                        RichText::new((if machine.halted {
                                                                 "HALTED"
                                                             } else {
                                                                 "RUNNING"
-                                                            }
-                                                        ))
+                                                            }).to_string())
                                                         .color(if machine.halted {
                                                             RED
                                                         } else {
@@ -592,7 +589,7 @@ impl Gui {
                                     |ui| {
                                         let mem = &machine.memory;
                                         ui.label(
-                                            RichText::new(&format!(
+                                            RichText::new(format!(
                                                 "{} {} {} {} {} {} {} {}",
                                                 if mem.joypad.up { "↑" } else { "_" },
                                                 if mem.joypad.down { "↓" } else { "_" },
@@ -699,10 +696,7 @@ impl Gui {
                                                         ui.label("Active:");
                                                         let breakpoints: Vec<u16> = machine
                                                             .debug
-                                                            .get_breakpoints_vec()
-                                                            .iter()
-                                                            .cloned()
-                                                            .collect();
+                                                            .get_breakpoints_vec().to_vec();
                                                         ScrollArea::vertical()
                                                             .id_salt("bp_list")
                                                             .max_height(100.0)

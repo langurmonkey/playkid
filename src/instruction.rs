@@ -1119,7 +1119,7 @@ impl RunInstr {
             OperandData::Op16(u16) => {
                 format!("{:#06x}", u16)
             }
-            _ => format!("{}", " "),
+            _ => " ".to_string(),
         }
     }
 }
