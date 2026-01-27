@@ -322,39 +322,31 @@ impl Gui {
                                 // Current instruction.
                                 let run_instr =
                                     RunInstr::new(opcode, &machine.memory, &machine.registers);
-                                let mut instr = LayoutJob::default();
-                                RichText::new(format!("${:04x}:", pc))
-                                    .color(GRAY)
-                                    .font(FontId::new(18.0, FontFamily::Monospace))
-                                    .strong()
-                                    .append_to(
-                                        &mut instr,
-                                        ui.style(),
-                                        egui::FontSelection::Default,
-                                        egui::Align::Center,
-                                    );
-                                RichText::new(format!(" {}", run_instr.instruction_str()))
-                                    .color(ORANGE)
-                                    .font(FontId::new(18.0, FontFamily::Monospace))
-                                    .strong()
-                                    .append_to(
-                                        &mut instr,
-                                        ui.style(),
-                                        egui::FontSelection::Default,
-                                        egui::Align::Center,
-                                    );
-                                RichText::new(format!("  {}", run_instr.operand_str()))
-                                    .color(BLUE)
-                                    .font(FontId::new(18.0, FontFamily::Monospace))
-                                    .strong()
-                                    .append_to(
-                                        &mut instr,
-                                        ui.style(),
-                                        egui::FontSelection::Default,
-                                        egui::Align::Center,
-                                    );
-                                ui.label(instr)
-                                    .on_hover_text("Current PC address, instruction, and operand.");
+                                ui.horizontal(|ui| {
+                                    ui.spacing_mut().item_spacing.x = 0.0;
+
+                                    ui.label(
+                                        RichText::new(format!("${:04x}:", pc))
+                                            .color(GRAY)
+                                            .monospace()
+                                            .strong(),
+                                    )
+                                    .on_hover_text("Program Counter (PC)");
+                                    ui.label(
+                                        RichText::new(format!(" {}", run_instr.instruction_str()))
+                                            .color(ORANGE)
+                                            .monospace()
+                                            .strong(),
+                                    )
+                                    .on_hover_text("Current instruction");
+                                    ui.label(
+                                        RichText::new(format!("  {}", run_instr.operand_str()))
+                                            .color(BLUE)
+                                            .monospace()
+                                            .strong(),
+                                    )
+                                    .on_hover_text("Operand");
+                                });
 
                                 ui.add_space(8.0);
 
@@ -371,40 +363,35 @@ impl Gui {
                                                 .spacing([10.0, 4.0])
                                                 .show(ui, |ui| {
                                                     // CPU state.
-                                                    let mut state = LayoutJob::default();
-                                                    RichText::new("State:")
-                                                        .color(GRAY)
+                                                    ui.label(
+                                                        RichText::new("State:")
+                                                            .color(GRAY)
+                                                            .font(FontId::new(
+                                                                12.0,
+                                                                FontFamily::Monospace,
+                                                            ))
+                                                            .strong(),
+                                                    );
+                                                    ui.label(
+                                                        RichText::new(format!(
+                                                            "{}",
+                                                            if machine.halted {
+                                                                "HALTED"
+                                                            } else {
+                                                                "RUNNING"
+                                                            }
+                                                        ))
+                                                        .color(if machine.halted {
+                                                            RED
+                                                        } else {
+                                                            GREEN
+                                                        })
                                                         .font(FontId::new(
-                                                            12.0,
+                                                            16.0,
                                                             FontFamily::Monospace,
                                                         ))
-                                                        .strong()
-                                                        .append_to(
-                                                            &mut state,
-                                                            ui.style(),
-                                                            egui::FontSelection::Default,
-                                                            egui::Align::Center,
-                                                        );
-                                                    let mut state_val = LayoutJob::default();
-                                                    RichText::new(format!(
-                                                        "{}",
-                                                        if machine.halted {
-                                                            "HALTED"
-                                                        } else {
-                                                            "RUNNING"
-                                                        }
-                                                    ))
-                                                    .color(if machine.halted { RED } else { GREEN })
-                                                    .font(FontId::new(16.0, FontFamily::Monospace))
-                                                    .strong()
-                                                    .append_to(
-                                                        &mut state_val,
-                                                        ui.style(),
-                                                        egui::FontSelection::Default,
-                                                        egui::Align::Center,
+                                                        .strong(),
                                                     );
-                                                    ui.label(state);
-                                                    ui.label(state_val);
                                                     ui.end_row();
 
                                                     // Timing Stats
@@ -420,137 +407,105 @@ impl Gui {
                                                     ui.monospace("Registers: ");
                                                     ui.vertical(|ui| {
                                                         // AF.
-                                                        let mut af = LayoutJob::default();
-                                                        RichText::new("AF ")
-                                                            .color(WHITE)
-                                                            .font(FontId::new(
-                                                                12.0,
-                                                                FontFamily::Monospace,
-                                                            ))
-                                                            .strong()
-                                                            .append_to(
-                                                                &mut af,
-                                                                ui.style(),
-                                                                egui::FontSelection::Default,
-                                                                egui::Align::Center,
+                                                        ui.horizontal(|ui| {
+                                                            ui.label(
+                                                                RichText::new("AF ")
+                                                                    .color(WHITE)
+                                                                    .font(FontId::new(
+                                                                        12.0,
+                                                                        FontFamily::Monospace,
+                                                                    ))
+                                                                    .strong(),
                                                             );
-                                                        RichText::new(format!(
-                                                            "{:02x} {:02x}",
-                                                            machine.registers.a,
-                                                            machine.registers.f
-                                                        ))
-                                                        .color(MAGENTA)
-                                                        .font(FontId::new(
-                                                            12.0,
-                                                            FontFamily::Monospace,
-                                                        ))
-                                                        .strong()
-                                                        .append_to(
-                                                            &mut af,
-                                                            ui.style(),
-                                                            egui::FontSelection::Default,
-                                                            egui::Align::Center,
-                                                        );
-                                                        ui.label(af);
+                                                            ui.label(
+                                                                RichText::new(format!(
+                                                                    "{:02x} {:02x}",
+                                                                    machine.registers.a,
+                                                                    machine.registers.f
+                                                                ))
+                                                                .color(MAGENTA)
+                                                                .font(FontId::new(
+                                                                    12.0,
+                                                                    FontFamily::Monospace,
+                                                                ))
+                                                                .strong(),
+                                                            );
+                                                        });
                                                         // BC.
-                                                        let mut bc = LayoutJob::default();
-                                                        RichText::new("BC ")
-                                                            .color(WHITE)
-                                                            .font(FontId::new(
-                                                                12.0,
-                                                                FontFamily::Monospace,
-                                                            ))
-                                                            .strong()
-                                                            .append_to(
-                                                                &mut bc,
-                                                                ui.style(),
-                                                                egui::FontSelection::Default,
-                                                                egui::Align::Center,
+                                                        ui.horizontal(|ui| {
+                                                            ui.label(
+                                                                RichText::new("BC ")
+                                                                    .color(WHITE)
+                                                                    .font(FontId::new(
+                                                                        12.0,
+                                                                        FontFamily::Monospace,
+                                                                    ))
+                                                                    .strong(),
                                                             );
-                                                        RichText::new(format!(
-                                                            "{:02x} {:02x}",
-                                                            machine.registers.b,
-                                                            machine.registers.c
-                                                        ))
-                                                        .color(MAGENTA)
-                                                        .font(FontId::new(
-                                                            12.0,
-                                                            FontFamily::Monospace,
-                                                        ))
-                                                        .strong()
-                                                        .append_to(
-                                                            &mut bc,
-                                                            ui.style(),
-                                                            egui::FontSelection::Default,
-                                                            egui::Align::Center,
-                                                        );
-                                                        ui.label(bc);
+                                                            ui.label(
+                                                                RichText::new(format!(
+                                                                    "{:02x} {:02x}",
+                                                                    machine.registers.b,
+                                                                    machine.registers.c
+                                                                ))
+                                                                .color(MAGENTA)
+                                                                .font(FontId::new(
+                                                                    12.0,
+                                                                    FontFamily::Monospace,
+                                                                ))
+                                                                .strong(),
+                                                            );
+                                                        });
                                                         // DE.
-                                                        let mut de = LayoutJob::default();
-                                                        RichText::new("DE ")
-                                                            .color(WHITE)
-                                                            .font(FontId::new(
-                                                                12.0,
-                                                                FontFamily::Monospace,
-                                                            ))
-                                                            .strong()
-                                                            .append_to(
-                                                                &mut de,
-                                                                ui.style(),
-                                                                egui::FontSelection::Default,
-                                                                egui::Align::Center,
+                                                        ui.horizontal(|ui| {
+                                                            ui.label(
+                                                                RichText::new("DE ")
+                                                                    .color(WHITE)
+                                                                    .font(FontId::new(
+                                                                        12.0,
+                                                                        FontFamily::Monospace,
+                                                                    ))
+                                                                    .strong(),
                                                             );
-                                                        RichText::new(format!(
-                                                            "{:02x} {:02x}",
-                                                            machine.registers.d,
-                                                            machine.registers.e
-                                                        ))
-                                                        .color(MAGENTA)
-                                                        .font(FontId::new(
-                                                            12.0,
-                                                            FontFamily::Monospace,
-                                                        ))
-                                                        .strong()
-                                                        .append_to(
-                                                            &mut de,
-                                                            ui.style(),
-                                                            egui::FontSelection::Default,
-                                                            egui::Align::Center,
-                                                        );
-                                                        ui.label(de);
+                                                            ui.label(
+                                                                RichText::new(format!(
+                                                                    "{:02x} {:02x}",
+                                                                    machine.registers.d,
+                                                                    machine.registers.e
+                                                                ))
+                                                                .color(MAGENTA)
+                                                                .font(FontId::new(
+                                                                    12.0,
+                                                                    FontFamily::Monospace,
+                                                                ))
+                                                                .strong(),
+                                                            );
+                                                        });
                                                         // HL.
-                                                        let mut hl = LayoutJob::default();
-                                                        RichText::new("HL ")
-                                                            .color(WHITE)
-                                                            .font(FontId::new(
-                                                                12.0,
-                                                                FontFamily::Monospace,
-                                                            ))
-                                                            .strong()
-                                                            .append_to(
-                                                                &mut hl,
-                                                                ui.style(),
-                                                                egui::FontSelection::Default,
-                                                                egui::Align::Center,
+                                                        ui.horizontal(|ui| {
+                                                            ui.label(
+                                                                RichText::new("HL ")
+                                                                    .color(WHITE)
+                                                                    .font(FontId::new(
+                                                                        12.0,
+                                                                        FontFamily::Monospace,
+                                                                    ))
+                                                                    .strong(),
                                                             );
-                                                        RichText::new(format!(
-                                                            "{:02x} {:02x}",
-                                                            machine.registers.h,
-                                                            machine.registers.l
-                                                        ))
-                                                        .color(MAGENTA)
-                                                        .font(FontId::new(
-                                                            12.0,
-                                                            FontFamily::Monospace,
-                                                        ))
-                                                        .strong()
-                                                        .append_to(
-                                                            &mut hl,
-                                                            ui.style(),
-                                                            egui::FontSelection::Default,
-                                                            egui::Align::Center,
-                                                        );
-                                                        ui.label(hl);
+                                                            ui.label(
+                                                                RichText::new(format!(
+                                                                    "{:02x} {:02x}",
+                                                                    machine.registers.h,
+                                                                    machine.registers.l
+                                                                ))
+                                                                .color(MAGENTA)
+                                                                .font(FontId::new(
+                                                                    12.0,
+                                                                    FontFamily::Monospace,
+                                                                ))
+                                                                .strong(),
+                                                            );
+                                                        });
                                                     });
                                                     ui.end_row();
 
@@ -563,21 +518,18 @@ impl Gui {
                                                     let h = if f & 0x20 != 0 { "H" } else { "_" };
                                                     let c = if f & 0x10 != 0 { "C" } else { "_" };
 
-                                                    let mut flags = LayoutJob::default();
-                                                    RichText::new(format!(
-                                                        "{} {} {} {}",
-                                                        z, n, h, c
-                                                    ))
-                                                    .color(CYAN)
-                                                    .font(FontId::new(12.0, FontFamily::Monospace))
-                                                    .strong()
-                                                    .append_to(
-                                                        &mut flags,
-                                                        ui.style(),
-                                                        egui::FontSelection::Default,
-                                                        egui::Align::Center,
+                                                    ui.label(
+                                                        RichText::new(format!(
+                                                            "{} {} {} {}",
+                                                            z, n, h, c
+                                                        ))
+                                                        .color(CYAN)
+                                                        .font(FontId::new(
+                                                            12.0,
+                                                            FontFamily::Monospace,
+                                                        ))
+                                                        .strong(),
                                                     );
-                                                    ui.label(flags);
 
                                                     let mem = &machine.memory;
 
@@ -639,28 +591,22 @@ impl Gui {
                                     ui,
                                     |ui| {
                                         let mem = &machine.memory;
-                                        let mut joypad = LayoutJob::default();
-                                        RichText::new(&format!(
-                                            "{} {} {} {} {} {} {} {}",
-                                            if mem.joypad.up { "↑" } else { "_" },
-                                            if mem.joypad.down { "↓" } else { "_" },
-                                            if mem.joypad.left { "←" } else { "_" },
-                                            if mem.joypad.right { "→" } else { "_" },
-                                            if mem.joypad.a { "A" } else { "_" },
-                                            if mem.joypad.b { "B" } else { "_" },
-                                            if mem.joypad.start { "S" } else { "_" },
-                                            if mem.joypad.select { "s" } else { "_" }
-                                        ))
-                                        .color(CYAN)
-                                        .font(FontId::new(12.0, FontFamily::Monospace))
-                                        .strong()
-                                        .append_to(
-                                            &mut joypad,
-                                            ui.style(),
-                                            egui::FontSelection::Default,
-                                            egui::Align::Center,
+                                        ui.label(
+                                            RichText::new(&format!(
+                                                "{} {} {} {} {} {} {} {}",
+                                                if mem.joypad.up { "↑" } else { "_" },
+                                                if mem.joypad.down { "↓" } else { "_" },
+                                                if mem.joypad.left { "←" } else { "_" },
+                                                if mem.joypad.right { "→" } else { "_" },
+                                                if mem.joypad.a { "A" } else { "_" },
+                                                if mem.joypad.b { "B" } else { "_" },
+                                                if mem.joypad.start { "S" } else { "_" },
+                                                if mem.joypad.select { "s" } else { "_" }
+                                            ))
+                                            .color(CYAN)
+                                            .font(FontId::new(12.0, FontFamily::Monospace))
+                                            .strong(),
                                         );
-                                        ui.label(joypad);
                                     },
                                 );
 
@@ -764,15 +710,15 @@ impl Gui {
                                                             .auto_shrink([false; 2])
                                                             .show(ui, |ui| {
                                                                 if breakpoints.is_empty() {
-                                                                    let none =
+                                                                    ui.label(
                                                                         RichText::new("-empty-")
                                                                             .color(BLUE)
-                                                                            .monospace();
-                                                                    ui.label(none);
+                                                                            .monospace(),
+                                                                    );
                                                                 } else {
                                                                     for bp in breakpoints {
                                                                         ui.horizontal(|ui| {
-                                                                            let text =
+                                                                            ui.label(
                                                                                 RichText::new(
                                                                                     format!(
                                                                                         "${:04x}",
@@ -780,9 +726,8 @@ impl Gui {
                                                                                     ),
                                                                                 )
                                                                                 .color(RED)
-                                                                                .monospace();
-
-                                                                            ui.label(text);
+                                                                                .monospace(),
+                                                                            );
                                                                             if ui
                                                                                 .small_button("❌")
                                                                                 .on_hover_text(
@@ -859,54 +804,39 @@ impl Gui {
                                                     );
 
                                                     let mut instruction = LayoutJob::default();
-                                                    RichText::new(format!("${:04x} ", addr))
-                                                        .color(
-                                                            if machine
-                                                                .debug
-                                                                .has_breakpoint(addr as u16)
-                                                            {
-                                                                RED
-                                                            } else {
-                                                                GRAY
-                                                            },
-                                                        )
-                                                        .font(FontId::new(
-                                                            12.0,
-                                                            FontFamily::Monospace,
-                                                        ))
-                                                        .strong()
-                                                        .append_to(
-                                                            &mut instruction,
-                                                            ui.style(),
-                                                            egui::FontSelection::Default,
-                                                            egui::Align::Center,
-                                                        );
-                                                    RichText::new(format!(
-                                                        "{:<4} ",
-                                                        i.instruction_str()
-                                                    ))
-                                                    .color(ORANGE)
-                                                    .font(FontId::new(12.0, FontFamily::Monospace))
-                                                    .strong()
-                                                    .append_to(
-                                                        &mut instruction,
-                                                        ui.style(),
-                                                        egui::FontSelection::Default,
-                                                        egui::Align::Center,
+                                                    let font_id = FontId::monospace(12.0);
+
+                                                    let mut append_instr =
+                                                        |text: String, color: Color32| {
+                                                            instruction.append(
+                                                                &text,
+                                                                0.0,
+                                                                egui::TextFormat {
+                                                                    font_id: font_id.clone(),
+                                                                    color,
+                                                                    ..Default::default()
+                                                                },
+                                                            );
+                                                        };
+
+                                                    let addr_color = if machine
+                                                        .debug
+                                                        .has_breakpoint(addr as u16)
+                                                    {
+                                                        RED
+                                                    } else {
+                                                        GRAY
+                                                    };
+                                                    append_instr(
+                                                        format!("${:04x} ", addr),
+                                                        addr_color,
                                                     );
-                                                    RichText::new(format!("{}", i.operand_str()))
-                                                        .color(BLUE)
-                                                        .font(FontId::new(
-                                                            12.0,
-                                                            FontFamily::Monospace,
-                                                        ))
-                                                        .strong()
-                                                        .append_to(
-                                                            &mut instruction,
-                                                            ui.style(),
-                                                            egui::FontSelection::Default,
-                                                            egui::Align::Center,
-                                                        );
+                                                    append_instr(
+                                                        format!("{:<4} ", i.instruction_str()),
+                                                        ORANGE,
+                                                    );
+                                                    append_instr(i.operand_str(), BLUE);
+
                                                     let galley =
                                                         ui.painter().layout_job(instruction);
                                                     let (rect, response) = ui.allocate_exact_size(

@@ -1,6 +1,6 @@
 [package]
 name = "playkid"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Toni Sagristà Sellés <me@tonisagrista.com>"]
 description = "Game Boy emulator and debugger written in Rust."
 documentation = "https://tonisagrista.com/projects/playkid"
