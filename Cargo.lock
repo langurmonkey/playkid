@@ -1165,6 +1165,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui-toast"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d70ffb0cc3f04ee54e4ce7a202bbbe2bc10020fa9287d10812cda8c92b033f2"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "egui-wgpu"
 version = "0.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1635,7 +1644,7 @@ dependencies = [
  "vec_map",
  "wasm-bindgen",
  "web-sys",
- "windows 0.58.0",
+ "windows 0.61.3",
 ]
 
 [[package]]
@@ -2964,6 +2973,7 @@ dependencies = [
  "colored",
  "eframe",
  "egui",
+ "egui-toast",
  "env_logger",
  "error-iter",
  "gilrs",

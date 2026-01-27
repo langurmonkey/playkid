@@ -76,22 +76,23 @@ Here are the Joypad keyboard mappings:
 - <kbd>a</kbd> - A button
 - <kbd>b</kbd> - B button
 
-The keyboard is clumsy for playing Game Boy games, so you can use any game controller. Controllers are detected when hot-plugged.
+The keyboard is clumsy for playing Game Boy games, so you can use any game controller. Controllers are detected when hot-plugged. Use <kbd>LB</kbd> and <kbd>RB</kbd> to cycle through different palettes.
 
 Additionally, there are some more actions available:
 
-- <kbd>p</kbd> - change the palette colors
+- <kbd>p</kbd> - cycle the palette colors
 - <kbd>w</kbd> - trigger the SRAM save operation to `.sav` file.
-- <kbd>f</kbd> - toggle FPS monitor
 - <kbd>s</kbd> - save a screenshot, with name `screenshot_[time].jpg`
-- <kbd>d</kbd> - enter debug mode
+- <kbd>d</kbd> - toggle debug panel
+- <kbd>f</kbd> - toggle FPS monitor
+- <kbd>r</kbd> - reset the CPU
 - <kbd>Esc</kbd> - exit the emulator
 
 You can also use the provided UI.
 
 # Debug panel
 
-You can open the debug panel any time by pressing <kbd>d</kbd>, by clikcing on `Machine` > `Debug panel...`, or activate it at launch with the `-d`/`--debug` flag. The debug panel shows up in a translucent window. It provides a view of the internal state of the emulator, with:
+You can open the debug panel any time by pressing <kbd>d</kbd>, by clikcing on `Machine` > `Debug panel...`, or activate it at launch with the `-d`/`--debug` flag. The debug panel shows up to the right. It provides a view of the internal state of the emulator, with:
 
 - Current address, instruction, operands, and opcode, to the top.
 - Internal state of CPU, PPU, and JOYP, to the left.
@@ -99,7 +100,7 @@ You can open the debug panel any time by pressing <kbd>d</kbd>, by clikcing on `
 - Breakpoints.
 
 <p align="center">
-  <img src="img/debug-mode.avif" />
+  <img src="img/debug-mode-3.avif" />
 </p>
 
 You can use the provided UI controls to work with debug mode. You can also use the keyboard. These are the key bindings:
@@ -107,9 +108,7 @@ You can use the provided UI controls to work with debug mode. You can also use t
 - <kbd>F6</kbd> - step a single instruction
 - <kbd>F7</kbd> - step a scanline
 - <kbd>F9</kbd> - continue execution until breakpoint (if paused), or pause execution (if running)
-- <kbd>r</kbd> - reset the CPU
 - <kbd>d</kbd> - exit debug mode and go back to normal full-speed emulation
-- <kbd>Esc</kbd> - exit the emulator
 
 You can also use breakpoints. A list with the current breakpoint addresses is provided at the bottom. To create a breakpoint, either **click on the address** in the disassembly panel, or enter it (in `$abcd` format) into the text field and click <kbd>+</kbd>. Remove a breakpoint by clicking the <kbd>×</kbd> in the breakpoints list. Clear all current breakpoints with <kbd>Clear all</kbd>.
 
@@ -138,13 +137,13 @@ Options:
 
 # SDL2 version
 
-Play Kid started as an SDL2 application, but it was moved to a pure Rust tech stack using `pixels`, `winit`, `egui`, and `rodio`. This makes it much easier to build for different targets (including WASM!). Additionally, the SDL2 version contains a minimalist homegrown UI library that I'm particularly proud about, but it can't hold a candle to `egui`. It looks like this:
+Play Kid started as an SDL2 application, but it was moved to a pure Rust tech stack using `winit`, `egui`, `rodio`, and `gilrs`. This makes it much easier to build for different targets (including WASM!). Additionally, the SDL2 version contains a minimalist homegrown UI library that I'm particularly proud about, but it can't hold a candle to `egui` in terms of functionality. It looks like this:
 
 <p align="center">
   <img src="img/debug-mode-sdl2.avif" />
 </p>
 
-The SDL2 version is forever tagged `playkid-sdl2` ([playkid-sdl2@codeberg](https://codeberg.org/langurmonkey/playkid/src/tag/playkid-sdl2), [playkid-sdl2@github](https://github.com/langurmonkey/playkid/tree/playkid-sdl2)).
+The SDL2 version is tagged `playkid-sdl2` ([playkid-sdl2@codeberg](https://codeberg.org/langurmonkey/playkid/src/tag/playkid-sdl2), [playkid-sdl2@github](https://github.com/langurmonkey/playkid/tree/playkid-sdl2)).
 
 # Useful links
 

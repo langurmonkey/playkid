@@ -57,24 +57,26 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: strip target/${{ matrix.target }}/release/${{ matrix.bin }}
 
-      - name: Package Binaries (Unix)
-        if: matrix.os != 'windows-latest'
+      - name: Get version
+        id: version
         run: |
-          # Move to the target directory for the specific architecture
-          cd target/${{ matrix.target }}/release
-          tar -czf ../../../${{ matrix.asset_name }} ${{ matrix.bin }}
+          echo "VERSION=$(cargo metadata --no-deps --format-version=1 \
+            | jq -r '.packages[0].version')" >> $GITHUB_ENV
 
-      - name: Package Binaries (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Package Binaries
         run: |
           cd target/${{ matrix.target }}/release
-          7z a ../../../${{ matrix.asset_name }} ${{ matrix.bin }}
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then 
+            7z a ../../../${{ matrix.asset_name%.* }}-${{ env.VERSION }}.zip ${{ matrix.bin }}; 
+          else 
+            tar -czf ../../../${{ matrix.asset_name%.* }}-${{ env.VERSION }}.tar.gz ${{ matrix.bin }}; 
+          fi
 
       - name: Upload temporary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.asset_name }}
+          name: ${{ matrix.artifact_name }}-${{ env.VERSION }}
+          path: ${{ matrix.asset_name%.* }}-${{ env.VERSION }}.*
           retention-days: 1
           
   release:
@@ -93,7 +95,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release-files/*
-          # This generates release notes automatically
           generate_release_notes: true 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

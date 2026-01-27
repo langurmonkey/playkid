@@ -126,11 +126,16 @@ impl PlayKid {
             // Reset.
             if i.key_pressed(egui::Key::R) {
                 self.machine.reset();
+                self.gui.add_info_toast("CPU reset");
                 handled = true;
             }
             // Palette change.
             if !handled && i.key_pressed(egui::Key::P) {
                 self.machine.memory.ppu.cycle_palette();
+                self.gui.add_info_toast(&format!(
+                    "Palette changed to {}",
+                    self.machine.memory.ppu.get_palette_name()
+                ));
                 handled = true;
             }
             // FPS.
@@ -143,6 +148,10 @@ impl PlayKid {
                 if self.machine.memory.cart.is_dirty() {
                     self.machine.memory.cart.save_sram();
                     self.machine.memory.cart.consume_dirty();
+                    self.gui.add_info_toast(&format!(
+                        "SRAM file written: {:?}",
+                        self.machine.memory.cart.get_sram_path()
+                    ));
                 }
                 handled = true;
             }
@@ -164,6 +173,8 @@ impl PlayKid {
         let fb = &self.machine.memory.ppu.fb_front;
         if let Ok(name) = save_screenshot(DISPLAY_WIDTH, DISPLAY_HEIGHT, fb) {
             println!("Screenshot saved: {}", name);
+            self.gui
+                .add_info_toast(&format!("Screenshot saved: {}", name));
         }
     }
 
@@ -181,6 +192,8 @@ impl PlayKid {
                         gamepad.vendor_id().unwrap_or(0),
                         gamepad.product_id().unwrap_or(0)
                     );
+                    self.gui
+                        .add_info_toast(&format!("Gamepad connected: {}", gamepad.name()));
                     true
                 }
                 EventType::Disconnected => {
@@ -192,8 +205,29 @@ impl PlayKid {
                         gamepad.vendor_id().unwrap_or(0),
                         gamepad.product_id().unwrap_or(0)
                     );
+                    self.gui
+                        .add_info_toast(&format!("Gamepad disconnected: {}", gamepad.name()));
                     true
                 }
+                EventType::ButtonReleased(button, _) => match button {
+                    gilrs::Button::LeftTrigger => {
+                        self.machine.memory.ppu.cycle_palette_rev();
+                        self.gui.add_info_toast(&format!(
+                            "Palette changed to {}",
+                            self.machine.memory.ppu.get_palette_name()
+                        ));
+                        true
+                    }
+                    gilrs::Button::RightTrigger => {
+                        self.machine.memory.ppu.cycle_palette();
+                        self.gui.add_info_toast(&format!(
+                            "Palette changed to {}",
+                            self.machine.memory.ppu.get_palette_name()
+                        ));
+                        true
+                    }
+                    _ => false,
+                },
                 _ => false,
             };
             if !handled {

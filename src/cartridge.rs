@@ -325,10 +325,13 @@ impl Cartridge {
         }
     }
 
+    pub fn get_sram_path(&self) -> std::path::PathBuf {
+        Path::new(&self.rom).with_extension("sav")
+    }
+
     /// Save SRAM of current cartridge to `.sav` file.
     pub fn save_sram(&self) {
-        let rom_path = &self.rom;
-        let save_path = Path::new(rom_path).with_extension("sav");
+        let save_path = self.get_sram_path();
 
         // Only save if the mapper actually has RAM.
         let ram_data = match &self.cart_type {
@@ -352,8 +355,7 @@ impl Cartridge {
 
     /// Load `.sav` file into SRAM.
     pub fn load_sram(&mut self) {
-        let rom_path = &self.rom;
-        let save_path = Path::new(rom_path).with_extension("sav");
+        let save_path = self.get_sram_path();
 
         if !save_path.exists() {
             return;

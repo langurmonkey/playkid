@@ -3,9 +3,10 @@ use crate::instruction::RunInstr;
 use crate::machine::Machine;
 use crate::uistate::UIState;
 use egui::{
-    CollapsingHeader, Color32, Context, FontFamily, FontId, Frame, RichText, ScrollArea, Sense,
-    TextEdit, text::LayoutJob, vec2,
+    Align2, CollapsingHeader, Color32, Context, FontFamily, FontId, Frame, RichText, ScrollArea,
+    Sense, TextEdit, text::LayoutJob, vec2,
 };
+use egui_toast::{Toast, Toasts};
 
 pub const BLUE: Color32 = Color32::from_rgb(66, 133, 244);
 pub const GRAY: Color32 = Color32::from_rgb(127, 127, 127);
@@ -48,6 +49,8 @@ pub struct Gui {
     logo_texture: Option<egui::TextureHandle>,
     /// Last PC.
     last_pc: u16,
+    /// Toasts (notifications).
+    toasts: Toasts,
 }
 
 impl Gui {
@@ -67,7 +70,27 @@ impl Gui {
             breakpoint_error: false,
             logo_texture: None,
             last_pc: 0,
+            toasts: Toasts::new().anchor(Align2::LEFT_TOP, (10.0, 30.0)),
         }
+    }
+
+    /// Adds an information toast with the given text.
+    pub fn add_info_toast(&mut self, text: &str) {
+        let t = egui_toast::Toast {
+            text: text.into(),
+            kind: egui_toast::ToastKind::Info,
+            options: egui_toast::ToastOptions::default()
+                .duration_in_seconds(3.0)
+                .show_progress(true)
+                .show_icon(true),
+            ..Default::default()
+        };
+        self.add_toast(t);
+    }
+
+    /// Adds the given toast.
+    pub fn add_toast(&mut self, toast: Toast) {
+        self.toasts.add(toast);
     }
 
     /// Toggle state of FPS.
@@ -98,6 +121,9 @@ impl Gui {
                 .is_some_and(|l| {
                     l.order == egui::Order::Foreground || l.order == egui::Order::Tooltip
                 });
+
+        // Toasts.
+        self.toasts.show(ctx);
 
         // Update Timer (5s).
         if mouse_moved || mouse_at_top || menu_in_use {
@@ -373,11 +399,14 @@ impl Gui {
                                                             .strong(),
                                                     );
                                                     ui.label(
-                                                        RichText::new((if machine.halted {
+                                                        RichText::new(
+                                                            (if machine.halted {
                                                                 "HALTED"
                                                             } else {
                                                                 "RUNNING"
-                                                            }).to_string())
+                                                            })
+                                                            .to_string(),
+                                                        )
                                                         .color(if machine.halted {
                                                             RED
                                                         } else {
@@ -696,7 +725,8 @@ impl Gui {
                                                         ui.label("Active:");
                                                         let breakpoints: Vec<u16> = machine
                                                             .debug
-                                                            .get_breakpoints_vec().to_vec();
+                                                            .get_breakpoints_vec()
+                                                            .to_vec();
                                                         ScrollArea::vertical()
                                                             .id_salt("bp_list")
                                                             .max_height(100.0)

@@ -861,9 +861,13 @@ impl Ppu {
         self.lcdc7
     }
 
-    /// Set the palette for rendering.
+    /// Cycles through the palettes in direct order.
     pub fn cycle_palette(&mut self) {
         self.set_palette((self.current_palette + 1) % PALETTES.len() as u8);
+    }
+    /// Cycles through the palettes in reverse order.
+    pub fn cycle_palette_rev(&mut self) {
+        self.set_palette((self.current_palette + PALETTES.len() as u8 - 1) % PALETTES.len() as u8);
     }
 
     /// Set the palette index.
@@ -880,6 +884,11 @@ impl Ppu {
     /// Get the current palette index.
     pub fn get_palette_index(&self) -> u8 {
         self.current_palette
+    }
+
+    /// Get the name of the current palette in use.
+    pub fn get_palette_name(&self) -> &str {
+        PALETTE_NAMES[self.current_palette as usize]
     }
 }
 
