@@ -854,7 +854,7 @@ impl Instruction {
 }
 
 impl fmt::Display for Instruction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Instruction::NOP() => write!(f, "{}", op("NOP")),
             Instruction::STOP() => write!(f, "{}", op("STOP")),
@@ -1125,7 +1125,7 @@ impl RunInstr {
 }
 
 impl fmt::Display for RunInstr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.data {
             OperandData::Op8(u8) => {
                 write!(f, "{}   {:#04x}", self.instr, u8)

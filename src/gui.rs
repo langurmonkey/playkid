@@ -3,13 +3,9 @@ use crate::instruction::RunInstr;
 use crate::machine::Machine;
 use crate::uistate::UIState;
 use egui::{
-    ClippedPrimitive, CollapsingHeader, Color32, Context, FontFamily, FontId, Frame, RichText,
-    ScrollArea, Sense, TextEdit, TexturesDelta, ViewportId, text::LayoutJob, vec2,
+    CollapsingHeader, Color32, Context, FontFamily, FontId, Frame, RichText, ScrollArea, Sense,
+    TextEdit, text::LayoutJob, vec2,
 };
-use egui_wgpu::{Renderer, ScreenDescriptor};
-use pixels::{PixelsContext, wgpu};
-use winit::event_loop::EventLoopWindowTarget;
-use winit::window::Window;
 
 pub const BLUE: Color32 = Color32::from_rgb(66, 133, 244);
 pub const GRAY: Color32 = Color32::from_rgb(127, 127, 127);
@@ -22,22 +18,9 @@ pub const RED: Color32 = Color32::from_rgb(219, 68, 55);
 pub const YELLOW: Color32 = Color32::from_rgb(60, 52, 0);
 pub const ORANGE: Color32 = Color32::from_rgb(255, 132, 0);
 
-/// Manages all state required for rendering egui over `Pixels`.
-pub(crate) struct Framework {
-    // State for egui.
-    pub egui_ctx: Context,
-    egui_state: egui_winit::State,
-    screen_descriptor: ScreenDescriptor,
-    renderer: Renderer,
-    paint_jobs: Vec<ClippedPrimitive>,
-    textures: TexturesDelta,
-    first_run_done: bool,
-
-    // State for the GUI
-    pub gui: Gui,
-}
-
-/// Example application state. A real application will need a lot more state than this.
+/// # GUI
+/// The main GUI of Play Kid. Contains a menu bar, the 'About' window,
+/// the FPS counter, and the debug panel.
 pub struct Gui {
     /// Show about window.
     show_about: bool,
@@ -45,6 +28,12 @@ pub struct Gui {
     pub show_debugger: bool,
     /// Show FPS.
     show_fps: bool,
+    /// The FPS timer.
+    fps_timer: f32,
+    /// The current FPS value.
+    current_fps: f32,
+    /// Frame count.
+    frame_count: f32,
     /// The menu timer.
     menu_timer: f32,
     /// Last mouse position.
@@ -61,150 +50,16 @@ pub struct Gui {
     last_pc: u16,
 }
 
-impl Framework {
-    /// Create egui.
-    pub(crate) fn new<T>(
-        event_loop: &EventLoopWindowTarget<T>,
-        width: u32,
-        height: u32,
-        scale_factor: f32,
-        pixels: &pixels::Pixels,
-        fps: bool,
-        debug: bool,
-    ) -> Self {
-        let max_texture_size = pixels.device().limits().max_texture_dimension_2d as usize;
-
-        let egui_ctx = Context::default();
-        let egui_state = egui_winit::State::new(
-            egui_ctx.clone(),
-            ViewportId::ROOT,
-            event_loop,
-            Some(scale_factor),
-            Some(max_texture_size),
-        );
-        let screen_descriptor = ScreenDescriptor {
-            size_in_pixels: [width, height],
-            pixels_per_point: scale_factor,
-        };
-        let renderer = Renderer::new(pixels.device(), pixels.render_texture_format(), None, 1);
-        let textures = TexturesDelta::default();
-        let gui = Gui::new(debug, fps);
-        // Warm up the context.
-        let _ = egui_ctx.run(egui::RawInput::default(), |_| {});
-
-        Self {
-            egui_ctx,
-            egui_state,
-            screen_descriptor,
-            renderer,
-            paint_jobs: Vec::new(),
-            textures,
-            first_run_done: false,
-            gui,
-        }
-    }
-
-    /// Handle input events from the window manager.
-    pub(crate) fn handle_event(&mut self, window: &Window, event: &winit::event::WindowEvent) {
-        let _ = self.egui_state.on_window_event(window, event);
-    }
-
-    /// Resize egui.
-    pub(crate) fn resize(&mut self, width: u32, height: u32) {
-        if width > 0 && height > 0 {
-            self.screen_descriptor.size_in_pixels = [width, height];
-        }
-    }
-
-    /// Update scaling factor.
-    pub(crate) fn scale_factor(&mut self, scale_factor: f64) {
-        self.screen_descriptor.pixels_per_point = scale_factor as f32;
-    }
-
-    /// Prepare egui.
-    pub(crate) fn prepare(&mut self, window: &Window, machine: &mut Machine) {
-        // Run the egui frame and create all paint jobs to prepare for rendering.
-        let raw_input = self.egui_state.take_egui_input(window);
-
-        let output = self.egui_ctx.run(raw_input, |egui_ctx| {
-            self.gui.ui(egui_ctx, machine);
-        });
-
-        self.textures.append(output.textures_delta);
-        self.egui_state
-            .handle_platform_output(window, output.platform_output);
-
-        // Only tessellate if we have a valid frame state.
-        self.paint_jobs = self
-            .egui_ctx
-            .tessellate(output.shapes, self.screen_descriptor.pixels_per_point);
-
-        // Mark that we've successfully completed a real pass.
-        self.first_run_done = true;
-    }
-
-    /// Render egui.
-    pub(crate) fn render(
-        &mut self,
-        encoder: &mut wgpu::CommandEncoder,
-        render_target: &wgpu::TextureView,
-        context: &PixelsContext,
-    ) {
-        // If prepare() hasn't been called yet, paint_jobs will be empty.
-        // We should only render if we have something to show.
-        if !self.first_run_done || self.paint_jobs.is_empty() {
-            return;
-        }
-
-        // Upload all resources to the GPU.
-        for (id, image_delta) in &self.textures.set {
-            self.renderer
-                .update_texture(&context.device, &context.queue, *id, image_delta);
-        }
-        self.renderer.update_buffers(
-            &context.device,
-            &context.queue,
-            encoder,
-            &self.paint_jobs,
-            &self.screen_descriptor,
-        );
-
-        // Render egui with WGPU
-        {
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("egui"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: render_target,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            self.renderer
-                .render(&mut rpass, &self.paint_jobs, &self.screen_descriptor);
-        }
-
-        // Cleanup
-        let textures = std::mem::take(&mut self.textures);
-        for id in &textures.free {
-            self.renderer.free_texture(id);
-        }
-    }
-}
-
 impl Gui {
     /// Create a `Gui`.
-    fn new(show_debugger: bool, show_fps: bool) -> Self {
+    pub fn new(show_debugger: bool, show_fps: bool) -> Self {
         Self {
             show_about: false,
             show_debugger,
             show_fps,
+            fps_timer: 0.0,
+            current_fps: 100.0,
+            frame_count: 0.0,
             menu_timer: 0.0,
             last_mouse_pos: None,
             ui_state: UIState::new(),
@@ -225,7 +80,7 @@ impl Gui {
     }
 
     /// Create the UI using egui.
-    fn ui(&mut self, ctx: &Context, machine: &mut Machine) {
+    pub fn ui(&mut self, ctx: &Context, machine: &mut Machine) {
         let mouse_pos = ctx.input(|i| i.pointer.hover_pos());
         let dt = ctx.input(|i| i.stable_dt);
 
@@ -254,15 +109,15 @@ impl Gui {
 
         if self.menu_timer > 0.0 {
             egui::TopBottomPanel::top("menubar_container").show(ctx, |ui| {
-                egui::menu::bar(ui, |ui| {
+                egui::MenuBar::new().ui(ui, |ui| {
                     ui.menu_button("File", |ui| {
                         if ui.button("About...").clicked() {
                             self.show_about = true;
-                            ui.close_menu();
+                            ui.close();
                         };
                         if ui.button("Quit").clicked() {
                             self.ui_state.exit_requested = true;
-                            ui.close_menu();
+                            ui.close();
                         }
                     });
                     ui.menu_button("Graphics", |ui| {
@@ -278,20 +133,20 @@ impl Gui {
                         });
                         if ui.button("Save screenshot").clicked() {
                             self.ui_state.screenshot_requested = true;
-                            ui.close_menu();
+                            ui.close();
                         }
                     });
                     ui.menu_button("Machine", |ui| {
                         if ui.button("Reset CPU").clicked() {
                             machine.reset();
-                            ui.close_menu();
+                            ui.close();
                         }
                         if ui.button("Debug panel...").clicked() {
                             self.show_debugger = true;
-                            ui.close_menu();
+                            ui.close();
                         };
                         if ui.checkbox(&mut self.show_fps, "Show FPS").clicked() {
-                            ui.close_menu();
+                            ui.close();
                         }
                     })
                 });
@@ -340,15 +195,13 @@ impl Gui {
 
         // Debugger.
         if self.show_debugger {
-            egui::Window::new("🐛 Debug Panel")
-                .default_width(400.0)
+            egui::SidePanel::right("🐛 Debug Panel")
+                .default_width(300.0)
                 .resizable(false)
-                .collapsible(true)
                 .frame(
                     egui::Frame::window(&ctx.style())
                         .fill(egui::Color32::from_rgba_unmultiplied(40, 40, 40, 253)),
                 )
-                .open(&mut self.show_debugger)
                 .show(ctx, |ui| {
                     let pc = machine.registers.pc;
                     let opcode = machine.memory.read8(pc);
@@ -893,7 +746,7 @@ impl Gui {
                                             ui.separator();
 
                                             // Scrollable list of breakpoints.
-                                            Frame::none().fill(DARKGRAY).inner_margin(4.0).show(
+                                            Frame::NONE.fill(DARKGRAY).inner_margin(4.0).show(
                                                 ui,
                                                 |ui| {
                                                     ui.vertical(|ui| {
@@ -905,7 +758,7 @@ impl Gui {
                                                             .cloned()
                                                             .collect();
                                                         ScrollArea::vertical()
-                                                            .id_source("bp_list")
+                                                            .id_salt("bp_list")
                                                             .max_height(100.0)
                                                             .min_scrolled_width(200.0)
                                                             .auto_shrink([false; 2])
@@ -970,9 +823,9 @@ impl Gui {
                                 let pc_moved = current_pc != self.last_pc;
 
                                 // Use frame to make the background dark.
-                                Frame::none()
+                                Frame::NONE
                                     .fill(DARKGRAY)
-                                    .rounding(8.0)
+                                    .corner_radius(8.0)
                                     .inner_margin(5.0)
                                     .show(ui, |ui| {
                                         let mut scroll_area =
@@ -1055,7 +908,7 @@ impl Gui {
                                                             egui::Align::Center,
                                                         );
                                                     let galley =
-                                                        ui.fonts(|f| f.layout_job(instruction));
+                                                        ui.painter().layout_job(instruction);
                                                     let (rect, response) = ui.allocate_exact_size(
                                                         vec2(ui.available_width(), row_height),
                                                         Sense::click(),
@@ -1090,19 +943,29 @@ impl Gui {
                 });
         }
 
+        self.frame_count += 1.0;
         if self.show_fps {
+            // Update FPS logic so that it only updates every second.
+            let dt = ctx.input(|i| i.stable_dt);
+            self.fps_timer += dt;
+
+            if self.fps_timer >= 1.0 {
+                // Compute average FPS value.
+                self.current_fps = self.frame_count / self.fps_timer;
+                self.fps_timer = 0.0;
+                self.frame_count = 0.0;
+            }
             // Area allows us to place things freely on the screen.
             egui::Area::new(egui::Id::new("fps_counter"))
-                .anchor(egui::Align2::LEFT_TOP, egui::vec2(10.0, 10.0))
+                .anchor(egui::Align2::LEFT_TOP, egui::vec2(10.0, 25.0))
                 .show(ctx, |ui| {
-                    egui::Frame::none()
+                    egui::Frame::NONE
                         .fill(egui::Color32::from_black_alpha(150))
-                        .rounding(2.0)
+                        .corner_radius(2.0)
                         .inner_margin(5.0)
                         .show(ui, |ui| {
                             // Get FPS from context.
-                            let fps_text =
-                                format!("FPS: {:.1}", ctx.input(|i| i.unstable_dt.recip()));
+                            let fps_text = format!("FPS: {:.1}", self.current_fps);
                             ui.label(
                                 egui::RichText::new(fps_text)
                                     .color(egui::Color32::RED)

@@ -1,5 +1,5 @@
-use winit_input_helper::WinitInputHelper;
+use egui::InputState;
 /// Event handler trait.
 pub trait EventHandler {
-    fn handle_event(&mut self, event: &WinitInputHelper) -> bool;
+    fn handle_event(&mut self, i: &InputState) -> bool;
 }

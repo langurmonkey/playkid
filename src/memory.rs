@@ -7,7 +7,7 @@ use crate::timer::Timer;
 
 /// # Memory
 /// The Game Boy uses a 2-byte address space (0x0000 to 0xFFFF) to map the different
-/// types of memory (RAM, VRAM, Cartridge memory, etc.)
+/// types of memory (RAM, VRAM, [Cartridge] memory, etc.)
 
 /// ## Memory map
 /// 0x0000-0x3FFF: 16 KiB bank #0                 (cartridge)
@@ -22,7 +22,7 @@ use crate::timer::Timer;
 /// 0xFF4C-0xFF7F: Empty (?)
 /// 0xFF80-0xFFFE: High RAM                       (HRAM)
 /// 0xFF80-0xFFFF: Interrupt Enable Register      (IER)
-pub struct Memory<'a> {
+pub struct Memory {
     /// Work RAM.
     pub wram: [u8; constants::WRAM_SIZE],
     // High RAM.
@@ -34,7 +34,7 @@ pub struct Memory<'a> {
     // IE flag: interrupt enable.
     pub ie: u8,
     // Cartridge reference.
-    pub cart: &'a mut Cartridge,
+    pub cart: Cartridge,
     /// The PPU, Picture Processing Unit.
     pub ppu: PPU,
     /// The timer.
@@ -45,9 +45,9 @@ pub struct Memory<'a> {
     pub apu: APU,
 }
 
-impl<'a> Memory<'a> {
+impl Memory {
     /// Create a new memory instance.
-    pub fn new(cart: &'a mut Cartridge) -> Self {
+    pub fn new(cart: Cartridge) -> Self {
         Memory {
             wram: [0; constants::WRAM_SIZE],
             hram: [0; constants::HRAM_SIZE],

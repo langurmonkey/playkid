@@ -1,5 +1,7 @@
 use rodio::{OutputStream, Sink, buffer::SamplesBuffer};
 
+/// # APU
+/// The Audio Processing Unit, which manages the sound system.
 pub struct APU {
     /// APU Registers 0xFF10-0xFF3F.
     regs: [u8; 0x30],
@@ -78,7 +80,7 @@ impl APU {
         // Initialize Rodio.
         let stream_handle =
             rodio::OutputStreamBuilder::open_default_stream().expect("open default audio stream");
-        let sink = rodio::Sink::connect_new(&stream_handle.mixer());
+        let sink = rodio::Sink::connect_new(stream_handle.mixer());
 
         Self {
             regs: [0; 0x30],
@@ -669,7 +671,7 @@ impl APU {
 
         // Get 4-bit sample from Wave RAM (32 samples total, 2 per byte)
         let byte = self.wave_ram[self.ch3_sample_idx / 2];
-        let mut sample = if self.ch3_sample_idx % 2 == 0 {
+        let mut sample = if self.ch3_sample_idx.is_multiple_of(2) {
             byte >> 4 // High nibble
         } else {
             byte & 0x0F // Low nibble

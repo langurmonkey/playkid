@@ -10,18 +10,17 @@ use cartridge::Cartridge;
 use instruction::{CC, Instruction, R8, R16, R16EXT, R16LD, RunInstr, TGT3};
 use memory::Memory;
 use registers::Registers;
-use winit_input_helper::WinitInputHelper;
 
 /// # Machine
-/// The machine contains the registers, the memory, and the display, and
-/// controls the execution and CPU state. It also implements the CPU, which
+/// The machine contains the [Registers], the [Memory], and the [Display], and
+/// controls the CPU state. It also implements the CPU itself, which
 /// decodes and executes instructions.
 
-pub struct Machine<'a> {
+pub struct Machine {
     /// The registers.
     pub registers: Registers,
     /// The main memory.
-    pub memory: Memory<'a>,
+    pub memory: Memory,
     /// Interrupt master enable flag.
     ime: bool,
     /// EI operation is delayed by one instruction, so we use this counter.
@@ -40,9 +39,9 @@ pub struct Machine<'a> {
     pub debug: DebugManager,
 }
 
-impl<'a> Machine<'a> {
+impl Machine {
     /// Create a new instance of the Game Boy.
-    pub fn new(cart: &'a mut Cartridge, debug: bool) -> Self {
+    pub fn new(cart: Cartridge, debug: bool) -> Self {
         // UI state object.
         let mut machine = Machine {
             registers: Registers::new(),
@@ -87,7 +86,7 @@ impl<'a> Machine<'a> {
             }
         }
 
-        if self.debug.is_paused() && !self.halted {
+        if self.debug.is_paused() {
             // Debug branch, we skip HALTED state.
             if self.debug.take_step_instruction() {
                 // Step one instruction.
@@ -99,6 +98,8 @@ impl<'a> Machine<'a> {
                     self.machine_cycle();
                 }
             }
+            // Present to get visual feedback when debugging.
+            self.memory.ppu.present();
         } else {
             // Normal full-speed execution.
             let mut cycles_this_frame: usize = 0;
@@ -2561,7 +2562,7 @@ impl<'a> Machine<'a> {
                     2
                 }
                 R8::E => {
-                    self.registers.e = self.registers.e | 0x10;
+                    self.registers.e |= 0x10;
                     2
                 }
                 R8::H => {
@@ -2973,21 +2974,21 @@ impl<'a> Machine<'a> {
     }
 }
 
-impl<'a> eventhandler::EventHandler for Machine<'a> {
+impl eventhandler::EventHandler for Machine {
     /// Polls the events in the queue of the event pump and redirects them to the
     /// interested partners ;).
-    fn handle_event(&mut self, event: &WinitInputHelper) -> bool {
+    fn handle_event(&mut self, i: &egui::InputState) -> bool {
         // Reset cycles.
         let mut handled = false;
 
         // Handle general emulator events.
         if !handled {
-            handled = self.memory.joypad.handle_event(&event);
+            handled = self.memory.joypad.handle_event(i);
         }
 
         // Debug events.
         if !handled {
-            handled = self.debug.handle_event(&event);
+            handled = self.debug.handle_event(i);
         }
 
         handled

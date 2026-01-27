@@ -1,15 +1,16 @@
 use crate::eventhandler;
-use colored::Colorize;
-use gilrs::{Button, Event, EventType, Gilrs};
-use winit::keyboard::KeyCode;
-use winit_input_helper::WinitInputHelper;
+use gilrs::{Button, EventType};
 
+/// # Joypad
+/// This class manages the state of the Joypad of the Game Boy.
+/// Contains the JOYP registers and the state variables for
+/// every button.
 pub struct Joypad {
     /// The P1/JOYP register.
     joyp: u8,
-    /// Bits 0-4 contain the state of SsAB.
+    /// Bit 5 - The state of Start/Select/A/B is in bits 0-3.
     select_buttons: bool,
-    /// Bits 0-4 contain the state of the D-Pad.
+    /// Bit 4 - The state of the D-Pad is in bits 0-3.
     select_dpad: bool,
     /// Start button.
     pub start: bool,
@@ -33,63 +34,75 @@ pub struct Joypad {
     pub i_mask: u8,
     /// Cycle counter,
     cycles: usize,
-    /// Game controller library.
-    gilrs: Gilrs,
 }
 
 impl eventhandler::EventHandler for Joypad {
-    fn handle_event(&mut self, event: &WinitInputHelper) -> bool {
-        if event.key_pressed(KeyCode::ArrowDown) {
+    fn handle_event(&mut self, i: &egui::InputState) -> bool {
+        if i.key_pressed(egui::Key::ArrowDown) {
             self.down = true;
-            true
-        } else if event.key_released(KeyCode::ArrowDown) {
-            self.down = false;
-            true
-        } else if event.key_pressed(KeyCode::ArrowUp) {
-            self.up = true;
-            true
-        } else if event.key_released(KeyCode::ArrowUp) {
-            self.up = false;
-            true
-        } else if event.key_pressed(KeyCode::ArrowRight) {
-            self.right = true;
-            true
-        } else if event.key_released(KeyCode::ArrowRight) {
-            self.right = false;
-            true
-        } else if event.key_pressed(KeyCode::ArrowLeft) {
-            self.left = true;
-            true
-        } else if event.key_released(KeyCode::ArrowLeft) {
-            self.left = false;
-            true
-        } else if event.key_pressed(KeyCode::Enter) {
-            self.start = true;
-            true
-        } else if event.key_released(KeyCode::Enter) {
-            self.start = false;
-            true
-        } else if event.key_pressed(KeyCode::Space) {
-            self.select = true;
-            true
-        } else if event.key_released(KeyCode::Space) {
-            self.select = false;
-            true
-        } else if event.key_pressed(KeyCode::KeyA) {
-            self.a = true;
-            true
-        } else if event.key_released(KeyCode::KeyA) {
-            self.a = false;
-            true
-        } else if event.key_pressed(KeyCode::KeyB) {
-            self.b = true;
-            true
-        } else if event.key_released(KeyCode::KeyB) {
-            self.b = false;
-            true
-        } else {
-            false
+            return true;
         }
+        if i.key_released(egui::Key::ArrowDown) {
+            self.down = false;
+            return true;
+        }
+        if i.key_pressed(egui::Key::ArrowUp) {
+            self.up = true;
+            return true;
+        }
+        if i.key_released(egui::Key::ArrowUp) {
+            self.up = false;
+            return true;
+        }
+        if i.key_pressed(egui::Key::ArrowRight) {
+            self.right = true;
+            return true;
+        }
+        if i.key_released(egui::Key::ArrowRight) {
+            self.right = false;
+            return true;
+        }
+        if i.key_pressed(egui::Key::ArrowLeft) {
+            self.left = true;
+            return true;
+        }
+        if i.key_released(egui::Key::ArrowLeft) {
+            self.left = false;
+            return true;
+        }
+        if i.key_pressed(egui::Key::A) {
+            self.a = true;
+            return true;
+        }
+        if i.key_released(egui::Key::A) {
+            self.a = false;
+            return true;
+        }
+        if i.key_pressed(egui::Key::B) {
+            self.b = true;
+            return true;
+        }
+        if i.key_released(egui::Key::B) {
+            self.b = false;
+            return true;
+        }
+        if i.key_pressed(egui::Key::Enter) {
+            self.start = true;
+            return true;
+        }
+        if i.key_released(egui::Key::Enter) {
+            self.start = false;
+            return true;
+        }
+        if i.key_pressed(egui::Key::Space) {
+            self.select = true;
+            return true;
+        }
+        if i.key_released(egui::Key::Space) {
+            self.select = false;
+            return true;
+        }
+        false
     }
 }
 
@@ -110,19 +123,7 @@ impl Joypad {
             request_interrupt: false,
             i_mask: 0,
             cycles: 0,
-            gilrs: Gilrs::new().unwrap(),
         };
-
-        // Print out detected gamepads.
-        let gamepads = joypad.gilrs.gamepads();
-        gamepads.for_each(move |(gid, g)| {
-            println!(
-                "{}: Gamepad {} detected: {} ",
-                "OK".green(),
-                gid,
-                g.name().to_string().yellow()
-            )
-        });
 
         joypad
     }
@@ -217,49 +218,27 @@ impl Joypad {
     }
 
     /// Main game controller handler.
-    pub fn handle_controller_input(&mut self) {
-        // Examine all events from the controller
-        while let Some(Event { id, event, .. }) = self.gilrs.next_event() {
-            match event {
-                EventType::Connected => {
-                    let gamepad = self.gilrs.gamepad(id);
-                    println!(
-                        "{}: Gamepad connected: {} (VID: {:04x} PID: {:04x})",
-                        "OK".green(),
-                        gamepad.name().yellow(),
-                        gamepad.vendor_id().unwrap_or(0),
-                        gamepad.product_id().unwrap_or(0)
-                    );
+    pub fn handle_controller_input(&mut self, event: EventType) {
+        match event {
+            EventType::ButtonPressed(button, _) => self.update_button(button, true),
+            EventType::ButtonReleased(button, _) => self.update_button(button, false),
+            EventType::AxisChanged(axis, value, _) => {
+                if axis == gilrs::Axis::LeftStickX {
+                    self.left = value < -0.5;
+                    self.right = value > 0.5;
                 }
-                EventType::Disconnected => {
-                    let gamepad = self.gilrs.gamepad(id);
-                    println!(
-                        "{}: Gamepad disconnected: {} (VID: {:04x} PID: {:04x})",
-                        "WARN".yellow(),
-                        gamepad.name().yellow(),
-                        gamepad.vendor_id().unwrap_or(0),
-                        gamepad.product_id().unwrap_or(0)
-                    );
+                if axis == gilrs::Axis::LeftStickY {
+                    self.up = value > 0.5;
+                    self.down = value < -0.5;
                 }
-                EventType::ButtonPressed(button, _) => self.update_button(button, true),
-                EventType::ButtonReleased(button, _) => self.update_button(button, false),
-                EventType::AxisChanged(axis, value, _) => {
-                    if axis == gilrs::Axis::LeftStickX {
-                        self.left = value < -0.5;
-                        self.right = value > 0.5;
-                    }
-                    if axis == gilrs::Axis::LeftStickY {
-                        self.up = value > 0.5;
-                        self.down = value < -0.5;
-                    }
-                }
-                _ => (),
             }
+            _ => (),
         }
     }
 
     /// Game controller button handling.
     fn update_button(&mut self, button: Button, pressed: bool) {
+        println!("Button: {:?} {}", button, pressed);
         match button {
             Button::South | Button::East => self.a = pressed,
             Button::North | Button::West => self.b = pressed,

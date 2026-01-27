@@ -7,7 +7,7 @@ use std::collections::HashMap;
 type SpriteTileKey = (u8, u8, bool, bool);
 
 /// # PPU
-/// The PPU is the picture processing unit of our machine.
+/// The PPU is the Picture Processing Unit of our machine.
 ///
 /// ## Video RAM
 /// The Video RAM, or VRAM, are 8 KiB located in addresses 0x8000 to 0x9FFF.
@@ -406,6 +406,11 @@ impl PPU {
         }
     }
 
+    /// Present the back buffer for rendering.
+    pub fn present(&mut self) {
+        self.fb_front.copy_from_slice(&self.fb_back);
+    }
+
     /// Updates the PPU mode and triggers the necessary actions.
     /// Rendering happens when entering mode 0 (HBlank).
     fn update_mode(&mut self, mode: u8) {
@@ -423,7 +428,7 @@ impl PPU {
             // VBlank.
             1 => {
                 // Frame is done, present it to front.
-                self.fb_front.copy_from_slice(&self.fb_back);
+                self.present();
 
                 self.wly_flag = false;
                 self.wly = 0;

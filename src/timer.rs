@@ -6,7 +6,7 @@ pub struct Timer {
     divider: u16,
     /// Detecting 1->0 edges.
     last_div_bit: bool,
-    /// Timer counter. The most common software interface to the timers. It can be configured
+    /// Timer counter. The commonest software interface to the timers. It can be configured
     /// using TAC to increment at different rates.
     tima: u8,
     /// Modulo. When TIMA overflows, it is reset to the value in here.

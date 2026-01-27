@@ -12,6 +12,8 @@ use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use std::str;
 
+/// # Cartridge type
+/// The type of cartridge, as an enum.
 pub enum CartridgeType {
     RomOnly,
     MBC1(Box<MBC1>),
@@ -19,7 +21,8 @@ pub enum CartridgeType {
     MBC3(Box<MBC3>),
 }
 
-/// A representation of a Game Boy cartridge.
+/// # Cartridge
+/// A representation of a Game Boy cartridge. Has a [CartridgeType].
 /// Checks for logo, header checksum, and detects Memory Bank Controller (MBC) type.
 /// MBC1/2/3 implemented in dedicated files.
 pub struct Cartridge {
@@ -48,17 +51,15 @@ impl Cartridge {
         // In 0x104 - 0x133, with contents in LOGO.
         if !skip_checksum {
             let slice = &data[0x104..0x133];
-            let mut i: usize = 0;
-            for u in slice.iter().cloned() {
+            for (i, u) in slice.iter().cloned().enumerate() {
                 if u != LOGO[i] {
                     return Err(Error::new(
                         ErrorKind::InvalidData,
                         "Incorrect Nintendo logo sequence in 0x104-0x133!",
                     ));
                 }
-                i += 1;
             }
-            println!("{}: {}", "OK".green(), "Logo sequence");
+            println!("{}: Logo sequence", "OK".green());
         }
 
         // Get title.
@@ -71,10 +72,10 @@ impl Cartridge {
         {
             if data[0x143] == 0x80 {
                 // Color GB.
-                println!("{}: {}", "OK".green(), "GB Color cartridge");
+                println!("{}: GB Color cartridge", "OK".green());
             } else {
                 // Not color GB.
-                println!("{}: {}", "OK".green(), "Regular GB cartridge",);
+                println!("{}: DMG Game Boy cartridge", "OK".green());
             }
         }
 
@@ -82,7 +83,7 @@ impl Cartridge {
         {
             let sgbf = data[0x146];
             if sgbf == 0x03 {
-                println!("{}: {}", "OK".green(), "Super Game Boy functions supported",);
+                println!("{}: Super Game Boy functions supported", "OK".green());
             }
         }
 
@@ -174,7 +175,7 @@ impl Cartridge {
                     cs as u16
                 );
             } else {
-                println!("{}: {}: {:#04x}", "OK".green(), "Global checksum", cs as u8);
+                println!("{}: Global checksum: {:#04x}", "OK".green(), cs as u8);
             }
         }
 

@@ -12,21 +12,15 @@ readme = "README.md"
 publish = false
 
 [dependencies]
+eframe = "0.33"
+image = "0.25"
+egui = "0.33"
 clap = { version = "4.5.*", features = ["derive"] }
 clap_derive = { version = "4.0.0-rc.1"}
 env_logger = "0.11.8"
 colored = "2.*"
 rand = "0.9"
 error-iter = "0.4.1"
-egui = "0.26"
-egui-wgpu = "0.26.0"
-egui-winit = { version = "0.26", default-features = false, features = ["links"] }
-pixels = "0.15"
-winit = "0.29"
-winit_input_helper = "0.15"
 log = "0.4.*"
 rodio = "0.21.1"
 gilrs = "0.11.1"
-image = "0.25.9"
-
-

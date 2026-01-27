@@ -1,8 +1,6 @@
 use crate::eventhandler;
 
 use colored::Colorize;
-use winit::keyboard::KeyCode;
-use winit_input_helper::WinitInputHelper;
 
 /// Manage the debug status and debug input events.
 pub struct DebugManager {
@@ -21,14 +19,14 @@ pub struct DebugManager {
 impl eventhandler::EventHandler for DebugManager {
     /// Process keyboard inputs specifically for debugging.
     /// Returns true if the event was handled.
-    fn handle_event(&mut self, event: &WinitInputHelper) -> bool {
-        if event.key_pressed(KeyCode::F6) {
+    fn handle_event(&mut self, i: &egui::InputState) -> bool {
+        if i.key_released(egui::Key::F6) {
             self.request_step_instruction();
             true
-        } else if event.key_released(KeyCode::F7) {
+        } else if i.key_released(egui::Key::F7) {
             self.request_step_scanline();
             true
-        } else if event.key_released(KeyCode::F9) {
+        } else if i.key_released(egui::Key::F9) {
             self.toggle_paused();
             true
         } else {
