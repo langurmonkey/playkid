@@ -1,6 +1,6 @@
 [package]
 name = "playkid"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Toni Sagristà Sellés <me@tonisagrista.com>"]
 description = "Game Boy emulator and debugger written in Rust."
 documentation = "https://tonisagrista.com/projects/playkid"
@@ -25,3 +25,5 @@ log = "0.4.*"
 rodio = "0.21.1"
 gilrs = "0.11.1"
 egui-toast = "0.19.1"
+rfd = "0.17.2"
+pollster = "0.4.0"

@@ -11,6 +11,8 @@ use colored::Colorize;
 use constants::{DISPLAY_HEIGHT, DISPLAY_WIDTH, TARGET_FRAME_DURATION};
 use eframe::egui;
 use gilrs::{Event, EventType, Gilrs};
+use std::path::PathBuf;
+use std::sync::mpsc::{Receiver, channel};
 use std::time::{Duration, Instant};
 
 /// # Play Kid
@@ -19,21 +21,22 @@ use std::time::{Duration, Instant};
 pub struct PlayKid {
     running: bool,
     gui: Gui,
-    machine: Machine,
+    machine: Option<Machine>,
     last_update: Instant,
     // The GPU handle for the Game Boy screen.
     screen_texture: egui::TextureHandle,
     /// Game controller library.
     gilrs: Gilrs,
+    /// CLI args.
+    args: Args,
+    /// MPSC receiver channel for ROM file paths.
+    rx_load: Receiver<Option<PathBuf>>,
 }
 
 #[allow(dead_code)]
 impl PlayKid {
     pub fn new(_cc: &eframe::CreationContext<'_>, args: Args) -> Self {
-        let rom = args.input.as_path().to_str().unwrap();
-        let mut cart = Cartridge::new(rom, args.skipcheck).expect("Error reading ROM file");
-        cart.load_sram();
-
+        let (tx_load, rx_load) = channel();
         // Create LCD texture.
         let texture = _cc.egui_ctx.load_texture(
             "lcd_screen",
@@ -43,8 +46,16 @@ impl PlayKid {
             ),
             egui::TextureOptions::NEAREST,
         );
-        let machine = Machine::new(cart, args.debug);
-        let gui = Gui::new(args.debug, args.fps);
+
+        let mut machine = None;
+
+        if let Some(path) = &args.input {
+            if let Some(m) = Self::create_machine(path, args.skipcheck, args.debug) {
+                machine = Some(m);
+            }
+        }
+
+        let gui = Gui::new(args.debug, args.fps, tx_load);
 
         // Use Gilrs to handle gamepad input.
         let gilrs = Gilrs::new().unwrap();
@@ -65,12 +76,12 @@ impl PlayKid {
             last_update: Instant::now(),
             screen_texture: texture,
             gilrs,
+            args,
+            rx_load,
         }
     }
     pub fn new_wasm(_cc: &eframe::CreationContext<'_>, rom: String) -> Self {
-        let mut cart = Cartridge::new(&rom, false).expect("Error reading ROM file");
-        cart.load_sram();
-
+        let (tx_load, rx_load) = channel();
         let texture = _cc.egui_ctx.load_texture(
             "gb_screen",
             egui::ColorImage::new(
@@ -79,8 +90,11 @@ impl PlayKid {
             ),
             egui::TextureOptions::NEAREST,
         );
-        let machine = Machine::new(cart, false);
-        let gui = Gui::new(false, false);
+        let args = Args::default();
+        // Create machine.
+        let machine =
+            Self::create_machine(&std::path::PathBuf::from(&rom), args.skipcheck, args.debug);
+        let gui = Gui::new(false, false, tx_load);
         Self {
             running: true,
             gui,
@@ -88,7 +102,23 @@ impl PlayKid {
             last_update: Instant::now(),
             screen_texture: texture,
             gilrs: Gilrs::new().unwrap(),
+            args: Args::default(),
+            rx_load,
         }
+    }
+
+    /// Helper to create a machine instance from a path
+    fn create_machine(path: &std::path::PathBuf, skipcheck: bool, debug: bool) -> Option<Machine> {
+        if let Some(rom_str) = path.to_str() {
+            match Cartridge::new(rom_str, skipcheck) {
+                Ok(mut cart) => {
+                    cart.load_sram();
+                    return Some(Machine::new(cart, debug));
+                }
+                Err(e) => eprintln!("Failed to load ROM: {}", e),
+            }
+        }
+        None
     }
 
     /// Handle requests from the GUI.
@@ -111,127 +141,123 @@ impl PlayKid {
         }
 
         ctx.input(|i| {
-            let mut handled = false;
+            // GLOBAL INPUTS.
             // Exit.
-            if !handled && i.key_pressed(egui::Key::Escape) {
+            if i.key_pressed(egui::Key::Escape) {
                 self.running = false;
-                handled = true;
             }
-            // Debug.
-            if !handled && i.key_pressed(egui::Key::D) {
-                let d = self.machine.debug.toggle_debugging();
-                self.machine.debug.set_paused(d);
-                self.gui.show_debugger(d);
-            }
-            // Reset.
-            if i.key_pressed(egui::Key::R) {
-                self.machine.reset();
-                self.gui.add_info_toast("CPU reset");
-                handled = true;
-            }
-            // Palette change.
-            if !handled && i.key_pressed(egui::Key::P) {
-                self.machine.memory.ppu.cycle_palette();
-                self.gui.add_info_toast(&format!(
-                    "Palette changed to {}",
-                    self.machine.memory.ppu.get_palette_name()
-                ));
-                handled = true;
-            }
-            // FPS.
-            if !handled && i.key_pressed(egui::Key::F) {
-                self.gui.toggle_fps();
-                handled = true;
-            }
-            // Write SRAM.
-            if !handled && i.key_pressed(egui::Key::W) {
-                if self.machine.memory.cart.is_dirty() {
-                    self.machine.memory.cart.save_sram();
-                    self.machine.memory.cart.consume_dirty();
-                    self.gui.add_info_toast(&format!(
-                        "SRAM file written: {:?}",
-                        self.machine.memory.cart.get_sram_path()
-                    ));
+            // MACHINE INPUTS.
+            if let Some(ref mut machine) = self.machine {
+                let mut handled = false;
+
+                // Debug.
+                if !handled && i.key_pressed(egui::Key::D) {
+                    let d = machine.debug.toggle_debugging();
+                    machine.debug.set_paused(d);
+                    self.gui.show_debugger(d);
                 }
-                handled = true;
-            }
 
-            // Screenshot logic
-            if !handled && i.key_released(egui::Key::S) {
-                self.screenshot();
-                handled = true;
-            }
+                // Reset.
+                if i.key_pressed(egui::Key::R) {
+                    machine.reset();
+                    self.gui.add_info_toast("CPU reset");
+                    handled = true;
+                }
 
-            if !handled {
-                self.machine.handle_event(i);
+                // Palette change.
+                if !handled && i.key_pressed(egui::Key::P) {
+                    machine.memory.ppu.cycle_palette();
+                    self.gui.add_info_toast(&format!(
+                        "Palette changed to {}",
+                        machine.memory.ppu.get_palette_name()
+                    ));
+                    handled = true;
+                }
+
+                // FPS.
+                if !handled && i.key_pressed(egui::Key::F) {
+                    self.gui.toggle_fps();
+                    handled = true;
+                }
+
+                // Write SRAM.
+                if !handled && i.key_pressed(egui::Key::W) {
+                    if machine.memory.cart.is_dirty() {
+                        machine.memory.cart.save_sram();
+                        machine.memory.cart.consume_dirty();
+                        self.gui.add_info_toast(&format!(
+                            "SRAM file written: {:?}",
+                            machine.memory.cart.get_sram_path()
+                        ));
+                    }
+                    handled = true;
+                }
+
+                // Machine-specific input handling.
+                if !handled {
+                    handled = machine.handle_event(i);
+                }
+
+                // Screenshot logic
+                if !handled && i.key_released(egui::Key::S) {
+                    self.screenshot();
+                }
             }
         });
     }
 
     /// Creates a screenshot from the front frame buffer of the PPU.
     fn screenshot(&mut self) {
-        let fb = &self.machine.memory.ppu.fb_front;
-        if let Ok(name) = save_screenshot(DISPLAY_WIDTH, DISPLAY_HEIGHT, fb) {
-            println!("Screenshot saved: {}", name);
-            self.gui
-                .add_info_toast(&format!("Screenshot saved: {}", name));
+        if let Some(ref machine) = self.machine {
+            let fb = &machine.memory.ppu.fb_front;
+            if let Ok(name) = save_screenshot(DISPLAY_WIDTH, DISPLAY_HEIGHT, fb) {
+                println!("Screenshot saved: {}", name);
+                self.gui
+                    .add_info_toast(&format!("Screenshot saved: {}", name));
+            }
         }
     }
 
     /// Handle controller/gamepad input.
     fn handle_controller_input(&mut self) {
-        // Examine all events from the controller
+        // Examine all events from the controller.
         while let Some(Event { id, event, .. }) = self.gilrs.next_event() {
-            let handled = match event {
+            let mut handled = match event {
                 EventType::Connected => {
                     let gamepad = self.gilrs.gamepad(id);
-                    println!(
-                        "{}: Gamepad connected: {} (VID: {:04x} PID: {:04x})",
-                        "OK".green(),
-                        gamepad.name().yellow(),
-                        gamepad.vendor_id().unwrap_or(0),
-                        gamepad.product_id().unwrap_or(0)
-                    );
                     self.gui
                         .add_info_toast(&format!("Gamepad connected: {}", gamepad.name()));
                     true
                 }
                 EventType::Disconnected => {
-                    let gamepad = self.gilrs.gamepad(id);
-                    println!(
-                        "{}: Gamepad disconnected: {} (VID: {:04x} PID: {:04x})",
-                        "WARN".yellow(),
-                        gamepad.name().yellow(),
-                        gamepad.vendor_id().unwrap_or(0),
-                        gamepad.product_id().unwrap_or(0)
-                    );
-                    self.gui
-                        .add_info_toast(&format!("Gamepad disconnected: {}", gamepad.name()));
+                    self.gui.add_info_toast("Gamepad disconnected");
                     true
                 }
-                EventType::ButtonReleased(button, _) => match button {
-                    gilrs::Button::LeftTrigger => {
-                        self.machine.memory.ppu.cycle_palette_rev();
-                        self.gui.add_info_toast(&format!(
-                            "Palette changed to {}",
-                            self.machine.memory.ppu.get_palette_name()
-                        ));
-                        true
-                    }
-                    gilrs::Button::RightTrigger => {
-                        self.machine.memory.ppu.cycle_palette();
-                        self.gui.add_info_toast(&format!(
-                            "Palette changed to {}",
-                            self.machine.memory.ppu.get_palette_name()
-                        ));
-                        true
-                    }
-                    _ => false,
-                },
                 _ => false,
             };
+
+            // Trigger Machine-specific controller logic.
             if !handled {
-                self.machine.memory.joypad.handle_controller_input(event);
+                if let Some(ref mut machine) = self.machine {
+                    handled = match event {
+                        EventType::ButtonReleased(button, _) => match button {
+                            gilrs::Button::LeftTrigger => {
+                                machine.memory.ppu.cycle_palette_rev();
+                                true
+                            }
+                            gilrs::Button::RightTrigger => {
+                                machine.memory.ppu.cycle_palette();
+                                true
+                            }
+                            _ => false,
+                        },
+                        _ => false,
+                    };
+
+                    if !handled {
+                        machine.memory.joypad.handle_controller_input(event);
+                    }
+                }
             }
         }
     }
@@ -239,6 +265,22 @@ impl PlayKid {
 
 impl eframe::App for PlayKid {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Check if ROM load has been requested via the channel.
+        if let Ok(maybe_rom_path) = self.rx_load.try_recv() {
+            self.gui.ui_state.is_picking_file = false;
+            if let Some(rom_path) = maybe_rom_path {
+                // A file was actually chosen.
+                if let Some(ref mut m) = self.machine {
+                    m.memory.cart.save_sram();
+                }
+                self.machine =
+                    Self::create_machine(&rom_path, self.args.skipcheck, self.args.debug);
+                self.last_update = std::time::Instant::now();
+                self.gui
+                    .add_info_toast(&format!("ROM Loaded: {:?}", rom_path));
+            }
+        }
+
         // Mouse/Kbd input.
         self.handle_inputs(ctx);
         // Controller input.
@@ -251,32 +293,34 @@ impl eframe::App for PlayKid {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
 
-        // Emulator Heartbeat.
-        let mut frame_ready = false;
-        let now = Instant::now();
-        let mut dt = now.duration_since(self.last_update);
+        if let Some(ref mut machine) = self.machine {
+            // Emulator Heartbeat.
+            let mut frame_ready = false;
+            let now = Instant::now();
+            let mut dt = now.duration_since(self.last_update);
 
-        // Cap dt to a few milliseconds.
-        if dt > Duration::from_millis(100) {
-            dt = TARGET_FRAME_DURATION;
-            self.last_update = now - dt;
-        }
+            // Cap dt to a few milliseconds.
+            if dt > Duration::from_millis(100) {
+                dt = TARGET_FRAME_DURATION;
+                self.last_update = now - dt;
+            }
 
-        // Update.
-        while dt >= TARGET_FRAME_DURATION {
-            self.machine.update();
-            dt -= TARGET_FRAME_DURATION;
-            self.last_update += TARGET_FRAME_DURATION;
-            frame_ready = true;
-        }
+            // Update.
+            while dt >= TARGET_FRAME_DURATION {
+                machine.update();
+                dt -= TARGET_FRAME_DURATION;
+                self.last_update += TARGET_FRAME_DURATION;
+                frame_ready = true;
+            }
 
-        // Render LCD to texture.
-        if frame_ready {
-            let size = [DISPLAY_WIDTH, DISPLAY_HEIGHT];
-            let color_image =
-                egui::ColorImage::from_rgba_unmultiplied(size, &self.machine.memory.ppu.fb_front);
-            self.screen_texture
-                .set(color_image, egui::TextureOptions::NEAREST);
+            // Render LCD to texture.
+            if frame_ready {
+                let size = [DISPLAY_WIDTH, DISPLAY_HEIGHT];
+                let color_image =
+                    egui::ColorImage::from_rgba_unmultiplied(size, &machine.memory.ppu.fb_front);
+                self.screen_texture
+                    .set(color_image, egui::TextureOptions::NEAREST);
+            }
         }
 
         // Render GUI.
@@ -312,7 +356,9 @@ impl eframe::App for PlayKid {
 
     /// Runs on exit.
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        self.machine.memory.cart.save_sram();
+        if let Some(ref mut machine) = self.machine {
+            machine.memory.cart.save_sram();
+        }
     }
 }
 

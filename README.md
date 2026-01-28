@@ -58,8 +58,10 @@ Build the project with `cargo build`.
 The usual Rust stuff.
 
 ```bash
-  cargo run -- [ROM_FILE]
+  cargo run
 ```
+
+You can also pass in a ROM file with `cargo run -- [ROM_FILE]`.
 
 Make the binary with:
 
@@ -68,6 +70,8 @@ Make the binary with:
 ```
 
 # Operation
+
+If you don't pass in any ROM file when you open the emulator, you need to select using the top menu bar, <kbd>File</kbd> > <kbd>Open ROM...</kbd>.
 
 Here are the Joypad keyboard mappings:
 
@@ -92,7 +96,7 @@ You can also use the provided UI.
 
 # Debug panel
 
-You can open the debug panel any time by pressing <kbd>d</kbd>, by clikcing on `Machine` > `Debug panel...`, or activate it at launch with the `-d`/`--debug` flag. The debug panel shows up to the right. It provides a view of the internal state of the emulator, with:
+You can open the debug panel any time by pressing <kbd>d</kbd>, by clicking on `Machine` > `Debug panel...`, or activate it at launch with the `-d`/`--debug` flag. The debug panel shows up to the right. It provides a view of the internal state of the emulator, with:
 
 - Current address, instruction, operands, and opcode, to the top.
 - Internal state of CPU, PPU, and JOYP, to the left.
@@ -117,14 +121,15 @@ You can also use breakpoints. A list with the current breakpoint addresses is pr
 There are some CLI arguments that you can use:
 
 ```
-Play Kid 0.1.0
+Play Kid 0.4.0
+Toni Sagristà - tonisagrista.com
 
 Minimalist Game Boy emulator for the cool kids.
 
-Usage: playkid [OPTIONS] <INPUT>
+Usage: playkid [OPTIONS] [INPUT]
 
 Arguments:
-  <INPUT>  Path to the input ROM file to load
+  [INPUT]  Path to the input ROM file to load
 
 Options:
   -s, --scale <SCALE>  Initial window scale. It can also be resized manually [default: 4]

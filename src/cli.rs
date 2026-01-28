@@ -15,7 +15,7 @@ use std::path::PathBuf;
 /// of Play Kid.
 pub struct Args {
     /// Path to the input ROM file to load.
-    pub input: PathBuf,
+    pub input: Option<PathBuf>,
     /// Initial window scale. It can also be resized manually.
     #[arg(short, long, default_value_t = 4, value_parser = clap::value_parser!(u8).range(1..15))]
     pub scale: u8,
@@ -28,4 +28,17 @@ pub struct Args {
     /// Skip global checksum, header checksum, and logo sequence check.
     #[arg(long)]
     pub skipcheck: bool,
+}
+
+impl Args {
+    /// Creates an Args instance with the default values.
+    pub fn default() -> Args {
+        Args {
+            input: None,
+            scale: 4,
+            debug: false,
+            fps: false,
+            skipcheck: false,
+        }
+    }
 }
