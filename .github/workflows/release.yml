@@ -64,19 +64,26 @@ jobs:
             | jq -r '.packages[0].version')" >> $GITHUB_ENV
 
       - name: Package Binaries
+        shell: bash
         run: |
+          FULL_NAME="${{ matrix.asset_name }}"
+          BASE_NAME="${FULL_NAME%.*}"
+          FINAL_NAME="${BASE_NAME}-${{ env.VERSION }}"
+    
           cd target/${{ matrix.target }}/release
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then 
-            7z a ../../../${{ matrix.asset_name%.* }}-${{ env.VERSION }}.zip ${{ matrix.bin }}; 
+            7z a ../../../${FINAL_NAME}.zip ${{ matrix.bin }}
           else 
-            tar -czf ../../../${{ matrix.asset_name%.* }}-${{ env.VERSION }}.tar.gz ${{ matrix.bin }}; 
+            tar -czf ../../../${FINAL_NAME}.tar.gz ${{ matrix.bin }}
           fi
+          # Store this for the next step
+          echo "ASSET_PATH=${FINAL_NAME}.*" >> $GITHUB_ENV
 
       - name: Upload temporary artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}-${{ env.VERSION }}
-          path: ${{ matrix.asset_name%.* }}-${{ env.VERSION }}.*
+          path: ${{ env.ASSET_PATH }}
           retention-days: 1
           
   release:

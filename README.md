@@ -61,7 +61,7 @@ The usual Rust stuff.
   cargo run
 ```
 
-You can also pass in a ROM file with `cargo run -- [ROM_FILE]`.
+You can also pass in a ROM file with `cargo run -- your-rom.gb`.
 
 Make the binary with:
 
@@ -71,7 +71,7 @@ Make the binary with:
 
 # Operation
 
-If you don't pass in any ROM file when you open the emulator, you need to select using the top menu bar, <kbd>File</kbd> > <kbd>Open ROM...</kbd>.
+If you don't pass in any ROM file as an argument, you need to select using the top menu bar, <kbd>File</kbd>▶<kbd>Open ROM...</kbd>.
 
 Here are the Joypad keyboard mappings:
 
@@ -96,7 +96,7 @@ You can also use the provided UI.
 
 # Debug panel
 
-You can open the debug panel any time by pressing <kbd>d</kbd>, by clicking on `Machine` > `Debug panel...`, or activate it at launch with the `-d`/`--debug` flag. The debug panel shows up to the right. It provides a view of the internal state of the emulator, with:
+You can open the debug panel any time by pressing <kbd>d</kbd>, by clicking on <kbd>Machine</kbd>▶<kbd>Debug panel...</kbd>, or activate it at launch with the `-d`/`--debug` flag. The debug panel shows up to the right. It provides a view of the internal state of the emulator, with:
 
 - Current address, instruction, operands, and opcode, to the top.
 - Internal state of CPU, PPU, and JOYP, to the left.
