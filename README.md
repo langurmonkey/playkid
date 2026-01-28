@@ -27,7 +27,6 @@ Here are the main features of Play Kid:
   - Displays internal state of CPU, PPU, and Joypad.
   - Full program disassembly, with breakpoints.
 - Save RAM to `.sav` files to emulate the battery-backed SRAM. Those are saved every minute.
-- Automatically adapts to multi-DPI setups by scaling the UI.
 - Working games/roms:
   - Passes `dmg-acid2`
   - Tetris
