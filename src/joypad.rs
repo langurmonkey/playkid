@@ -108,8 +108,6 @@ impl eventhandler::EventHandler for Joypad {
 
 impl Joypad {
     pub fn new() -> Self {
-        
-
         Joypad {
             joyp: 0xFF,
             select_buttons: false,
@@ -238,7 +236,6 @@ impl Joypad {
 
     /// Game controller button handling.
     fn update_button(&mut self, button: Button, pressed: bool) {
-        println!("Button: {:?} {}", button, pressed);
         match button {
             Button::South | Button::East => self.a = pressed,
             Button::North | Button::West => self.b = pressed,
