@@ -167,6 +167,7 @@ impl PlayKid {
                 // Palette change.
                 if !handled && i.key_pressed(egui::Key::P) {
                     machine.memory.ppu.cycle_palette();
+                    self.gui.clear_toasts();
                     self.gui.add_info_toast(&format!(
                         "Palette changed to {}",
                         machine.memory.ppu.get_palette_name()

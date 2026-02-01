@@ -3,12 +3,13 @@ use crate::instruction::RunInstr;
 use crate::machine::Machine;
 use crate::uistate::UIState;
 use egui::{
-    Align2, CollapsingHeader, Color32, Context, FontFamily, FontId, Frame, RichText, ScrollArea,
-    Sense, TextEdit, text::LayoutJob, vec2,
+    CollapsingHeader, Color32, Context, FontFamily, FontId, Frame, RichText, ScrollArea, Sense,
+    TextEdit, text::LayoutJob, vec2,
 };
-use egui_toast::{Toast, Toasts};
+use egui_notify::{Anchor, Toast, Toasts};
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
+use std::time::Duration;
 
 pub const BLUE: Color32 = Color32::from_rgb(66, 133, 244);
 pub const GRAY: Color32 = Color32::from_rgb(127, 127, 127);
@@ -74,28 +75,22 @@ impl Gui {
             breakpoint_error: false,
             logo_texture: None,
             last_pc: 0,
-            toasts: Toasts::new().anchor(Align2::LEFT_TOP, (10.0, 30.0)),
+            toasts: Toasts::default().with_anchor(Anchor::BottomLeft),
             load_tx,
         }
     }
 
-    /// Adds an information toast with the given text.
-    pub fn add_info_toast(&mut self, text: &str) {
-        let t = egui_toast::Toast {
-            text: text.into(),
-            kind: egui_toast::ToastKind::Info,
-            options: egui_toast::ToastOptions::default()
-                .duration_in_seconds(3.0)
-                .show_progress(true)
-                .show_icon(true),
-            ..Default::default()
-        };
-        self.add_toast(t);
+    pub fn clear_toasts(&mut self) {
+        self.toasts.dismiss_all_toasts();
     }
 
-    /// Adds the given toast.
-    pub fn add_toast(&mut self, toast: Toast) {
-        self.toasts.add(toast);
+    /// Adds an information toast with the given text.
+    pub fn add_info_toast(&mut self, text: &str) {
+        self.toasts
+            .info(text)
+            .duration(Some(Duration::from_secs(3)))
+            .level(egui_notify::ToastLevel::Info)
+            .closable(true);
     }
 
     /// Toggle state of FPS.
