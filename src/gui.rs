@@ -6,7 +6,7 @@ use egui::{
     CollapsingHeader, Color32, Context, FontFamily, FontId, Frame, RichText, ScrollArea, Sense,
     TextEdit, text::LayoutJob, vec2,
 };
-use egui_notify::{Anchor, Toast, Toasts};
+use egui_notify::{Anchor, Toasts};
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
